@@ -1,0 +1,124 @@
+<Page x:Class="WallYouNeed.App.Pages.CategoryPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:local="clr-namespace:WallYouNeed.App.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="650" d:DesignWidth="800"
+      Title="CategoryPage">
+
+    <Grid Margin="18">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Margin="0,0,0,20">
+            <TextBlock 
+                x:Name="CategoryTitleTextBlock"
+                Text="{Binding CategoryTitle}" 
+                FontSize="28" 
+                FontWeight="SemiBold"
+                Foreground="{ui:ThemeResource TextFillColorPrimaryBrush}"/>
+            <TextBlock 
+                x:Name="CategoryDescriptionTextBlock"
+                Text="{Binding CategoryDescription}" 
+                FontSize="16" 
+                Margin="0,8,0,0"
+                Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"/>
+        </StackPanel>
+
+        <!-- Actions -->
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,16">
+            <ui:Button
+                x:Name="SortButton"
+                Content="Sort Wallpapers"
+                Icon="ArrowSort20"
+                Margin="0,0,8,0"
+                Click="SortButton_Click"/>
+            <ui:Button
+                x:Name="AddWallpaperButton"
+                Content="Add Wallpaper"
+                Icon="Add20"
+                Appearance="Primary"
+                Click="AddWallpaperButton_Click"/>
+        </StackPanel>
+
+        <!-- Content -->
+        <Grid Grid.Row="2">
+            <!-- Loading Spinner -->
+            <ui:ProgressRing
+                x:Name="LoadingProgressRing"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Center"
+                Width="40"
+                Height="40" 
+                IsIndeterminate="True"
+                Visibility="Collapsed"/>
+            
+            <!-- Empty State -->
+            <StackPanel 
+                x:Name="NoWallpapersMessage"
+                HorizontalAlignment="Center" 
+                VerticalAlignment="Center" 
+                Visibility="Collapsed">
+                <ui:SymbolIcon 
+                    Symbol="Image24" 
+                    FontSize="48" 
+                    HorizontalAlignment="Center"
+                    Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"/>
+                <TextBlock 
+                    Text="No wallpapers in this category" 
+                    FontSize="16" 
+                    Margin="0,12,0,8"
+                    HorizontalAlignment="Center"
+                    Foreground="{ui:ThemeResource TextFillColorSecondaryBrush}"/>
+                <TextBlock 
+                    Text="Add wallpapers to this category to see them here" 
+                    FontSize="14" 
+                    TextWrapping="Wrap"
+                    HorizontalAlignment="Center"
+                    TextAlignment="Center"
+                    MaxWidth="300"
+                    Foreground="{ui:ThemeResource TextFillColorTertiaryBrush}"/>
+            </StackPanel>
+            
+            <!-- Wallpapers list -->
+            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                <WrapPanel 
+                    x:Name="WallpapersPanel" 
+                    Orientation="Horizontal" 
+                    HorizontalAlignment="Left">
+                    <!-- Wallpaper cards will be added here dynamically -->
+                    
+                    <!-- Sample card for design time -->
+                    <ui:Card 
+                        d:Visibility="Visible"
+                        Visibility="Collapsed"
+                        Margin="8"
+                        Width="280"
+                        Height="200">
+                        <Grid>
+                            <Image Source="/Assets/SampleWallpaper.jpg" Stretch="UniformToFill"/>
+                            <Border Background="#B0000000" VerticalAlignment="Bottom" Padding="10,8,10,8">
+                                <StackPanel>
+                                    <TextBlock Text="Sample Wallpaper" Foreground="White" FontSize="14" FontWeight="SemiBold"/>
+                                    <TextBlock Text="Source: Example.com" Foreground="LightGray" FontSize="12" Margin="0,4,0,0"/>
+                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,8,0,0">
+                                        <ui:Button Content="Apply" Appearance="Primary" Padding="8,4,8,4" Margin="0,0,4,0" FontSize="12"/>
+                                        <ui:Button Content="♡" Appearance="Secondary" Padding="8,4,8,4" Margin="4,0,4,0" FontSize="12"/>
+                                        <ui:Button Content="⋮" Appearance="Secondary" Padding="8,4,8,4" Margin="4,0,0,0" FontSize="12"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </ui:Card>
+                </WrapPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page> 

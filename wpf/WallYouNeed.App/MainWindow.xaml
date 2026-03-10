@@ -1,0 +1,473 @@
+<Window x:Class="WallYouNeed.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+        xmlns:local="clr-namespace:WallYouNeed.App"
+        mc:Ignorable="d"
+        Title="Wall-You-Need" 
+        Height="800" 
+        Width="1200"
+        MinWidth="200"
+        WindowStartupLocation="CenterScreen"
+        WindowStyle="None"
+        ResizeMode="CanResizeWithGrip"
+        Background="{DynamicResource ApplicationBackgroundBrush}"
+        BorderThickness="1"
+        Icon="pack://application:,,,/Assets/logo.png"
+        BorderBrush="{DynamicResource ControlElevationBorderBrush}">
+
+    <Window.Resources>
+        <!-- Nav button style -->
+        <Style x:Key="NavButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="60"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Width="52" Height="60">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="32"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Background rectangle that spans entire button -->
+                            <Rectangle x:Name="BackgroundRect" Grid.RowSpan="2" Fill="Transparent" RadiusX="6" RadiusY="6" 
+                                     Width="60" Height="64" Margin="-4,-2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            
+                            <!-- Icon Container - Fixed position -->
+                            <Grid Grid.Row="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ContentPresenter x:Name="ButtonContent" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                            
+                            <!-- Text Label - Fixed position -->
+                            <TextBlock Grid.Row="1" 
+                                       x:Name="ButtonText" 
+                                       Text="{TemplateBinding Tag}" 
+                                       FontSize="9" 
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" 
+                                       TextAlignment="Center"
+                                       Width="60"
+                                       Height="24"
+                                       Margin="0,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonText" Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                <Setter TargetName="BackgroundRect" Property="Fill" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Two-line nav button style -->
+        <Style x:Key="TwoLineNavButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="60"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Width="52" Height="60">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="32"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Background rectangle that spans entire button -->
+                            <Rectangle x:Name="BackgroundRect" Grid.RowSpan="2" Fill="Transparent" RadiusX="6" RadiusY="6" 
+                                     Width="60" Height="64" Margin="-4,-2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            
+                            <!-- Icon Container - Fixed position -->
+                            <Grid Grid.Row="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ContentPresenter x:Name="ButtonContent" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                            
+                            <!-- Text Label - Two Lines -->
+                            <TextBlock Grid.Row="1" 
+                                       x:Name="ButtonText" 
+                                       Text="{TemplateBinding Tag}" 
+                                       FontSize="8" 
+                                       Foreground="{DynamicResource TextFillColorSecondaryBrush}"
+                                       HorizontalAlignment="Center" 
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Width="60"
+                                       Height="24"
+                                       Margin="0,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="ButtonText" Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+                                <Setter TargetName="BackgroundRect" Property="Fill" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Active two-line nav button style -->
+        <Style x:Key="ActiveTwoLineNavButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="60"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Width="52" Height="60">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="32"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Background rectangle that spans entire button -->
+                            <Rectangle x:Name="BackgroundRect" Grid.RowSpan="2" Fill="Transparent" RadiusX="6" RadiusY="6"
+                                     Width="60" Height="64" Margin="-4,-2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            
+                            <!-- Selection Indicator -->
+                            <Border Grid.Row="0" Width="4" Height="20" Background="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Left" Margin="-24,0,0,0" CornerRadius="0,2,2,0" VerticalAlignment="Center"/>
+                            
+                            <!-- Icon Container - Fixed position -->
+                            <Grid Grid.Row="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ContentPresenter x:Name="ButtonContent" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                            
+                            <!-- Text Label - Two Lines -->
+                            <TextBlock Grid.Row="1" 
+                                       x:Name="ButtonText" 
+                                       Text="{TemplateBinding Tag}" 
+                                       FontSize="8" 
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center" 
+                                       TextAlignment="Center"
+                                       TextWrapping="Wrap"
+                                       Width="60"
+                                       Height="24"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BackgroundRect" Property="Fill" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Active nav button style -->
+        <Style x:Key="ActiveNavButton" TargetType="Button">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Width" Value="52"/>
+            <Setter Property="Height" Value="60"/>
+            <Setter Property="Margin" Value="0,4"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Width="52" Height="60">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="32"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Background rectangle that spans entire button -->
+                            <Rectangle x:Name="BackgroundRect" Grid.RowSpan="2" Fill="Transparent" RadiusX="6" RadiusY="6"
+                                     Width="60" Height="64" Margin="-4,-2" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            
+                            <!-- Selection Indicator -->
+                            <Border Grid.Row="0" Width="4" Height="20" Background="{DynamicResource AccentFillColorDefaultBrush}" HorizontalAlignment="Left" Margin="-24,0,0,0" CornerRadius="0,2,2,0" VerticalAlignment="Center"/>
+                            
+                            <!-- Icon Container - Fixed position -->
+                            <Grid Grid.Row="0" Width="24" Height="24" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                <ContentPresenter x:Name="ButtonContent" Width="24" Height="24" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Grid>
+                            
+                            <!-- Text Label - Fixed position -->
+                            <TextBlock Grid.Row="1" 
+                                       x:Name="ButtonText" 
+                                       Text="{TemplateBinding Tag}" 
+                                       FontSize="9" 
+                                       Foreground="{DynamicResource AccentTextFillColorPrimaryBrush}"
+                                       HorizontalAlignment="Center" 
+                                       TextAlignment="Center"
+                                       Width="60"
+                                       Height="24"
+                                       FontWeight="SemiBold"
+                                       Margin="0,0,0,0"/>
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="BackgroundRect" Property="Fill" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Search box style -->
+        <Style x:Key="SearchBoxStyle" TargetType="TextBox">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Padding" Value="8,6"/>
+            <Setter Property="VerticalContentAlignment" Value="Center"/>
+            <Setter Property="Foreground" Value="{DynamicResource TextFillColorPrimaryBrush}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="TextBox">
+                        <Border x:Name="border" 
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}" 
+                                SnapsToDevicePixels="True">
+                            <ScrollViewer x:Name="PART_ContentHost" Focusable="false" 
+                                          HorizontalScrollBarVisibility="Hidden" 
+                                          VerticalScrollBarVisibility="Hidden"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Resize grip style -->
+        <Style x:Key="ResizeGripStyle" TargetType="Rectangle">
+            <Setter Property="Fill" Value="Transparent"/>
+            <Setter Property="Opacity" Value="0"/>
+        </Style>
+    </Window.Resources>
+
+    <!-- Main Window Content -->
+    <Grid>
+        <Border BorderBrush="{DynamicResource ControlElevationBorderBrush}" BorderThickness="1">
+            <Grid>
+                <!-- Custom Title Bar with Search -->
+                <Grid Height="52" VerticalAlignment="Top" Background="{DynamicResource ApplicationBackgroundBrush}" Margin="0,0,0,0" MouseLeftButtonDown="TitleBar_MouseLeftButtonDown">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+                    
+                    <!-- App Logo and Title -->
+                    <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="12,0,0,0" VerticalAlignment="Center">
+                        <Image Source="pack://application:,,,/Assets/logo.png" Height="24" Width="24" Margin="0,0,8,0"/>
+                        <TextBlock Text="Wall-You-Need" FontWeight="SemiBold" FontSize="16" Foreground="{DynamicResource TextFillColorPrimaryBrush}" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <!-- Search Box (Center-aligned) -->
+                    <Grid Grid.Column="1" VerticalAlignment="Center" HorizontalAlignment="Center" Margin="0,0,0,0">
+                        <Border Background="{DynamicResource ControlFillColorDefaultBrush}" CornerRadius="5" Width="300" Height="32">
+                            <Grid>
+                                <!-- Search Text Input -->
+                                <TextBox x:Name="SearchBox" 
+                                         BorderThickness="0" 
+                                         Background="Transparent" 
+                                         Padding="8,6,80,6" 
+                                         Text="Search..." 
+                                         Foreground="{DynamicResource TextFillColorSecondaryBrush}" 
+                                         CaretBrush="{DynamicResource TextFillColorPrimaryBrush}"
+                                         SelectionBrush="{DynamicResource TextFillColorSecondaryBrush}"
+                                         VerticalContentAlignment="Center"/>
+                                
+                                <!-- Clear (X) Button -->
+                                <Border x:Name="ClearButtonBorder" 
+                                        Width="32" Height="24" 
+                                        Background="Transparent" 
+                                        CornerRadius="3"
+                                        Margin="0,0,42,0" 
+                                        VerticalAlignment="Center" 
+                                        HorizontalAlignment="Right"
+                                        Visibility="Collapsed"
+                                        Panel.ZIndex="10">
+                                    <Button x:Name="ClearSearchButton"
+                                            Width="32" Height="24"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            ToolTip="Clear search"
+                                            Padding="0">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="ButtonBorder" 
+                                                                    Background="Transparent" 
+                                                                    CornerRadius="3"
+                                                                    BorderThickness="0">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                        <Path Data="M19,6.41L17.59,5L12,10.59L6.41,5L5,6.41L10.59,12L5,17.59L6.41,19L12,13.41L17.59,19L19,17.59L13.41,12L19,6.41Z" 
+                                              Fill="{DynamicResource TextFillColorPrimaryBrush}" 
+                                              Width="12" 
+                                              Height="12"
+                                              Stretch="Uniform"/>
+                                    </Button>
+                                </Border>
+                                
+                                <!-- Search Button -->
+                                <Border x:Name="SearchButtonBorder"
+                                        Width="32" Height="24"
+                                        Background="Transparent"
+                                        CornerRadius="3"
+                                        Margin="0,0,8,0"
+                                        HorizontalAlignment="Right"
+                                        VerticalAlignment="Center"
+                                        Panel.ZIndex="10">
+                                    <Button x:Name="SearchButton"
+                                            Width="32" Height="24"
+                                            Background="Transparent"
+                                            BorderThickness="0"
+                                            Cursor="Hand"
+                                            ToolTip="Search"
+                                            Padding="0">
+                                        <Button.Style>
+                                            <Style TargetType="Button">
+                                                <Setter Property="Template">
+                                                    <Setter.Value>
+                                                        <ControlTemplate TargetType="Button">
+                                                            <Border x:Name="ButtonBorder" 
+                                                                    Background="Transparent" 
+                                                                    CornerRadius="3"
+                                                                    BorderThickness="0">
+                                                                <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                                            </Border>
+                                                            <ControlTemplate.Triggers>
+                                                                <Trigger Property="IsMouseOver" Value="True">
+                                                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ControlFillColorSecondaryBrush}"/>
+                                                                </Trigger>
+                                                                <Trigger Property="IsPressed" Value="True">
+                                                                    <Setter TargetName="ButtonBorder" Property="Background" Value="{DynamicResource ControlFillColorTertiaryBrush}"/>
+                                                                </Trigger>
+                                                            </ControlTemplate.Triggers>
+                                                        </ControlTemplate>
+                                                    </Setter.Value>
+                                                </Setter>
+                                            </Style>
+                                        </Button.Style>
+                                        <Path Data="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z" 
+                                              Fill="{DynamicResource TextFillColorPrimaryBrush}" 
+                                              Width="14" 
+                                              Height="14"
+                                              Stretch="Uniform"/>
+                                    </Button>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                    
+                    <!-- Window Controls (minimize, maximize, close) -->
+                    <StackPanel Grid.Column="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                        <Button x:Name="MinimizeButton" Content="—" Width="46" Height="30" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Background="Transparent" BorderThickness="0" Click="MinimizeButton_Click"/>
+                        <Button x:Name="MaximizeButton" Content="□" Width="46" Height="30" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Background="Transparent" BorderThickness="0" Click="MaximizeButton_Click"/>
+                        <Button x:Name="CloseButton" Content="✕" Width="46" Height="30" Foreground="{DynamicResource TextFillColorPrimaryBrush}" Background="Transparent" BorderThickness="0" Click="CloseButton_Click"/>
+                    </StackPanel>
+                </Grid>
+
+                <!-- Main Content Area -->
+                <Grid Margin="0,52,0,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="80"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <!-- Left Navigation Bar -->
+                    <Border Grid.Column="0" Background="{DynamicResource ControlFillColorDefaultBrush}" BorderThickness="0,0,1,0" BorderBrush="{DynamicResource ControlElevationBorderBrush}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            
+                            <!-- Navigation Items -->
+                            <StackPanel Grid.Row="0" Margin="0,12,0,0">
+                                <!-- Home (Active) -->
+                                <Button x:Name="HomeButton" Style="{StaticResource ActiveNavButton}" Tag="Home" Click="HomeButton_Click">
+                                    <Image Source="pack://application:,,,/Assets/home.png" Width="24" Height="24"/>
+                                </Button>
+
+                                <!-- Collections -->
+                                <Button x:Name="CollectionButton" Style="{StaticResource NavButton}" Tag="Collections" Click="CollectionButton_Click">
+                                    <Image Source="pack://application:,,,/Assets/collections.png" Width="24" Height="24"/>
+                                </Button>
+
+                                <!-- AI Generated -->
+                                <Button Style="{StaticResource TwoLineNavButton}" Tag="AI generated">
+                                    <Image Source="pack://application:,,,/Assets/aigenerated.png" Width="24" Height="24"/>
+                                </Button>
+                                
+                                <!-- Personal -->
+                                <Button Style="{StaticResource NavButton}" Tag="Personal">
+                                    <Image Source="pack://application:,,,/Assets/personal.png" Width="24" Height="24"/>
+                                </Button>
+                                
+                                <!-- Slideshow -->
+                                <Button Style="{StaticResource NavButton}" Tag="Slideshow">
+                                    <Image Source="pack://application:,,,/Assets/slideshow.png" Width="24" Height="24"/>
+                                </Button>
+                                
+                                <!-- Interactive Slideshow -->
+                                <Button Style="{StaticResource TwoLineNavButton}" Tag="Interactive slideshow">
+                                    <Image Source="pack://application:,,,/Assets/interactive.png" Width="24" Height="24"/>
+                                </Button>
+                                
+                                <!-- Widgets -->
+                                <Button Style="{StaticResource NavButton}" Tag="Widgets">
+                                    <Image Source="pack://application:,,,/Assets/widget.png" Width="24" Height="24"/>
+                                </Button>
+                                
+                                <!-- Upload Wallpaper -->
+                                <Button Style="{StaticResource TwoLineNavButton}" Tag="Upload wallpaper">
+                                    <Image Source="pack://application:,,,/Assets/upload.png" Width="24" Height="24"/>
+                                </Button>
+                            </StackPanel>
+                            
+                            <!-- Bottom Options -->
+                            <StackPanel Grid.Row="1" Margin="0,0,0,12">
+                                <!-- Account -->
+                                <Button Style="{StaticResource NavButton}" Tag="My account">
+                                    <Image Source="pack://application:,,,/Assets/account.png" Width="24" Height="24"/>
+                                </Button>
+
+                                <!-- Settings -->
+                                <Button x:Name="SettingsButton" Style="{StaticResource NavButton}" Tag="Settings" Click="SettingsButton_Click">
+                                    <Image Source="pack://application:,,,/Assets/settings.png" Width="24" Height="24"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                        
+                    <!-- Main Content Frame -->
+                    <Frame Grid.Column="1" x:Name="ContentFrame" NavigationUIVisibility="Hidden" Background="#FFFFFF"/>
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
+</Window> 

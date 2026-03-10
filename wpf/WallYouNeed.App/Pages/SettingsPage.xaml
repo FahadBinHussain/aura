@@ -1,0 +1,471 @@
+<Page x:Class="WallYouNeed.App.Pages.SettingsPage"
+      xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+      xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+      xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+      xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+      xmlns:ui="http://schemas.lepo.co/wpfui/2022/xaml"
+      xmlns:local="clr-namespace:WallYouNeed.App.Pages"
+      mc:Ignorable="d" 
+      d:DesignHeight="650" d:DesignWidth="800"
+      Title="Settings"
+      Background="#1E1E1E"
+      x:Name="SettingsPageControl">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header with Title -->
+        <TextBlock Grid.Row="0" 
+                   Text="Settings" 
+                   FontSize="32" 
+                   FontWeight="SemiBold" 
+                   Foreground="White"
+                   Margin="24,12,0,12"/>
+
+        <!-- Main Content -->
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- Tabs Navigation -->
+            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="24,0,0,0">
+                <Border BorderThickness="0,0,0,2" BorderBrush="#569DE5">
+                    <TextBlock Text="Settings" 
+                               FontSize="16" 
+                               Foreground="White" 
+                               Margin="0,0,24,0"
+                               FontWeight="SemiBold"
+                               Padding="0,4,0,6"/>
+                </Border>
+                
+                <TextBlock Text="About" 
+                           FontSize="16" 
+                           Foreground="#AAAAAA" 
+                           Margin="0,0,24,0"
+                           Padding="0,4,0,8"/>
+                
+                <TextBlock Text="Our applications" 
+                           FontSize="16" 
+                           Foreground="#AAAAAA" 
+                           Margin="0,0,24,0"
+                           Padding="0,4,0,8"/>
+                
+                <TextBlock Text="Release notes" 
+                           FontSize="16" 
+                           Foreground="#AAAAAA" 
+                           Margin="0,0,24,0"
+                           Padding="0,4,0,8"/>
+            </StackPanel>
+
+            <!-- Settings Content -->
+            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="24,12">
+                    
+                    <!-- Language -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="Globe24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Language" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Select language for the application" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <ComboBox Grid.Column="2" 
+                                     Width="120" 
+                                     SelectedValue="English" 
+                                     x:Name="LanguageComboBox"
+                                     VerticalAlignment="Center"
+                                     Background="#383838"
+                                     Foreground="White"
+                                     BorderThickness="0"
+                                     SelectionChanged="LanguageComboBox_SelectionChanged">
+                                <ComboBoxItem Content="English" IsSelected="True"/>
+                                <ComboBoxItem Content="Spanish"/>
+                                <ComboBoxItem Content="French"/>
+                                <ComboBoxItem Content="German"/>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Automatic Launch -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="ArrowSync24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Automatic launch" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Launch backlee when I start my computer" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <ui:ToggleSwitch Grid.Column="2" 
+                                     x:Name="AutoLaunchToggle"
+                                     VerticalAlignment="Center"
+                                     IsChecked="False"
+                                     Checked="AutoLaunchToggle_Checked"
+                                     Unchecked="AutoLaunchToggle_Unchecked"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Remove all widgets -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="Delete24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Remove all widgets" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Remove all your widgets" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="2" 
+                                    Content="Remove" 
+                                    x:Name="RemoveWidgetsButton"
+                                    Background="#444444"
+                                    Foreground="White"
+                                    Padding="16,8"
+                                    VerticalAlignment="Center"
+                                    Click="RemoveWidgetsButton_Click"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Push notification -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="Alert24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Push notification" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Customize push notification" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="2" 
+                                    Width="24" 
+                                    Height="24"
+                                    x:Name="NotificationExpandButton"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Padding="0"
+                                    VerticalAlignment="Center"
+                                    Click="NotificationExpandButton_Click">
+                                <Path x:Name="ExpandCollapseIcon" 
+                                      Data="M12 15.375L6 9.375L7.067 8.308L12 13.233L16.933 8.308L18 9.375L12 15.375Z" 
+                                      Fill="White"
+                                      Stretch="Uniform"
+                                      Width="14"
+                                      Height="14" />
+                            </Button>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Push Notification Settings (Expandable Panel) -->
+                    <Border x:Name="NotificationSettingsPanel" 
+                            Background="#242424" 
+                            CornerRadius="8" 
+                            Margin="0,-8,0,12"
+                            Visibility="Collapsed">
+                        <StackPanel Margin="16,12">
+                            
+                            <!-- New wallpapers notification -->
+                            <Grid Margin="0,4,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <TextBlock Text="New wallpapers" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           Grid.Column="0"
+                                           VerticalAlignment="Center"/>
+                                
+                                <ui:ToggleSwitch Grid.Column="1" 
+                                              x:Name="NewWallpapersToggle"
+                                              VerticalAlignment="Center"
+                                              IsChecked="True"
+                                              Checked="NewWallpapersToggle_Checked"
+                                              Unchecked="NewWallpapersToggle_Unchecked"/>
+                            </Grid>
+                            
+                            <!-- Daily wallpaper selections -->
+                            <Grid Margin="0,4,0,12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <TextBlock Text="Daily wallpaper selections" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           Grid.Column="0"
+                                           VerticalAlignment="Center"/>
+                                
+                                <ui:ToggleSwitch Grid.Column="1" 
+                                              x:Name="DailySelectionsToggle"
+                                              VerticalAlignment="Center"
+                                              IsChecked="True"
+                                              Checked="DailySelectionsToggle_Checked"
+                                              Unchecked="DailySelectionsToggle_Unchecked"/>
+                            </Grid>
+                            
+                            <!-- New wallpapers (duplicate entry as shown in the image) -->
+                            <Grid Margin="0,4,0,4">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                
+                                <TextBlock Text="New wallpapers" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           Grid.Column="0"
+                                           VerticalAlignment="Center"/>
+                                
+                                <ui:ToggleSwitch Grid.Column="1" 
+                                              x:Name="NewWallpapersToggle2"
+                                              VerticalAlignment="Center"
+                                              IsChecked="True"
+                                              Checked="NewWallpapersToggle2_Checked"
+                                              Unchecked="NewWallpapersToggle2_Unchecked"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                    
+                    <!-- Quick like -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="Heart24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Quick like" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="You can turn on or off whether the quick like feature enabled in the wallpaper lists" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           TextWrapping="Wrap"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <ui:ToggleSwitch Grid.Column="2" 
+                                     x:Name="QuickLikeToggle"
+                                     VerticalAlignment="Center"
+                                     IsChecked="True"
+                                     Checked="QuickLikeToggle_Checked"
+                                     Unchecked="QuickLikeToggle_Unchecked"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Synchronization -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="ArrowSync24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Synchronization" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Enable synchronization using metered connection" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <ui:ToggleSwitch Grid.Column="2" 
+                                     x:Name="SyncToggle"
+                                     VerticalAlignment="Center"
+                                     IsChecked="False"
+                                     Checked="SyncToggle_Checked"
+                                     Unchecked="SyncToggle_Unchecked"/>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Theme -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="DarkTheme24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Theme" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Select light or dark theme for the application" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <ComboBox Grid.Column="2" 
+                                     Width="120" 
+                                     SelectedValue="Light" 
+                                     x:Name="ThemeComboBox"
+                                     VerticalAlignment="Center"
+                                     Background="#383838"
+                                     Foreground="White"
+                                     BorderThickness="0"
+                                     SelectionChanged="ThemeComboBox_SelectionChanged">
+                                <ComboBoxItem Content="Light" IsSelected="True"/>
+                                <ComboBoxItem Content="Dark"/>
+                                <ComboBoxItem Content="System Default"/>
+                            </ComboBox>
+                        </Grid>
+                    </Border>
+                    
+                    <!-- Hints -->
+                    <Border Background="#2D2D2D" 
+                            CornerRadius="8" 
+                            Margin="0,0,0,12">
+                        <Grid Margin="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            
+                            <ui:SymbolIcon Symbol="Info24" 
+                                          Foreground="White" 
+                                          FontSize="22"
+                                          Grid.Column="0" 
+                                          Margin="0,0,16,0"/>
+                            
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Hints" 
+                                           Foreground="White" 
+                                           FontSize="16"
+                                           FontWeight="SemiBold"/>
+                                <TextBlock Text="Show all hints again on every page" 
+                                           Foreground="#AAAAAA" 
+                                           FontSize="12"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                            
+                            <Button Grid.Column="2" 
+                                    Content="Show all tips again" 
+                                    x:Name="ShowHintsButton"
+                                    Background="#444444"
+                                    Foreground="White"
+                                    Padding="16,8"
+                                    VerticalAlignment="Center"
+                                    Click="ShowHintsButton_Click"/>
+                        </Grid>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+    </Grid>
+</Page> 

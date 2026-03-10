@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\WallYouNeed.Core\WallYouNeed.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.2.2" />
+    <PackageReference Include="LiteDB" Version="5.0.17" />
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.4.0" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Http" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Console" Version="8.0.0" />
+    <PackageReference Include="Microsoft.Extensions.Logging.Debug" Version="8.0.0" />
+    <PackageReference Include="MahApps.Metro" Version="2.4.10" />
+    <PackageReference Include="ModernWpfUI" Version="0.9.6" />
+    <PackageReference Include="Serilog.Extensions.Logging.File" Version="3.0.0" />
+    <PackageReference Include="WPF-UI" Version="3.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\4k_logo.png" />
+    <Resource Include="Assets\5k_logo.png" />
+    <Resource Include="Assets\8k_logo.png" />
+    <Resource Include="Assets\aigenerated-icon.png" />
+    <Resource Include="Assets\aigenerated.png" />
+    <Resource Include="Assets\account.png" />
+    <Resource Include="Assets\collections.png" />
+    <Resource Include="Assets\home.png" />
+    <Resource Include="Assets\interactive.png" />
+    <Resource Include="Assets\personal.png" />
+    <Resource Include="Assets\settings.png" />
+    <Resource Include="Assets\slideshow.png" />
+    <Resource Include="Assets\upload.png" />
+    <Resource Include="Assets\widget.png" />
+    <Resource Include="Assets\world.png" />
+    <Resource Include="Assets\logo.png" />
+    <Resource Include="Assets\noad.png" />
+    <Resource Include="Assets\placeholder-dark.png" />
+  </ItemGroup>
+
+</Project> 
