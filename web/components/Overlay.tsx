@@ -106,7 +106,7 @@ export default function Overlay() {
         <FadeIn delay={0.35}>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <a
-              href="https://github.com/fa-hat/aura/releases/latest/download/Aura-x64.zip"
+              href="https://github.com/fahadbinhussain/aura/releases/latest/download/Aura-x64.zip"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold text-white transition-all duration-300 hover:scale-105"
@@ -117,7 +117,7 @@ export default function Overlay() {
               <ArrowRight className="w-4 h-4 transition-transform group-hover:translate-x-1" />
             </a>
             <a
-              href="https://github.com/fa-hat/aura"
+              href="https://github.com/fahadbinhussain/aura"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-7 py-3.5 font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300"
@@ -282,7 +282,7 @@ export default function Overlay() {
 
           <div className="flex flex-wrap items-center justify-center gap-4 mb-10">
             <a
-              href="https://github.com/fa-hat/aura/releases/latest/download/Aura-x64.zip"
+              href="https://github.com/fahadbinhussain/aura/releases/latest/download/Aura-x64.zip"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-full px-10 py-5 text-xl font-bold text-white transition-all duration-300 hover:scale-105"
@@ -293,7 +293,7 @@ export default function Overlay() {
               <ArrowRight className="w-5 h-5 transition-transform group-hover:translate-x-1" />
             </a>
             <a
-              href="https://github.com/fa-hat/aura"
+              href="https://github.com/fahadbinhussain/aura"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 rounded-full border border-white/10 bg-white/5 backdrop-blur-md px-8 py-4 text-lg font-semibold text-white/70 hover:text-white hover:bg-white/10 transition-all duration-300"
