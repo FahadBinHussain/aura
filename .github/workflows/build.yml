@@ -9,6 +9,8 @@ on:
 jobs:
   build:
     runs-on: windows-latest
+    permissions:
+      contents: write
 
     steps:
       - name: Checkout repository
@@ -46,3 +48,24 @@ jobs:
           name: Aura-x64
           path: winui/publish/Aura-x64.zip
           if-no-files-found: error
+
+      - name: Create or update GitHub Release (main branch only)
+        if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: "Aura — Latest Build"
+          body: |
+            🚀 **Automatic build from the latest commit on `main`.**
+
+            ### How to install
+            1. Download `Aura-x64.zip`
+            2. Extract the zip to any folder
+            3. Run `Aura.exe`
+
+            > Requires Windows 10 (1903+) or Windows 11, x64.
+          prerelease: false
+          make_latest: true
+          files: winui/publish/Aura-x64.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

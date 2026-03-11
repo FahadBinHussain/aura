@@ -106,7 +106,7 @@ export default function Overlay() {
         <FadeIn delay={0.35}>
           <div className="flex flex-wrap items-center justify-center gap-4">
             <a
-              href="https://github.com/fa-hat/aura/releases"
+              href="https://github.com/fa-hat/aura/releases/latest/download/Aura-x64.zip"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-full px-7 py-3.5 font-semibold text-white transition-all duration-300 hover:scale-105"
@@ -282,7 +282,7 @@ export default function Overlay() {
 
           <div className="flex flex-wrap items-center justify-center gap-4 mb-10">
             <a
-              href="https://github.com/fa-hat/aura/releases"
+              href="https://github.com/fa-hat/aura/releases/latest/download/Aura-x64.zip"
               target="_blank"
               rel="noopener noreferrer"
               className="group flex items-center gap-2 rounded-full px-10 py-5 text-xl font-bold text-white transition-all duration-300 hover:scale-105"
