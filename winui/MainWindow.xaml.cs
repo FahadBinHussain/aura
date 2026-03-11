@@ -78,7 +78,6 @@ namespace Aura
             catch (Exception ex)
             {
                 // Log any error but don't crash
-                System.Diagnostics.Debug.WriteLine($"Failed to initialize selected brush: {ex.Message}");
             }
 
             // Change the window's title
@@ -178,7 +177,6 @@ namespace Aura
                     catch (Exception ex)
                     {
                         // Log error but continue
-                        System.Diagnostics.Debug.WriteLine($"Error resetting button style: {ex.Message}");
                     }
                 }
             }
@@ -197,7 +195,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error resetting specific buttons: {ex.Message}");
             }
         }
 
@@ -225,7 +222,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error saving window settings: {ex.Message}");
             }
         }
 
@@ -320,7 +316,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error saving window settings to registry: {ex.Message}");
             }
         }
 
@@ -342,7 +337,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error restoring window settings: {ex.Message}");
                 ApplyDefaultWindowSize();
             }
         }
@@ -362,7 +356,6 @@ namespace Aura
                 {
                     // If not OverlappedPresenter, maybe log or handle differently
                     // For now, fall back to default size setting below
-                    System.Diagnostics.Debug.WriteLine("Presenter is not OverlappedPresenter, cannot restore state.");
                 }
                 else if (localSettings.Values.TryGetValue("WindowState", out object stateObj) && stateObj is int stateInt)
                 {
@@ -434,7 +427,6 @@ namespace Aura
             catch (Exception ex)
             {
                 // Log error and apply default size as a final fallback
-                System.Diagnostics.Debug.WriteLine($"Error restoring window state/size/pos: {ex.Message}");
                 try
                 {
                     if (!settingsApplied) // Only resize if no settings were successfully applied
@@ -469,7 +461,6 @@ namespace Aura
                         var presenter = m_appWindow.Presenter as OverlappedPresenter;
                         if (presenter == null)
                         {
-                            System.Diagnostics.Debug.WriteLine("Presenter is not OverlappedPresenter, cannot restore state.");
                         }
                         else
                         {
@@ -532,7 +523,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error restoring window state from registry: {ex.Message}");
                 if (!settingsApplied)
                 {
                     ApplyDefaultWindowSize();
@@ -569,7 +559,6 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error applying default window size: {ex.Message}");
             }
         }
 
@@ -684,7 +673,6 @@ namespace Aura
             catch (Exception ex)
             {
                 // Log the exception but don't crash
-                System.Diagnostics.Debug.WriteLine($"Navigation error: {ex.Message}");
             }
         }
 
@@ -853,7 +841,6 @@ namespace Aura
                 catch (Exception ex)
                 {
                     // Log the error but continue
-                    System.Diagnostics.Debug.WriteLine($"Failed to apply active style: {ex.Message}");
                 }
 
                 // Update selected text color
@@ -971,5 +958,16 @@ namespace Aura
             }
         }
         // *** End Theme Change Handler ***
+
+        private void HotReloadButton_Click(object sender, RoutedEventArgs e)
+        {
+            // Disable button immediately to prevent multiple clicks
+            if (sender is Button btn)
+                btn.IsEnabled = false;
+
+            // Simply exit — dev.bat will auto-rebuild and relaunch.
+            // Run winui\dev.bat in your terminal instead of dotnet run.
+            Microsoft.UI.Xaml.Application.Current.Exit();
+        }
     }
 }

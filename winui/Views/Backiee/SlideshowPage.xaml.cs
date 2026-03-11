@@ -1,6 +1,7 @@
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Microsoft.UI.Dispatching;
 using System;
 using System.Collections.Generic;
 using Aura.Services;
@@ -30,6 +31,9 @@ namespace Aura.Views.Backiee
         // Current wallpaper items for navigation
         private WallpaperItem? _currentDesktopWallpaperItem = null;
         private WallpaperItem? _currentLockScreenWallpaperItem = null;
+        
+        // Countdown timers
+        private DispatcherQueueTimer? _countdownTimer;
 
         public SlideshowPage()
         {
@@ -41,6 +45,91 @@ namespace Aura.Views.Backiee
             
             // Delay loading settings until page is fully loaded
             this.Loaded += SlideshowPage_Loaded;
+            this.Unloaded += SlideshowPage_Unloaded;
+            
+            // Start countdown timer
+            StartCountdownTimer();
+        }
+        
+        private void SlideshowPage_Unloaded(object sender, RoutedEventArgs e)
+        {
+            // Stop countdown timer when page is unloaded
+            _countdownTimer?.Stop();
+            _countdownTimer = null;
+        }
+        
+        private void StartCountdownTimer()
+        {
+            _countdownTimer = DispatcherQueue.CreateTimer();
+            _countdownTimer.Interval = TimeSpan.FromSeconds(1);
+            _countdownTimer.IsRepeating = true;
+            _countdownTimer.Tick += (s, e) => UpdateCountdowns();
+            _countdownTimer.Start();
+        }
+        
+        private void UpdateCountdowns()
+        {
+            // Update desktop countdown
+            if (_desktopSlideshowEnabled && SlideshowService.Instance.DesktopNextChangeTime > DateTime.MinValue)
+            {
+                var timeRemaining = SlideshowService.Instance.DesktopNextChangeTime - DateTime.Now;
+                
+                if (timeRemaining.TotalSeconds > 0)
+                {
+                    DesktopCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
+                    DesktopCountdownText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    DesktopCountdownText.Text = "Changing wallpaper...";
+                    DesktopCountdownText.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                DesktopCountdownText.Visibility = Visibility.Collapsed;
+            }
+            
+            // Update lock screen countdown
+            if (_lockScreenSlideshowEnabled && SlideshowService.Instance.LockScreenNextChangeTime > DateTime.MinValue)
+            {
+                var timeRemaining = SlideshowService.Instance.LockScreenNextChangeTime - DateTime.Now;
+                
+                if (timeRemaining.TotalSeconds > 0)
+                {
+                    LockScreenCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
+                    LockScreenCountdownText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    LockScreenCountdownText.Text = "Changing wallpaper...";
+                    LockScreenCountdownText.Visibility = Visibility.Visible;
+                }
+            }
+            else
+            {
+                LockScreenCountdownText.Visibility = Visibility.Collapsed;
+            }
+        }
+        
+        private string FormatTimeSpan(TimeSpan timeSpan)
+        {
+            if (timeSpan.TotalDays >= 1)
+            {
+                return $"{(int)timeSpan.TotalDays}d {timeSpan.Hours}h {timeSpan.Minutes}m";
+            }
+            else if (timeSpan.TotalHours >= 1)
+            {
+                return $"{(int)timeSpan.TotalHours}h {timeSpan.Minutes}m {timeSpan.Seconds}s";
+            }
+            else if (timeSpan.TotalMinutes >= 1)
+            {
+                return $"{(int)timeSpan.TotalMinutes}m {timeSpan.Seconds}s";
+            }
+            else
+            {
+                return $"{(int)timeSpan.TotalSeconds}s";
+            }
         }
         
         private async void SlideshowPage_Loaded(object sender, RoutedEventArgs e)
@@ -85,7 +174,6 @@ namespace Aura.Views.Backiee
             }
             catch (Exception ex)
             {
-                LogInfo($"Error loading current wallpapers: {ex.Message}");
             }
         }
 
@@ -95,13 +183,11 @@ namespace Aura.Views.Backiee
             {
                 if (string.IsNullOrEmpty(imageUrl)) return;
                 
-                LogInfo($"Loading desktop wallpaper: {imageUrl}");
                 var bitmap = new BitmapImage(new Uri(imageUrl));
                 DesktopSlideshowImage.Source = bitmap;
             }
             catch (Exception ex)
             {
-                LogInfo($"Error loading desktop wallpaper image: {ex.Message}");
             }
         }
 
@@ -111,13 +197,11 @@ namespace Aura.Views.Backiee
             {
                 if (string.IsNullOrEmpty(imageUrl)) return;
                 
-                LogInfo($"Loading lock screen wallpaper: {imageUrl}");
                 var bitmap = new BitmapImage(new Uri(imageUrl));
                 LockScreenSlideshowImage.Source = bitmap;
             }
             catch (Exception ex)
             {
-                LogInfo($"Error loading lock screen wallpaper image: {ex.Message}");
             }
         }
 
@@ -129,32 +213,27 @@ namespace Aura.Views.Backiee
             }
             catch
             {
-                System.Diagnostics.Debug.WriteLine($"[SlideshowPage] {message}");
             }
         }
 
         private void ExpandDesktopSlideshow_Click(object sender, RoutedEventArgs e)
         {
-            LogInfo("Expand desktop slideshow clicked");
             
             // Get the current desktop wallpaper item
             var wallpaperItem = SlideshowService.Instance.GetCurrentDesktopWallpaperItem();
             
             if (wallpaperItem != null)
             {
-                LogInfo($"Navigating to wallpaper detail: {wallpaperItem.Title}");
                 Frame.Navigate(typeof(WallpaperDetailPage), wallpaperItem);
             }
             else
             {
-                LogInfo("No desktop wallpaper item available to expand");
             }
         }
 
         private async void NextDesktopSlideshow_Click(object sender, RoutedEventArgs e)
         {
             await SlideshowService.Instance.NextDesktopWallpaper();
-            LogInfo("Next desktop slideshow clicked");
         }
 
         private async void EditDesktopSlideshow_Click(object sender, RoutedEventArgs e)
@@ -169,26 +248,22 @@ namespace Aura.Views.Backiee
 
         private void ExpandLockScreenSlideshow_Click(object sender, RoutedEventArgs e)
         {
-            LogInfo("Expand lock screen slideshow clicked");
             
             // Get the current lock screen wallpaper item
             var wallpaperItem = SlideshowService.Instance.GetCurrentLockScreenWallpaperItem();
             
             if (wallpaperItem != null)
             {
-                LogInfo($"Navigating to wallpaper detail: {wallpaperItem.Title}");
                 Frame.Navigate(typeof(WallpaperDetailPage), wallpaperItem);
             }
             else
             {
-                LogInfo("No lock screen wallpaper item available to expand");
             }
         }
 
         private async void NextLockScreenSlideshow_Click(object sender, RoutedEventArgs e)
         {
             await SlideshowService.Instance.NextLockScreenWallpaper();
-            LogInfo("Next lock screen slideshow clicked");
         }
 
         private async void EditLockScreenSlideshow_Click(object sender, RoutedEventArgs e)
@@ -209,7 +284,6 @@ namespace Aura.Views.Backiee
                 
                 if (!File.Exists(settingsPath))
                 {
-                    LogInfo("No saved settings found");
                     return;
                 }
 
@@ -218,7 +292,6 @@ namespace Aura.Views.Backiee
                 
                 if (settings == null)
                 {
-                    LogInfo("Failed to deserialize settings");
                     return;
                 }
                 
@@ -258,16 +331,19 @@ namespace Aura.Views.Backiee
                     _lockScreenRefreshInterval = settings["LockScreenSlideshowInterval"].GetString() ?? "12 hours";
                 }
                 
-                LogInfo($"Loaded settings from {settingsPath}");
-                LogInfo($"Desktop: {_desktopSlideshowEnabled} ({_desktopPlatform}/{_desktopCategory}), Lock: {_lockScreenSlideshowEnabled} ({_lockScreenPlatform}/{_lockScreenCategory})");
                 
                 // Restart slideshows if they were enabled
                 _ = RestoreSlideshows();
             }
             catch (Exception ex)
             {
-                LogInfo($"Error loading settings: {ex.Message}");
             }
+            
+            UpdateStatusUI();
+        }
+        
+        private async Task UpdateStatusUIAsync()
+        {
             
             // Update desktop slideshow status
             if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
@@ -288,6 +364,17 @@ namespace Aura.Views.Backiee
             {
                 LockScreenStatusText.Text = "No slideshow set";
             }
+            
+            // Wait a moment for the service to update next change times
+            await Task.Delay(100);
+            
+            // Force immediate countdown update
+            UpdateCountdowns();
+        }
+        
+        private void UpdateStatusUI()
+        {
+            _ = UpdateStatusUIAsync();
         }
         
         private void SaveSettings()
@@ -317,11 +404,9 @@ namespace Aura.Views.Backiee
                 var json = JsonSerializer.Serialize(settings, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(settingsPath, json);
                 
-                LogInfo($"Saved settings to {settingsPath}");
             }
             catch (Exception ex)
             {
-                LogInfo($"Error saving settings: {ex.Message}");
             }
         }
         
@@ -332,7 +417,6 @@ namespace Aura.Views.Backiee
                 // Restore desktop slideshow if it was enabled
                 if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                 {
-                    LogInfo($"Restoring desktop slideshow: {_desktopPlatform} - {_desktopCategory}");
                     var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
                     await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
                 }
@@ -340,14 +424,12 @@ namespace Aura.Views.Backiee
                 // Restore lock screen slideshow if it was enabled
                 if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
                 {
-                    LogInfo($"Restoring lock screen slideshow: {_lockScreenPlatform} - {_lockScreenCategory}");
                     var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
                     await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, this.DispatcherQueue);
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"Error restoring slideshows: {ex.Message}");
             }
         }
 
@@ -536,50 +618,31 @@ namespace Aura.Views.Backiee
                 string selectedPlatform = platformComboBox.SelectedItem?.ToString() ?? "Backiee";
                 string selectedCategory = categoryComboBox.SelectedItem?.ToString() ?? "Latest Wallpapers";
 
-                LogInfo($"========== {slideshowType} Slideshow Settings Dialog - SET CLICKED ==========");
-                LogInfo($"  Enabled: {isEnabled}");
-                LogInfo($"  Platform: {selectedPlatform}");
-                LogInfo($"  Category: {selectedCategory}");
 
                 // Save to class fields and start/stop slideshow
                 if (slideshowType == "Desktop")
                 {
-                    LogInfo($"  Current Desktop Refresh Interval: {_desktopRefreshInterval}");
                     _desktopSlideshowEnabled = isEnabled;
                     _desktopPlatform = selectedPlatform;
                     _desktopCategory = selectedCategory;
                     
-                    LogInfo($"Saved desktop settings. Enabled={_desktopSlideshowEnabled}, Platform={_desktopPlatform}, Category={_desktopCategory}");
-                    
-                    DesktopStatusText.Text = isEnabled 
-                        ? $"{selectedPlatform} - {selectedCategory}" 
-                        : "No slideshow set";
 
                     // Start or stop slideshow
                     if (isEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                     {
-                        LogInfo($"Starting desktop slideshow...");
                         var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                        LogInfo($"Parsed interval: {interval}");
                         await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
-                        LogInfo($"Desktop slideshow start command completed");
                     }
                     else
                     {
-                        LogInfo($"Stopping desktop slideshow...");
                         SlideshowService.Instance.StopDesktopSlideshow();
                     }
                 }
                 else
                 {
-                    LogInfo($"  Current Lock Screen Refresh Interval: {_lockScreenRefreshInterval}");
                     _lockScreenSlideshowEnabled = isEnabled;
                     _lockScreenPlatform = selectedPlatform;
                     _lockScreenCategory = selectedCategory;
-                    
-                    LockScreenStatusText.Text = isEnabled 
-                        ? $"{selectedPlatform} - {selectedCategory}" 
-                        : "No slideshow set";
 
                     // Start or stop slideshow
                     if (isEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
@@ -593,8 +656,9 @@ namespace Aura.Views.Backiee
                     }
                 }
                 
-                // Save settings to local storage
+                // Save settings to local storage and update UI
                 SaveSettings();
+                await UpdateStatusUIAsync();
             }
         }
 
@@ -683,18 +747,17 @@ namespace Aura.Views.Backiee
 
             if (result == ContentDialogResult.Primary && unitComboBox.SelectedItem != null && numberBox.Value > 0)
             {
+                
                 double intervalValue = numberBox.Value;
                 string intervalUnit = unitComboBox.SelectedItem.ToString();
                 string selectedInterval = $"{intervalValue} {intervalUnit}";
                 
-                LogInfo($"New interval set: {selectedInterval}");
                 
                 // Parse and validate minimum 10 seconds
                 var interval = SlideshowService.ParseInterval(selectedInterval);
                 
                 if (interval.TotalSeconds < 10)
                 {
-                    LogInfo("Interval too short - minimum is 10 seconds");
                     
                     var errorDialog = new ContentDialog
                     {
@@ -712,32 +775,28 @@ namespace Aura.Views.Backiee
                 if (slideshowType == "Desktop")
                 {
                     _desktopRefreshInterval = selectedInterval;
-                    LogInfo($"Updated desktop refresh interval: {selectedInterval}");
-                    LogInfo($"Parsed to TimeSpan: {interval}");
                     
                     // Restart desktop slideshow with new interval if enabled
                     if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                     {
                         await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
-                        DesktopStatusText.Text = $"{_desktopPlatform} - {_desktopCategory} (Refresh: {selectedInterval})";
                     }
                 }
                 else
                 {
                     _lockScreenRefreshInterval = selectedInterval;
-                    LogInfo($"Updated lock screen refresh interval: {selectedInterval}");
-                    LogInfo($"Parsed to TimeSpan: {interval}");
                     
                     // Restart lock screen slideshow with new interval if enabled
                     if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
                         await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, this.DispatcherQueue);
-                        LockScreenStatusText.Text = $"{_lockScreenPlatform} - {_lockScreenCategory} (Refresh: {selectedInterval})";
                     }
                 }
                 
-                // Save settings to local storage
+                // Save settings to local storage and update UI
                 SaveSettings();
+                
+                await UpdateStatusUIAsync();
             }
         }
 

@@ -64,7 +64,6 @@ namespace Aura.Views.Backiee
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading static banner images: {ex.Message}");
                 // Use placeholder if image loading fails
                 UltraHdImage.Source = new BitmapImage(new Uri("ms-appx:///Assets/StoreLogo.png"));
                 AiGeneratedImage.Source = new BitmapImage(new Uri("ms-appx:///Assets/StoreLogo.png"));
@@ -105,7 +104,6 @@ namespace Aura.Views.Backiee
                             }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"Error parsing wallpaper item: {ex.Message}");
                             }
                         }
 
@@ -127,14 +125,12 @@ namespace Aura.Views.Backiee
                 }
                 else
                 {
-                     System.Diagnostics.Debug.WriteLine($"API request failed: {response.StatusCode}");
                      // Optionally load a default banner image on failure
                      LatestBannerImage.Source = new BitmapImage(new Uri("ms-appx:///Assets/placeholder-dark.png"));
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading latest banner wallpapers: {ex.Message}");
                 // Optionally load a default banner image on failure
                 LatestBannerImage.Source = new BitmapImage(new Uri("ms-appx:///Assets/placeholder-dark.png"));
             }

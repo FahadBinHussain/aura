@@ -33,7 +33,6 @@ namespace Aura.Services
 
         private static void LogDebug(string message)
         {
-            System.Diagnostics.Debug.WriteLine(message);
             DebugLogger?.Invoke(message);
         }
 
@@ -58,22 +57,17 @@ namespace Aura.Services
                 // Clear previous URLs for fresh scraping
                 var currentPageUrls = new List<string>();
 
-                LogDebug($"Starting to scrape pages {startPage} to {endPage}...");
                 for (int page = startPage; page <= endPage; page++)
                 {
-                    LogDebug($"Scraping page {page}...");
                     var smallUrls = await GetSmallImageUrlsAsync(page);
-                    LogDebug($"Found {smallUrls.Count} small images on page {page}");
 
                     // Log first few URLs for debugging
                     for (int i = 0; i < Math.Min(3, smallUrls.Count); i++)
                     {
-                        LogDebug($"  Small URL {i + 1}: {smallUrls[i]}");
                     }
 
                     currentPageUrls.AddRange(smallUrls);
                 }
-                LogDebug($"Total small URLs collected: {currentPageUrls.Count}");
 
                 // Create WallpaperItem objects directly from current scrape
                 wallpapers = CreateWallpaperItemsFromUrls(currentPageUrls);
@@ -82,7 +76,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                LogDebug($"Error in ScrapeWallpapersAsync: {ex.Message}");
                 return wallpapers;
             }
         }
@@ -96,22 +89,17 @@ namespace Aura.Services
                 var currentPageUrls = new List<string>();
                 string categoryUrl = GetCategoryUrl(category);
 
-                LogDebug($"Starting to scrape category '{category}' pages {startPage} to {endPage}...");
                 for (int page = startPage; page <= endPage; page++)
                 {
-                    LogDebug($"Scraping page {page}...");
                     var smallUrls = await GetSmallImageUrlsByCategoryAsync(categoryUrl, page);
-                    LogDebug($"Found {smallUrls.Count} small images on page {page}");
 
                     // Log first few URLs for debugging
                     for (int i = 0; i < Math.Min(3, smallUrls.Count); i++)
                     {
-                        LogDebug($"  Small URL {i + 1}: {smallUrls[i]}");
                     }
 
                     currentPageUrls.AddRange(smallUrls);
                 }
-                LogDebug($"Total small URLs collected: {currentPageUrls.Count}");
 
                 // Create WallpaperItem objects directly from current scrape
                 wallpapers = CreateWallpaperItemsFromUrls(currentPageUrls);
@@ -120,7 +108,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                LogDebug($"Error in ScrapeWallpapersByCategoryAsync: {ex.Message}");
                 return wallpapers;
             }
         }
@@ -143,16 +130,13 @@ namespace Aura.Services
             try
             {
                 var url = string.Format(categoryUrlTemplate, pageNumber);
-                LogDebug($"Fetching URL: {url}");
                 var response = await _httpClient.GetAsync(url);
                 var htmlContent = await response.Content.ReadAsStringAsync();
-                LogDebug($"Got HTML response, length: {htmlContent.Length} characters");
 
                 var doc = new HtmlDocument();
                 doc.LoadHtml(htmlContent);
 
                 var imgNodes = doc.DocumentNode.SelectNodes("//img[@src]");
-                LogDebug($"Found {imgNodes?.Count ?? 0} img nodes");
 
                 if (imgNodes != null)
                 {
@@ -165,7 +149,6 @@ namespace Aura.Services
                             if (src.Contains("thumbbig"))
                             {
                                 thumbbigCount++;
-                                LogDebug($"Found thumbbig image: {src}");
                             }
 
                             if (src.Contains("thumbbig") && src.StartsWith("https://images"))
@@ -174,13 +157,10 @@ namespace Aura.Services
                             }
                         }
                     }
-                    LogDebug($"Total thumbbig images found: {thumbbigCount}");
-                    LogDebug($"Valid thumbbig images (starting with https://images): {imageUrls.Count}");
                 }
             }
             catch (Exception ex)
             {
-                LogDebug($"Error getting small image URLs from page {pageNumber}: {ex.Message}");
             }
 
             return imageUrls;
@@ -193,16 +173,13 @@ namespace Aura.Services
             try
             {
                 var url = string.Format(_baseUrl, pageNumber);
-                LogDebug($"Fetching URL: {url}");
                 var response = await _httpClient.GetAsync(url);
                 var htmlContent = await response.Content.ReadAsStringAsync();
-                LogDebug($"Got HTML response, length: {htmlContent.Length} characters");
 
                 var doc = new HtmlDocument();
                 doc.LoadHtml(htmlContent);
 
                 var imgNodes = doc.DocumentNode.SelectNodes("//img[@src]");
-                LogDebug($"Found {imgNodes?.Count ?? 0} img nodes");
 
                 if (imgNodes != null)
                 {
@@ -215,7 +192,6 @@ namespace Aura.Services
                             if (src.Contains("thumbbig"))
                             {
                                 thumbbigCount++;
-                                LogDebug($"Found thumbbig image: {src}");
                             }
 
                             if (src.Contains("thumbbig") && src.StartsWith("https://images"))
@@ -224,13 +200,10 @@ namespace Aura.Services
                             }
                         }
                     }
-                    LogDebug($"Total thumbbig images found: {thumbbigCount}");
-                    LogDebug($"Valid thumbbig images (starting with https://images): {imageUrls.Count}");
                 }
             }
             catch (Exception ex)
             {
-                LogDebug($"Error getting small image URLs from page {pageNumber}: {ex.Message}");
             }
 
             return imageUrls;
@@ -278,23 +251,19 @@ namespace Aura.Services
                             var response = await httpClient.GetAsync(bigUrl);
                             if (response.IsSuccessStatusCode)
                             {
-                                Console.WriteLine($"Found big image with extension {ext}: {bigUrl}");
                                 return bigUrl;
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Failed {bigUrl}: {ex.Message}");
                         }
                     }
                 }
 
-                Console.WriteLine($"Big image not found for {smallUrl}");
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting big image URL for {smallUrl}: {ex.Message}");
                 return null;
             }
         }
@@ -325,23 +294,19 @@ namespace Aura.Services
                             var response = await httpClient.GetAsync(bigUrl);
                             if (response.IsSuccessStatusCode)
                             {
-                                Console.WriteLine($"Found big image with extension {ext}: {bigUrl}");
                                 return bigUrl;
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Failed {bigUrl}: {ex.Message}");
                         }
                     }
                 }
 
-                Console.WriteLine($"Big image not found for {smallUrl}");
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting big image URL for {smallUrl}: {ex.Message}");
                 return null;
             }
         }
@@ -358,7 +323,6 @@ namespace Aura.Services
 
                 string[] extensions = { "jpeg", "jpg", "png" };
 
-                Console.WriteLine($"Getting original URL for imageId: {imageIdFromUrl}, domainShort: {domainShort}");
 
                 using (var httpClient = new HttpClient())
                 {
@@ -369,34 +333,28 @@ namespace Aura.Services
                     foreach (var ext in extensions)
                     {
                         var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageIdFromUrl}/{ext}";
-                        Console.WriteLine($"Trying original URL: {originalUrl}");
 
                         try
                         {
                             var response = await httpClient.SendAsync(new HttpRequestMessage(HttpMethod.Head, originalUrl));
                             if (response.IsSuccessStatusCode)
                             {
-                                Console.WriteLine($"Valid original URL found: {originalUrl}");
                                 return originalUrl;
                             }
                             else
                             {
-                                Console.WriteLine($"URL returned {response.StatusCode}: {originalUrl}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            Console.WriteLine($"Failed to validate {originalUrl}: {ex.Message}");
                         }
                     }
                 }
 
-                Console.WriteLine($"No valid original URL found for {smallUrl}");
                 return null;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting original image URL for {smallUrl}: {ex.Message}");
                 return null;
             }
         }
@@ -412,16 +370,10 @@ namespace Aura.Services
 
                 // Return base URL pattern - extension will be determined dynamically
                 var baseOriginalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}";
-                Console.WriteLine($"Converting to original URL base:");
-                Console.WriteLine($"  Small URL: {smallUrl}");
-                Console.WriteLine($"  Image ID: {imageId}");
-                Console.WriteLine($"  Domain short: {domainShort}");
-                Console.WriteLine($"  Base Original URL: {baseOriginalUrl}");
                 return baseOriginalUrl;
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Error getting original image URL for {smallUrl}: {ex.Message}");
                 return null;
             }
         }
@@ -456,11 +408,9 @@ namespace Aura.Services
                     wallpapers.Add(wallpaper);
                 }
 
-                LogDebug($"Created {wallpapers.Count} wallpaper items from {urls.Count} URLs");
             }
             catch (Exception ex)
             {
-                LogDebug($"Error creating wallpaper items: {ex.Message}");
             }
 
             return wallpapers;

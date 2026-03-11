@@ -62,7 +62,6 @@ namespace Aura.Views.AlphaCoders
                 // Ensure the file exists and is accessible
                 if (!File.Exists(path))
                 {
-                    System.Diagnostics.Debug.WriteLine($"Wallpaper file does not exist: {path}");
                     return false;
                 }
 
@@ -74,11 +73,9 @@ namespace Aura.Views.AlphaCoders
                     {
                         // Just testing access, no need to read anything
                     }
-                    System.Diagnostics.Debug.WriteLine($"Confirmed file is readable: {path}");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"File access test failed: {ex.Message}");
                     return false;
                 }
 
@@ -86,7 +83,6 @@ namespace Aura.Views.AlphaCoders
                 bool success = false;
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine($"Setting wallpaper using SystemParametersInfo: {path}");
 
                     // Make sure the file is accessible to the system
                     System.IO.File.SetAttributes(path, System.IO.FileAttributes.Normal);
@@ -98,14 +94,11 @@ namespace Aura.Views.AlphaCoders
                     if (!success)
                     {
                         int error = Marshal.GetLastWin32Error();
-                        System.Diagnostics.Debug.WriteLine($"SystemParametersInfo failed with error code: {error}");
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"SystemParametersInfo result: {result}");
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"SystemParametersInfo failed: {ex.Message}");
                 }
 
                 // Method 2: Using Registry if Method 1 failed
@@ -113,7 +106,6 @@ namespace Aura.Views.AlphaCoders
                 {
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine("Trying registry method for wallpaper...");
                         // First, ensure the file is accessible with proper permissions
                         System.IO.File.SetAttributes(path, System.IO.FileAttributes.Normal);
 
@@ -126,12 +118,10 @@ namespace Aura.Views.AlphaCoders
                             System.IO.Directory.CreateDirectory(System.IO.Path.GetDirectoryName(persistentWallpaperPath));
                             // Copy the file
                             System.IO.File.Copy(path, persistentWallpaperPath, true);
-                            System.Diagnostics.Debug.WriteLine($"Copied wallpaper to Windows directory: {persistentWallpaperPath}");
                             // Use the Windows directory path for registry
                             path = persistentWallpaperPath;
                         }
                         catch (Exception ex) {
-                            System.Diagnostics.Debug.WriteLine($"Failed to copy to Windows directory: {ex.Message}");
                             // Continue with original path if copy fails
                         }
 
@@ -146,13 +136,11 @@ namespace Aura.Views.AlphaCoders
                                 // Set the wallpaper tile (0 = no tile)
                                 key.SetValue(WALLPAPER_TILE_REG_VALUE, "0");
                                 success = true;
-                                System.Diagnostics.Debug.WriteLine("Registry method for wallpaper succeeded");
                             }
                         }
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Registry method for wallpaper failed: {ex.Message}");
                     }
                 }
 
@@ -160,7 +148,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"SetWallpaper failed: {ex.Message}");
                 return false;
             }
         }
@@ -169,13 +156,11 @@ namespace Aura.Views.AlphaCoders
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"Setting lock screen using registry method: {path}");
                 bool success = false;
 
                 // Method: Using Registry for lock screen with LocalMachine
                 try
                 {
-                    System.Diagnostics.Debug.WriteLine("Trying LocalMachine registry for lock screen...");
                     using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(PERSONALIZE_REG_KEY, true))
                     {
                         if (key == null)
@@ -189,7 +174,6 @@ namespace Aura.Views.AlphaCoders
                                     newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                     newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, path);
                                     success = true;
-                                    System.Diagnostics.Debug.WriteLine("Registry method for lock screen succeeded (created key in LocalMachine)");
                                 }
                             }
                         }
@@ -200,13 +184,11 @@ namespace Aura.Views.AlphaCoders
                             key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                             key.SetValue(LOCKSCREEN_URL_REG_VALUE, path);
                             success = true;
-                            System.Diagnostics.Debug.WriteLine("Registry method for lock screen succeeded (updated key in LocalMachine)");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"LocalMachine registry method for lock screen failed: {ex.Message}");
                 }
 
                 // If LocalMachine failed, try with CurrentUser as fallback
@@ -214,7 +196,6 @@ namespace Aura.Views.AlphaCoders
                 {
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine("Trying CurrentUser registry for lock screen...");
                         using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(PERSONALIZE_REG_KEY, true))
                         {
                             if (key == null)
@@ -228,7 +209,6 @@ namespace Aura.Views.AlphaCoders
                                         newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                         newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, path);
                                         success = true;
-                                        System.Diagnostics.Debug.WriteLine("Registry method for lock screen succeeded (created key in CurrentUser)");
                                     }
                                 }
                             }
@@ -239,13 +219,11 @@ namespace Aura.Views.AlphaCoders
                                 key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                 key.SetValue(LOCKSCREEN_URL_REG_VALUE, path);
                                 success = true;
-                                System.Diagnostics.Debug.WriteLine("Registry method for lock screen succeeded (updated key in CurrentUser)");
                             }
                         }
                     }
                     catch (Exception innerEx)
                     {
-                        System.Diagnostics.Debug.WriteLine($"CurrentUser registry method for lock screen also failed: {innerEx.Message}");
                     }
                 }
 
@@ -253,7 +231,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"SetLockScreen failed: {ex.Message}");
                 return false;
             }
         }
@@ -269,7 +246,6 @@ namespace Aura.Views.AlphaCoders
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine("Fetching big thumb URL for Alpha Coders wallpaper on-demand");
 
                 // Only fetch the big thumb URL for display
                 var scraperService = new Aura.Services.AlphaCodersScraperService();
@@ -281,22 +257,18 @@ namespace Aura.Views.AlphaCoders
                     DebugBigThumbTextBlock.Text = $"Big Thumb URL: {bigThumbUrl}";
 
                     // Store big thumb for display, original URL will be fetched on-demand during set/download
-                    System.Diagnostics.Debug.WriteLine($"Found big thumb URL: {bigThumbUrl}");
 
                     // Load the big thumb directly (no WebP conversion needed)
                     WallpaperImage.Source = new BitmapImage(new Uri(bigThumbUrl));
-                    System.Diagnostics.Debug.WriteLine("Successfully loaded Alpha Coders big thumb");
                 }
                 else
                 {
                     DebugBigThumbTextBlock.Text = "Big Thumb URL: Not available";
-                    System.Diagnostics.Debug.WriteLine("Failed to find big thumb URL");
                     await ShowErrorDialogAsync("Image preview is not available for this wallpaper.");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading Alpha Coders image: {ex.Message}");
             }
         }
 
@@ -312,7 +284,6 @@ namespace Aura.Views.AlphaCoders
         {
             base.OnNavigatedTo(e);
 
-            System.Diagnostics.Debug.WriteLine("WallpaperDetailPage.OnNavigatedTo called");
 
             if (e.Parameter is WallpaperItem wallpaper)
             {
@@ -324,19 +295,14 @@ namespace Aura.Views.AlphaCoders
                     if (!string.IsNullOrEmpty(_currentWallpaper.ImageUrl) && _currentWallpaper.ImageUrl.Contains("alphacoders.com"))
                     {
                         _currentWallpaper.SourceUrl = $"https://wall.alphacoders.com/big.php?i={_currentWallpaper.Id}";
-                        System.Diagnostics.Debug.WriteLine($"Set Alpha Coders SourceUrl: {_currentWallpaper.SourceUrl}");
                     }
                     else if (string.IsNullOrEmpty(_currentWallpaper.SourceUrl))
                     {
                         _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{_currentWallpaper.Id}";
-                        System.Diagnostics.Debug.WriteLine($"Set default Backiee SourceUrl: {_currentWallpaper.SourceUrl}");
                     }
                 }
 
 
-                System.Diagnostics.Debug.WriteLine($"Received wallpaper: ID={wallpaper.Id}, Title={wallpaper.Title}");
-                System.Diagnostics.Debug.WriteLine($"FullPhotoUrl={wallpaper.FullPhotoUrl}");
-                System.Diagnostics.Debug.WriteLine($"SourceUrl={wallpaper.SourceUrl}");
 
                 // Set title at the top of the page
                 TitleTextBlock.Text = wallpaper.Title ?? "Error Loading Wallpaper";
@@ -344,7 +310,6 @@ namespace Aura.Views.AlphaCoders
                 // Check if this is an Alpha Coders wallpaper that needs on-demand big thumb fetching
                 if (!string.IsNullOrEmpty(_currentWallpaper.ImageUrl) && _currentWallpaper.ImageUrl.Contains("alphacoders.com"))
                 {
-                    System.Diagnostics.Debug.WriteLine("Detected Alpha Coders wallpaper - fetching big thumb on-demand");
                     // Load the big thumb asynchronously
                     _ = LoadAlphaCodersImageAsync(wallpaper);
                 }
@@ -353,17 +318,14 @@ namespace Aura.Views.AlphaCoders
                     // For non-Alpha Coders wallpapers with FullPhotoUrl, load directly
                     try
                     {
-                        System.Diagnostics.Debug.WriteLine($"Setting WallpaperImage.Source to {wallpaper.FullPhotoUrl}");
                         WallpaperImage.Source = new BitmapImage(new Uri(wallpaper.FullPhotoUrl));
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error setting wallpaper image: {ex.Message}");
                     }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine("No FullPhotoUrl available - using placeholder image");
                 }
 
                 // Handle AI tag exactly as in LatestWallpapersPage.SetItemMetadata
@@ -379,19 +341,16 @@ namespace Aura.Views.AlphaCoders
                     QualityTagBorder.Visibility = Visibility.Visible;
                     // Set the quality image source
                     string qualityImagePath = wallpaper.QualityLogoPath;
-                    System.Diagnostics.Debug.WriteLine($"QualityLogoPath from model: {qualityImagePath}");
 
                     if (!string.IsNullOrEmpty(qualityImagePath))
                     {
                         try
                         {
                             QualityImage.Source = new BitmapImage(new Uri(qualityImagePath));
-                            System.Diagnostics.Debug.WriteLine("Quality tag should be visible now");
                         }
                         catch (Exception ex)
                         {
                             // Log error and keep the quality tag hidden
-                            System.Diagnostics.Debug.WriteLine($"Error setting quality image: {ex.Message}");
                             QualityTagBorder.Visibility = Visibility.Collapsed;
                         }
                     }
@@ -405,7 +364,6 @@ namespace Aura.Views.AlphaCoders
                 {
                     // No quality tag available
                     QualityTagBorder.Visibility = Visibility.Collapsed;
-                    System.Diagnostics.Debug.WriteLine("No quality tag available, hiding the quality border");
                 }
 
                 // Fetch and display the publisher details
@@ -415,7 +373,6 @@ namespace Aura.Views.AlphaCoders
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to parse wallpaper ID: {wallpaper.Id}");
                 }
             }
             else
@@ -433,14 +390,12 @@ namespace Aura.Views.AlphaCoders
             try
             {
                 string apiUrl = $"{DetailApiBaseUrl}{wallpaperId}";
-                System.Diagnostics.Debug.WriteLine($"Fetching publisher details from: {apiUrl}");
 
                 HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
 
                 if (response.IsSuccessStatusCode)
                 {
                     string jsonResponse = await response.Content.ReadAsStringAsync();
-                    System.Diagnostics.Debug.WriteLine($"Publisher API Response: {jsonResponse}");
 
                     using JsonDocument document = JsonDocument.Parse(jsonResponse);
 
@@ -454,13 +409,11 @@ namespace Aura.Views.AlphaCoders
                             string sourceUrl = sourceUrlElement.GetString();
                             // Update the SourceUrl property of the current wallpaper
                             _currentWallpaper.SourceUrl = sourceUrl;
-                            System.Diagnostics.Debug.WriteLine($"Set SourceUrl to: {sourceUrl}");
                         }
                         else
                         {
                             // If no source URL in API, create one based on wallpaper ID
                             _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{wallpaperId}";
-                            System.Diagnostics.Debug.WriteLine($"Created fallback SourceUrl: {_currentWallpaper.SourceUrl}");
                         }
 
                         // Update UI with publisher information on the UI thread
@@ -471,17 +424,14 @@ namespace Aura.Views.AlphaCoders
                     }
                     else
                     {
-                        System.Diagnostics.Debug.WriteLine("Publisher info not found in API response");
                     }
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error fetching publisher details: {response.StatusCode}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Exception while loading publisher details: {ex.Message}");
             }
         }
 
@@ -576,14 +526,12 @@ namespace Aura.Views.AlphaCoders
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Error setting publisher profile image: {ex.Message}");
                         // Keep the default gradient and silhouette
                     }
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error updating publisher UI: {ex.Message}");
             }
         }
 
@@ -660,9 +608,6 @@ namespace Aura.Views.AlphaCoders
                     var bigThumbPath = bigThumbUri.AbsolutePath;
                     var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
 
-                    System.Diagnostics.Debug.WriteLine($"Debug - Big thumb URL: {bigThumbUrl}");
-                    System.Diagnostics.Debug.WriteLine($"Debug - Big thumb path: {bigThumbPath}");
-                    System.Diagnostics.Debug.WriteLine($"Debug - Extracted extension: {extension}");
 
                     // Build original URL with same extension
                     var imageId = _currentWallpaper.Id;
@@ -672,19 +617,14 @@ namespace Aura.Views.AlphaCoders
 
                     var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
 
-                    System.Diagnostics.Debug.WriteLine($"Debug - Image ID: {imageId}");
-                    System.Diagnostics.Debug.WriteLine($"Debug - Domain short: {domainShort}");
-                    System.Diagnostics.Debug.WriteLine($"Debug - Original URL: {originalUrl}");
 
                     byte[] imageBytes;
                     try
                     {
                         imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                        System.Diagnostics.Debug.WriteLine($"Successfully downloaded from: {originalUrl}");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Failed to download from {originalUrl}: {ex.Message}");
                         throw new Exception($"Failed to download original image. Error: {ex.Message}");
                     }
 
@@ -694,13 +634,11 @@ namespace Aura.Views.AlphaCoders
                     // Use the same extension as determined above
                     string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
 
-                    System.Diagnostics.Debug.WriteLine($"Debug - File extension for saving: {fileExtension}");
 
                     var wallpaperFile = await wallpapersFolder.CreateFileAsync(
                         $"wallpaper-{_currentWallpaper.Id}-{timestamp}.{fileExtension}",
                         CreationCollisionOption.GenerateUniqueName);
 
-                    System.Diagnostics.Debug.WriteLine($"Debug - Final file path: {wallpaperFile.Path}");
 
                     // Write the image to the file
                     using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
@@ -744,7 +682,6 @@ namespace Aura.Views.AlphaCoders
                         throw new Exception("Failed to save wallpaper image properly.");
                     }
 
-                    System.Diagnostics.Debug.WriteLine($"Wallpaper saved to: {wallpaperFile.Path}");
 
                     // Try to set the wallpaper or lock screen using WinRT API
                     var userProfilePersonalizationSettings = UserProfilePersonalizationSettings.Current;
@@ -755,13 +692,10 @@ namespace Aura.Views.AlphaCoders
                         try
                         {
                             // Method 1: WinRT API
-                            System.Diagnostics.Debug.WriteLine("Attempting to set desktop wallpaper using WinRT API...");
                             success = await userProfilePersonalizationSettings.TrySetWallpaperImageAsync(wallpaperFile);
-                            System.Diagnostics.Debug.WriteLine($"WinRT API result for desktop wallpaper: {success}");
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"WinRT API failed for desktop wallpaper: {ex.Message}");
                             errorMessage = ex.Message;
                         }
 
@@ -770,13 +704,10 @@ namespace Aura.Views.AlphaCoders
                         {
                             try
                             {
-                                System.Diagnostics.Debug.WriteLine("WinRT API failed or returned false, trying WallpaperHelper...");
                                 success = WallpaperHelper.SetWallpaper(wallpaperFile.Path);
-                                System.Diagnostics.Debug.WriteLine($"WallpaperHelper result: {success}");
                             }
                             catch (Exception innerEx)
                             {
-                                System.Diagnostics.Debug.WriteLine($"WallpaperHelper also failed: {innerEx.Message}");
                                 errorMessage += $" Fallback method also failed: {innerEx.Message}";
                             }
                         }
@@ -787,13 +718,10 @@ namespace Aura.Views.AlphaCoders
                         try
                         {
                             // Method 1: WinRT API
-                            System.Diagnostics.Debug.WriteLine("Attempting to set lock screen using WinRT API...");
                             success = await userProfilePersonalizationSettings.TrySetLockScreenImageAsync(wallpaperFile);
-                            System.Diagnostics.Debug.WriteLine($"WinRT API result for lock screen: {success}");
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"WinRT API failed for lock screen: {ex.Message}");
                             errorMessage = ex.Message;
                         }
 
@@ -802,13 +730,10 @@ namespace Aura.Views.AlphaCoders
                         {
                             try
                             {
-                                System.Diagnostics.Debug.WriteLine("WinRT API failed or returned false, trying WallpaperHelper for lock screen...");
                                 success = WallpaperHelper.SetLockScreen(wallpaperFile.Path);
-                                System.Diagnostics.Debug.WriteLine($"WallpaperHelper lock screen result: {success}");
                             }
                             catch (Exception innerEx)
                             {
-                                System.Diagnostics.Debug.WriteLine($"WallpaperHelper for lock screen also failed: {innerEx.Message}");
                                 errorMessage += $" Fallback method also failed: {innerEx.Message}";
                             }
                         }
@@ -817,7 +742,6 @@ namespace Aura.Views.AlphaCoders
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error setting {(wallpaperType == WallpaperType.Desktop ? "desktop wallpaper" : "lock screen")}: {ex.Message}");
                     errorMessage = ex.Message;
                 }
 
@@ -845,7 +769,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in Set{(wallpaperType == WallpaperType.Desktop ? "Desktop" : "LockScreen")}: {ex.Message}");
                 await ShowErrorDialogAsync($"An error occurred: {ex.Message}");
             }
         }
@@ -872,7 +795,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error opening browser: {ex.Message}");
                 await ShowErrorDialogAsync("Error opening source URL");
             }
         }
@@ -927,7 +849,6 @@ namespace Aura.Views.AlphaCoders
                     safeFileName = string.Join("_", safeFileName.Split(System.IO.Path.GetInvalidFileNameChars()));
                     var fileName = $"{safeFileName}_{_currentWallpaper.Id}.{correctExtension}";
 
-                    System.Diagnostics.Debug.WriteLine($"Debug Download - Download filename: {fileName}");
 
                     // Create the file in the downloads folder
                     var downloadFile = await appFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
@@ -940,19 +861,14 @@ namespace Aura.Views.AlphaCoders
 
                     var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{correctExtension}";
 
-                    System.Diagnostics.Debug.WriteLine($"Debug Download - Image ID: {imageId}");
-                    System.Diagnostics.Debug.WriteLine($"Debug Download - Domain short: {domainShort}");
-                    System.Diagnostics.Debug.WriteLine($"Debug Download - Original URL: {originalUrl}");
 
                     byte[] imageBytes;
                     try
                     {
                         imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                        System.Diagnostics.Debug.WriteLine($"Successfully downloaded from: {originalUrl}");
                     }
                     catch (Exception ex)
                     {
-                        System.Diagnostics.Debug.WriteLine($"Failed to download from {originalUrl}: {ex.Message}");
                         throw new Exception($"Failed to download original image. Error: {ex.Message}");
                     }
                     using (var stream = await downloadFile.OpenStreamForWriteAsync())
@@ -971,13 +887,11 @@ namespace Aura.Views.AlphaCoders
                     // Hide progress dialog
                     progressDialog.Hide();
 
-                    System.Diagnostics.Debug.WriteLine($"Error downloading file: {ex.Message}");
                     await ShowErrorDialogAsync($"Error downloading wallpaper: {ex.Message}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error in DownloadWallpaper: {ex.Message}");
                 await ShowErrorDialogAsync($"An error occurred: {ex.Message}");
             }
         }
@@ -1011,7 +925,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error getting window via reflection: {ex.Message}");
             }
 
             return null;

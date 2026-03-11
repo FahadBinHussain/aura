@@ -30,19 +30,16 @@ namespace Aura
             AppDomain.CurrentDomain.UnhandledException += CurrentDomain_UnhandledException;
             TaskScheduler.UnobservedTaskException += TaskScheduler_UnobservedTaskException;
 
-            LogInfo("Application initialized");
         }
 
         protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
         {
             try
             {
-                LogInfo("OnLaunched started");
 
                 m_window = new MainWindow();
                 m_window.Activate();
 
-                LogInfo("Main window activated");
             }
             catch (Exception ex)
             {

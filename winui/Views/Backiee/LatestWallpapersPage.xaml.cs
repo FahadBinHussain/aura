@@ -81,11 +81,9 @@ namespace Aura.Views.Backiee
                 _placeholderImage.UriSource = new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png");
 
                 // Log success
-                System.Diagnostics.Debug.WriteLine("Placeholder image initialized successfully");
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error initializing placeholder image: {ex.Message}");
                 // Create a fallback placeholder if needed
                 _placeholderImage = new BitmapImage();
             }
@@ -158,7 +156,6 @@ namespace Aura.Views.Backiee
                             string title = wallpaperElement.GetProperty("Title").GetString();
 
                             // Debug output the full JSON for this wallpaper
-                            System.Diagnostics.Debug.WriteLine($"Wallpaper {id} JSON: {wallpaperElement.ToString()}");
 
                             // Try to get MiniPhotoUrl
                             string imageUrl;
@@ -170,7 +167,6 @@ namespace Aura.Views.Backiee
                             {
                                 // If MiniPhotoUrl doesn't exist, use a default or the regular photo URL from the API
                                 imageUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
-                                System.Diagnostics.Debug.WriteLine($"MiniPhotoUrl not found for wallpaper ID {id}, using regular photo URL instead");
                             }
 
                             // Get FullPhotoUrl with proper error handling
@@ -178,11 +174,9 @@ namespace Aura.Views.Backiee
                             try
                             {
                                 fullPhotoUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
-                                System.Diagnostics.Debug.WriteLine($"FullPhotoUrl for ID {id}: {fullPhotoUrl}");
                             }
                             catch (Exception ex)
                             {
-                                System.Diagnostics.Debug.WriteLine($"Error getting FullPhotoUrl for ID {id}: {ex.Message}");
                                 // Fallback to using the thumbnail URL if full photo URL is not available
                                 fullPhotoUrl = imageUrl;
                             }
@@ -235,7 +229,6 @@ namespace Aura.Views.Backiee
             catch (Exception ex)
             {
                 // Log the exception
-                System.Diagnostics.Debug.WriteLine($"Error loading wallpapers: {ex.Message}");
                 _hasMoreItems = false;
             }
             finally
@@ -279,13 +272,11 @@ namespace Aura.Views.Backiee
         private void FilterButton_Click(object sender, RoutedEventArgs e)
         {
             // Just log to debug
-            System.Diagnostics.Debug.WriteLine("Filter button clicked");
         }
 
         private void SetAsSlideshowButton_Click(object sender, RoutedEventArgs e)
         {
             // Just log to debug
-            System.Diagnostics.Debug.WriteLine("Set as slideshow button clicked");
         }
 
         private void WallpapersWrapGrid_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -331,7 +322,6 @@ namespace Aura.Views.Backiee
         private void WallpapersGridView_ContainerContentChanging(ListViewBase sender, ContainerContentChangingEventArgs args)
         {
             // Add logging to track container lifecycle
-            System.Diagnostics.Debug.WriteLine($"Container changing for phase {args.Phase}, recycling: {args.InRecycleQueue}");
 
             if (args.InRecycleQueue)
             {
@@ -393,7 +383,6 @@ namespace Aura.Views.Backiee
                 }
                 catch (Exception ex)
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error in ShowImage: {ex.Message}");
                 }
             }
         }
@@ -402,7 +391,6 @@ namespace Aura.Views.Backiee
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"Starting image load for {wallpaper.Id} with key {requestKey}");
 
                 // Load the image asynchronously
                 var bitmap = await wallpaper.LoadImageAsync();
@@ -413,7 +401,6 @@ namespace Aura.Views.Backiee
                     // Set up event handlers to track loading
                     bitmap.ImageOpened += (s, e) =>
                     {
-                        System.Diagnostics.Debug.WriteLine($"SUCCESS: Image loaded for {wallpaper.Id}");
 
                         // After successful load, update the item's ImageSource
                         wallpaper.ImageSource = bitmap;
@@ -427,7 +414,6 @@ namespace Aura.Views.Backiee
 
                     bitmap.ImageFailed += (s, e) =>
                     {
-                        System.Diagnostics.Debug.WriteLine($"FAILED: Image failed to load for {wallpaper.Id}: {e.ErrorMessage}");
 
                         // If image fails to load, ensure we keep the placeholder
                         if (_dispatcherQueue.HasThreadAccess && imageControl.Tag?.ToString() == requestKey)
@@ -442,7 +428,6 @@ namespace Aura.Views.Backiee
                         // Always update on UI thread to avoid threading issues
                         if (_dispatcherQueue.HasThreadAccess)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Setting image source for {wallpaper.Id}");
                             imageControl.Source = bitmap;
                         }
                         else
@@ -451,7 +436,6 @@ namespace Aura.Views.Backiee
                             {
                                 if (imageControl.Tag?.ToString() == requestKey)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"Setting image source via dispatcher for {wallpaper.Id}");
                                     imageControl.Source = bitmap;
                                 }
                             });
@@ -460,12 +444,10 @@ namespace Aura.Views.Backiee
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Failed to create bitmap for {wallpaper.Id}");
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Exception loading image for {wallpaper.Id}: {ex.Message}");
 
                 // Keep the placeholder on failure
                 if (imageControl.Tag?.ToString() == requestKey && _dispatcherQueue.HasThreadAccess)
@@ -538,7 +520,6 @@ namespace Aura.Views.Backiee
                             if (image.Source == null)
                             {
                                 image.Source = _placeholderImage;
-                                System.Diagnostics.Debug.WriteLine("Set placeholder for idle item with no source");
                             }
                             // Don't override images that are already being loaded or displayed
                         }
@@ -547,7 +528,6 @@ namespace Aura.Views.Backiee
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error setting placeholders: {ex.Message}");
             }
         }
     }

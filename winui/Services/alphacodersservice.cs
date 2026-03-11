@@ -24,7 +24,6 @@ namespace Aura.Services
 
         private static void LogDebug(string message)
         {
-            System.Diagnostics.Debug.WriteLine(message);
             DebugLogger?.Invoke(message);
         }
 
@@ -47,7 +46,6 @@ namespace Aura.Services
         {
             try
             {
-                LogDebug($"Requesting page {page} with {count} wallpapers");
 
                 // Load the requested page if we haven't loaded it yet
                 if (page > _lastScrapedPage)
@@ -55,17 +53,14 @@ namespace Aura.Services
                     // Load only the pages we need, not all from 1 to current
                     for (int p = _lastScrapedPage + 1; p <= page; p++)
                     {
-                        LogDebug($"Loading page {p} from scraper...");
                         var newWallpapers = await _scraperService.ScrapeWallpapersAsync(p, p);
                         if (newWallpapers.Count > 0)
                         {
                             _cachedWallpapers.AddRange(newWallpapers);
                             _lastScrapedPage = p;
-                            LogDebug($"Loaded {newWallpapers.Count} wallpapers from page {p}");
                         }
                         else
                         {
-                            LogDebug($"No wallpapers found on page {p}");
                             break; // Stop loading if we hit an empty page
                         }
                     }
@@ -77,18 +72,15 @@ namespace Aura.Services
 
                 if (startIndex >= _cachedWallpapers.Count)
                 {
-                    LogDebug($"No wallpapers available for page {page}");
                     return new List<WallpaperItem>();
                 }
 
                 var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
-                LogDebug($"Returning {pageWallpapers.Count} wallpapers for page {page}");
 
                 return pageWallpapers;
             }
             catch (Exception ex)
             {
-                LogDebug($"Error fetching wallpapers: {ex.Message}");
                 return new List<WallpaperItem>();
             }
         }
@@ -97,12 +89,10 @@ namespace Aura.Services
         {
             try
             {
-                LogDebug($"Requesting category '{category}' page {page} with {count} wallpapers");
 
                 // Clear cache if category changed
                 if (category != _currentCategory)
                 {
-                    LogDebug($"Category changed from '{_currentCategory}' to '{category}', clearing cache");
                     _cachedWallpapers.Clear();
                     _lastScrapedPage = 0;
                     _currentCategory = category;
@@ -122,17 +112,14 @@ namespace Aura.Services
                 {
                     for (int p = _lastScrapedPage + 1; p <= page; p++)
                     {
-                        LogDebug($"Loading page {p} from scraper with search term '{searchTerm}'...");
                         var newWallpapers = await _scraperService.ScrapeWallpapersByCategoryAsync(searchTerm, p, p);
                         if (newWallpapers.Count > 0)
                         {
                             _cachedWallpapers.AddRange(newWallpapers);
                             _lastScrapedPage = p;
-                            LogDebug($"Loaded {newWallpapers.Count} wallpapers from page {p}");
                         }
                         else
                         {
-                            LogDebug($"No wallpapers found on page {p}");
                             break;
                         }
                     }
@@ -144,18 +131,15 @@ namespace Aura.Services
 
                 if (startIndex >= _cachedWallpapers.Count)
                 {
-                    LogDebug($"No wallpapers available for page {page}");
                     return new List<WallpaperItem>();
                 }
 
                 var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
-                LogDebug($"Returning {pageWallpapers.Count} wallpapers for page {page}");
 
                 return pageWallpapers;
             }
             catch (Exception ex)
             {
-                LogDebug($"Error fetching wallpapers by category: {ex.Message}");
                 return new List<WallpaperItem>();
             }
         }
@@ -186,12 +170,10 @@ namespace Aura.Services
                 if (response.IsSuccessStatusCode)
                 {
                     string htmlContent = await response.Content.ReadAsStringAsync();
-                    System.Diagnostics.Debug.WriteLine($"Successfully fetched wallpaper details, length: {htmlContent.Length}");
                     var wallpaper = ParseHtmlWallpaperDetails(htmlContent, wallpaperId);
 
                     if (wallpaper == null)
                     {
-                        System.Diagnostics.Debug.WriteLine("Failed to parse wallpaper details, using placeholder");
                         return GeneratePlaceholderWallpaper(wallpaperId);
                     }
 
@@ -199,13 +181,11 @@ namespace Aura.Services
                 }
                 else
                 {
-                    System.Diagnostics.Debug.WriteLine($"Error fetching wallpaper details: {response.StatusCode}");
                     return GeneratePlaceholderWallpaper(wallpaperId);
                 }
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error fetching wallpaper details: {ex.Message}");
                 return GeneratePlaceholderWallpaper(wallpaperId);
             }
         }
@@ -220,7 +200,6 @@ namespace Aura.Services
                     var cachedWallpaper = _cachedWallpapers.FirstOrDefault(w => w.Id == wallpaperId);
                     if (cachedWallpaper != null && !string.IsNullOrEmpty(cachedWallpaper.SourceUrl))
                     {
-                        System.Diagnostics.Debug.WriteLine($"Using scraped original URL: {cachedWallpaper.SourceUrl}");
                         return cachedWallpaper.SourceUrl;
                     }
                 }
@@ -230,7 +209,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error getting download URL: {ex.Message}");
                 return null;
             }
         }
@@ -274,42 +252,35 @@ namespace Aura.Services
                             imgStartIndex += imgPattern.Length;
                             int imgEndIndex = htmlContent.IndexOf('"', imgStartIndex);
                             string imageUrl = htmlContent.Substring(imgStartIndex, imgEndIndex - imgStartIndex);
-                    System.Diagnostics.Debug.WriteLine($"Extracted detail image URL: {imageUrl}");
 
                     // Ensure the URL is absolute
                     if (imageUrl.StartsWith("//"))
                     {
                         imageUrl = "https:" + imageUrl;
-                        System.Diagnostics.Debug.WriteLine($"Fixed protocol-relative detail URL to: {imageUrl}");
                     }
                     else if (imageUrl.StartsWith("/"))
                     {
                         imageUrl = _wallBaseUrl + imageUrl;
-                        System.Diagnostics.Debug.WriteLine($"Fixed relative detail URL to: {imageUrl}");
                     }
 
                             // Ensure the URL is absolute
                             if (imageUrl.StartsWith("//"))
                             {
                                 imageUrl = "https:" + imageUrl;
-                                System.Diagnostics.Debug.WriteLine($"Fixed protocol-relative URL to: {imageUrl}");
                             }
                             else if (imageUrl.StartsWith("/"))
                             {
                                 imageUrl = _wallBaseUrl + imageUrl;
-                                System.Diagnostics.Debug.WriteLine($"Fixed relative URL to: {imageUrl}");
                             }
 
                             // Ensure the URL is absolute
                             if (imageUrl.StartsWith("//"))
                             {
                                 imageUrl = "https:" + imageUrl;
-                                System.Diagnostics.Debug.WriteLine($"Fixed protocol-relative URL to: {imageUrl}");
                             }
                             else if (imageUrl.StartsWith("/"))
                             {
                                 imageUrl = _wallBaseUrl + imageUrl;
-                                System.Diagnostics.Debug.WriteLine($"Fixed relative URL to: {imageUrl}");
                             }
 
                             // Find the title
@@ -345,7 +316,6 @@ namespace Aura.Services
                                 }
                                 catch (Exception ex)
                                 {
-                                    System.Diagnostics.Debug.WriteLine($"Error loading image: {ex.Message}");
                                     // Use placeholder image if loading fails
                                     wallpaper.ImageSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png"));
                                 }
@@ -363,7 +333,6 @@ namespace Aura.Services
                 // If we didn't find any wallpapers, return placeholders
                 if (wallpapers.Count == 0)
                 {
-                    System.Diagnostics.Debug.WriteLine("No wallpapers found in HTML, using placeholders");
                     return GeneratePlaceholderWallpapers(count);
                 }
 
@@ -371,7 +340,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error parsing HTML: {ex.Message}");
                 return GeneratePlaceholderWallpapers(count);
             }
         }
@@ -458,7 +426,6 @@ namespace Aura.Services
                         }
                         catch (Exception ex)
                         {
-                            System.Diagnostics.Debug.WriteLine($"Error loading detail image: {ex.Message}");
                             // Use placeholder image if loading fails
                             wallpaper.ImageSource = new Microsoft.UI.Xaml.Media.Imaging.BitmapImage(new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png"));
                         }
@@ -472,7 +439,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error parsing HTML details: {ex.Message}");
                 return null;
             }
         }
@@ -518,7 +484,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error parsing wallpaper response: {ex.Message}");
             }
 
             return wallpapers;
@@ -552,7 +517,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error parsing resolution: {ex.Message}");
             }
 
             return string.Empty;

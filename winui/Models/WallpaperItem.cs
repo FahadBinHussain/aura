@@ -67,7 +67,6 @@ namespace Aura.Models
         // Async method to load the actual image when needed with WebP support
         public async Task<BitmapImage> LoadImageAsync()
         {
-            System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Starting to load image from URL: {ImageUrl}");
 
             using (var httpClient = new System.Net.Http.HttpClient())
             {
@@ -77,16 +76,13 @@ namespace Aura.Models
                 httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
                 httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
 
-                System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Making HTTP request to {ImageUrl}");
 
                 // Download the image data
                 var imageBytes = await httpClient.GetByteArrayAsync(ImageUrl);
-                System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Downloaded {imageBytes.Length} bytes for {ImageUrl}");
 
                 // Convert WebP to PNG using ImageSharp
                 using (var inputStream = new MemoryStream(imageBytes))
                 {
-                    System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Converting image format for {ImageUrl}");
 
                     // Load the image using ImageSharp (supports WebP)
                     using (var image = await Image.LoadAsync(inputStream))
@@ -97,7 +93,6 @@ namespace Aura.Models
                             await image.SaveAsPngAsync(outputStream);
                             outputStream.Position = 0;
 
-                            System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Converted to PNG, size: {outputStream.Length} bytes");
 
                             // Create BitmapImage from PNG data
                             var bitmap = new BitmapImage();
@@ -111,7 +106,6 @@ namespace Aura.Models
 
                             // Set bitmap source
                             await bitmap.SetSourceAsync(randomAccessStream);
-                            System.Diagnostics.Debug.WriteLine($"LoadImageAsync: Successfully created bitmap for {ImageUrl}");
 
                             return bitmap;
                         }
@@ -125,7 +119,6 @@ namespace Aura.Models
         {
             try
             {
-                System.Diagnostics.Debug.WriteLine($"Loading full image from URL: {FullPhotoUrl}");
 
                 using (var httpClient = new System.Net.Http.HttpClient())
                 {
@@ -137,7 +130,6 @@ namespace Aura.Models
 
                     // Download the image data
                     var imageBytes = await httpClient.GetByteArrayAsync(FullPhotoUrl);
-                    System.Diagnostics.Debug.WriteLine($"Downloaded {imageBytes.Length} bytes for full image");
 
                     // Convert WebP to PNG using ImageSharp
                     using (var inputStream = new MemoryStream(imageBytes))
@@ -150,7 +142,6 @@ namespace Aura.Models
                                 // Convert to PNG
                                 await image.SaveAsPngAsync(outputStream);
                                 outputStream.Position = 0;
-                                System.Diagnostics.Debug.WriteLine($"Converted full image to PNG, size: {outputStream.Length} bytes");
 
                                 // Create BitmapImage from PNG data
                                 var bitmap = new BitmapImage();
@@ -163,7 +154,6 @@ namespace Aura.Models
 
                                 // Set bitmap source
                                 await bitmap.SetSourceAsync(randomAccessStream);
-                                System.Diagnostics.Debug.WriteLine($"Successfully created full image bitmap");
 
                                 return bitmap;
                             }
@@ -173,8 +163,6 @@ namespace Aura.Models
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"Error loading full image from {FullPhotoUrl}: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Stack trace: {ex.StackTrace}");
 
                 // Return null instead of throwing - let the calling code handle this
                 return null;

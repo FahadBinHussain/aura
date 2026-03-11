@@ -34,10 +34,6 @@ namespace Aura.Views.AlphaCoders
 
             _alphaCodersService = new AlphaCodersService();
             
-            // Set up debug logging
-            AlphaCodersService.DebugLogger = AppendDebugLog;
-            AppendDebugLog("AlphaCodersGridPage initialized");
-            
             // Set ItemsSource after all initialization is complete
             try
             {
@@ -48,7 +44,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                AppendDebugLog($"Error setting ItemsSource: {ex.Message}");
             }
         }
 
@@ -64,7 +59,6 @@ namespace Aura.Views.AlphaCoders
             }
             else
             {
-                AppendDebugLog("Page already initialized, preserving state");
             }
         }
 
@@ -86,7 +80,6 @@ namespace Aura.Views.AlphaCoders
                 _currentPage = 1;
                 _hasMoreWallpapers = true;
                 
-                AppendDebugLog($"Switched to category: {category}");
                 LoadWallpapers();
             }
         }
@@ -123,15 +116,12 @@ namespace Aura.Views.AlphaCoders
             {
                 _isLoading = true;
                 LoadingProgressBar.Visibility = Visibility.Visible;
-                AppendDebugLog($"Loading page {_currentPage} for category {_currentCategory}");
 
                 var newWallpapers = await _alphaCodersService.GetWallpapersByCategoryAsync(_currentCategory, _currentPage);
-                AppendDebugLog($"Received {newWallpapers.Count} wallpapers");
 
                 if (newWallpapers.Count == 0)
                 {
                     _hasMoreWallpapers = false;
-                    AppendDebugLog("No more wallpapers available");
                 }
                 else
                 {
@@ -140,13 +130,10 @@ namespace Aura.Views.AlphaCoders
                         _wallpapers.Add(wallpaper);
                     }
                     _currentPage++;
-                    AppendDebugLog($"Added {newWallpapers.Count} wallpapers, page: {_currentPage}");
                 }
             }
             catch (Exception ex)
             {
-                AppendDebugLog($"Error loading wallpapers: {ex.Message}");
-                System.Diagnostics.Debug.WriteLine($"Error loading wallpapers: {ex.Message}");
             }
             finally
             {
@@ -168,43 +155,33 @@ namespace Aura.Views.AlphaCoders
         {
             try
             {
-                AppendDebugLog("ItemClick event triggered");
 
                 if (e?.ClickedItem is WallpaperItem wallpaper)
                 {
-                    AppendDebugLog($"Clicked item is WallpaperItem with ID: {wallpaper.Id}");
 
                     // Use MainWindow static instance to access NavigationFrame
                     if (MainWindow.Instance?.NavigationFrame == null)
                     {
-                        AppendDebugLog("MainWindow.Instance or NavigationFrame is null - cannot navigate");
                         return;
                     }
 
-                    AppendDebugLog($"Navigating to detail page for wallpaper {wallpaper.Id}");
 
                     // Navigate using the main window's NavigationFrame to the AlphaCoders WallpaperDetailPage
                     bool navigationResult = MainWindow.Instance.NavigationFrame.Navigate(typeof(WallpaperDetailPage), wallpaper);
 
                     if (!navigationResult)
                     {
-                        AppendDebugLog("Navigation failed - Frame.Navigate returned false");
                     }
                     else
                     {
-                        AppendDebugLog("Navigation succeeded - Frame.Navigate returned true");
                     }
                 }
                 else
                 {
-                    AppendDebugLog($"ClickedItem is not WallpaperItem. Type: {e?.ClickedItem?.GetType()?.Name ?? "null"}");
                 }
             }
             catch (Exception ex)
             {
-                AppendDebugLog($"Error during navigation: {ex.Message}");
-                AppendDebugLog($"Stack trace: {ex.StackTrace}");
-                System.Diagnostics.Debug.WriteLine($"Navigation error: {ex.Message}");
             }
         }
 
@@ -231,12 +208,10 @@ namespace Aura.Views.AlphaCoders
                             }
                             else
                             {
-                                AppendDebugLog($"Failed to load image for wallpaper {w.Id}");
                             }
                         }
                         catch (Exception ex)
                         {
-                            AppendDebugLog($"Error loading image {w.Id}: {ex.Message}");
                         }
                     }
                 });
@@ -299,7 +274,6 @@ namespace Aura.Views.AlphaCoders
             }
             catch (Exception ex)
             {
-                AppendDebugLog($"Error copying debug log: {ex.Message}");
             }
         }
     }

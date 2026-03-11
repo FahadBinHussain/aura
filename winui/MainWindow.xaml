@@ -565,6 +565,31 @@
                    Padding="0"
                    Background="Transparent">
             </Frame>
+
+            <!-- Persistent "Next Gen Edition" badge with hot-reload button (overlays all pages) -->
+            <Border Grid.Column="1"
+                    VerticalAlignment="Bottom"
+                    HorizontalAlignment="Right"
+                    Margin="0,0,16,12"
+                    Padding="8,4"
+                    CornerRadius="16"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    IsHitTestVisible="True">
+                <StackPanel Orientation="Horizontal" Spacing="4" VerticalAlignment="Center">
+                    <TextBlock Text="Next Gen Edition" FontSize="12" Opacity="0.7" VerticalAlignment="Center"/>
+                    <Button x:Name="HotReloadButton"
+                            ToolTipService.ToolTip="Restart app (use dev.bat for auto-relaunch)"
+                            Padding="5,3"
+                            CornerRadius="10"
+                            BorderThickness="0"
+                            Background="Transparent"
+                            Click="HotReloadButton_Click">
+                        <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE72C;" FontSize="13"/>
+                    </Button>
+                </StackPanel>
+            </Border>
         </Grid>
     </Grid>
 </Window>

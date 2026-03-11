@@ -41,6 +41,14 @@ namespace Aura.Services
         private TimeSpan _desktopInterval = TimeSpan.FromHours(12);
         private TimeSpan _lockScreenInterval = TimeSpan.FromHours(12);
         
+        // Track next wallpaper change times
+        private DateTime _desktopNextChangeTime = DateTime.MinValue;
+        private DateTime _lockScreenNextChangeTime = DateTime.MinValue;
+        
+        // Guard flags to prevent overlapping timer ticks (race condition)
+        private bool _isChangingDesktop = false;
+        private bool _isChangingLockScreen = false;
+        
         // Track current platform for desktop and lockscreen
         private string _desktopPlatform = "";
         private string _lockScreenPlatform = "";
@@ -52,6 +60,12 @@ namespace Aura.Services
         // Events for wallpaper changes
         public event EventHandler<string>? DesktopWallpaperChanged;
         public event EventHandler<string>? LockScreenWallpaperChanged;
+        
+        // Properties to get next change times
+        public DateTime DesktopNextChangeTime => _desktopNextChangeTime;
+        public DateTime LockScreenNextChangeTime => _lockScreenNextChangeTime;
+        public TimeSpan DesktopInterval => _desktopInterval;
+        public TimeSpan LockScreenInterval => _lockScreenInterval;
 
         // Windows API for setting desktop wallpaper
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
@@ -76,7 +90,6 @@ namespace Aura.Services
             }
             catch
             {
-                Debug.WriteLine($"[SlideshowService] {message}");
             }
         }
 
@@ -84,7 +97,6 @@ namespace Aura.Services
         {
             try
             {
-                LogInfo($"Starting desktop slideshow: {platform} - {category}, Interval: {interval}");
 
                 // Store parameters for batch loading
                 _desktopCategory = category;
@@ -102,45 +114,58 @@ namespace Aura.Services
 
                 if (_desktopWallpapers.Count == 0)
                 {
-                    LogInfo("ERROR: No wallpapers loaded for desktop slideshow");
                     return;
                 }
 
-                LogInfo($"Loaded {_desktopWallpapers.Count} wallpapers");
 
                 // Set first wallpaper immediately (or current index if resuming)
                 await SetDesktopWallpaper(_desktopWallpapers[_desktopCurrentIndex]);
                 SaveProgress();
+                
+                
+                // Set next change time AFTER wallpaper is set
+                _desktopNextChangeTime = DateTime.Now.Add(interval);
+                LogInfo($"[NEW CODE] Desktop next change time set to: {_desktopNextChangeTime}");
 
-                // Create and start timer
+                // Use one-shot timer so the countdown restarts AFTER work completes
+                // This ensures: set wallpaper → countdown → download → set → countdown → ...
                 _desktopTimer = dispatcherQueue.CreateTimer();
                 _desktopTimer.Interval = interval;
+                _desktopTimer.IsRepeating = false;
                 _desktopTimer.Tick += async (sender, e) =>
                 {
+                    if (_isChangingDesktop) return;
+                    _isChangingDesktop = true;
                     try
                     {
                         await NextDesktopWallpaper();
+                        // Countdown starts only after wallpaper is successfully set
+                        _desktopNextChangeTime = DateTime.Now.Add(interval);
+                        LogInfo($"[NEW CODE] Desktop next change time set to: {_desktopNextChangeTime}");
+                        // Restart timer for next cycle
+                        if (_desktopTimer != null)
+                        {
+                            _desktopTimer.Start();
+                        }
                     }
                     catch (Exception ex)
                     {
-                        LogInfo($"ERROR in timer tick: {ex.Message}");
-                        LogInfo($"Stack trace: {ex.StackTrace}");
+                    }
+                    finally
+                    {
+                        _isChangingDesktop = false;
                     }
                 };
                 _desktopTimer.Start();
 
-                LogInfo($"Desktop slideshow started successfully with {_desktopWallpapers.Count} wallpapers");
             }
             catch (Exception ex)
             {
-                LogInfo($"ERROR starting desktop slideshow: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
         public async Task StartLockScreenSlideshow(string platform, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
         {
-            LogInfo($"Starting lock screen slideshow: {platform} - {category}, Interval: {interval}");
 
             // Store parameters for batch loading
             _lockScreenCategory = category;
@@ -158,32 +183,47 @@ namespace Aura.Services
 
             if (_lockScreenWallpapers.Count == 0)
             {
-                LogInfo("No wallpapers loaded for lock screen slideshow");
                 return;
             }
 
             // Set first wallpaper immediately (or current index if resuming)
             await SetLockScreenWallpaper(_lockScreenWallpapers[_lockScreenCurrentIndex]);
             SaveProgress();
+            
+            // Set next change time AFTER wallpaper is set
+            _lockScreenNextChangeTime = DateTime.Now.Add(interval);
+            LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
 
-            // Create and start timer
+            // Use one-shot timer so the countdown restarts AFTER work completes
             _lockScreenTimer = dispatcherQueue.CreateTimer();
             _lockScreenTimer.Interval = interval;
+            _lockScreenTimer.IsRepeating = false;
             _lockScreenTimer.Tick += async (sender, e) =>
             {
+                if (_isChangingLockScreen) return;
+                _isChangingLockScreen = true;
                 try
                 {
                     await NextLockScreenWallpaper();
+                    // Countdown starts only after wallpaper is successfully set
+                    _lockScreenNextChangeTime = DateTime.Now.Add(interval);
+                    LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
+                    // Restart timer for next cycle
+                    if (_lockScreenTimer != null)
+                    {
+                        _lockScreenTimer.Start();
+                    }
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"ERROR in lock screen timer tick: {ex.Message}");
-                    LogInfo($"Stack trace: {ex.StackTrace}");
+                }
+                finally
+                {
+                    _isChangingLockScreen = false;
                 }
             };
             _lockScreenTimer.Start();
 
-            LogInfo($"Lock screen slideshow started with {_lockScreenWallpapers.Count} wallpapers");
         }
 
         public void StopDesktopSlideshow()
@@ -192,8 +232,8 @@ namespace Aura.Services
             {
                 _desktopTimer.Stop();
                 _desktopTimer = null;
-                LogInfo("Desktop slideshow stopped");
             }
+            _isChangingDesktop = false;
         }
 
         public void StopLockScreenSlideshow()
@@ -202,20 +242,18 @@ namespace Aura.Services
             {
                 _lockScreenTimer.Stop();
                 _lockScreenTimer = null;
-                LogInfo("Lock screen slideshow stopped");
             }
+            _isChangingLockScreen = false;
         }
 
         public async Task NextDesktopWallpaper()
         {
             try
             {
-                LogInfo($"NextDesktopWallpaper called - Current index: {_desktopCurrentIndex}, Batch: {_desktopCurrentBatch}, Count: {_desktopWallpapers.Count}");
                 
                 if (_desktopWallpapers.Count > 0)
                 {
                     _desktopCurrentIndex++;
-                    LogInfo($"Incremented index to: {_desktopCurrentIndex}");
                     
                     // Check if we've reached the end of current batch
                     if (_desktopCurrentIndex >= _desktopWallpapers.Count)
@@ -223,32 +261,25 @@ namespace Aura.Services
                         // Load next batch
                         _desktopCurrentBatch++;
                         _desktopCurrentIndex = 0;
-                        LogInfo($"End of batch reached. Loading next desktop batch: {_desktopCurrentBatch}, Platform: {_desktopPlatform}, Category: {_desktopCategory}");
                         await LoadWallpapersForDesktop(_desktopPlatform, _desktopCategory);
                         SaveProgress(); // Save progress after loading new batch
-                        LogInfo($"After loading: Wallpapers count: {_desktopWallpapers.Count}");
                     }
                     
                     if (_desktopWallpapers.Count > 0 && _desktopCurrentIndex < _desktopWallpapers.Count)
                     {
-                        LogInfo($"Setting wallpaper at index {_desktopCurrentIndex}");
                         await SetDesktopWallpaper(_desktopWallpapers[_desktopCurrentIndex]);
                         SaveProgress(); // Save progress after each wallpaper change
                     }
                     else
                     {
-                        LogInfo($"ERROR: Cannot set wallpaper - Count: {_desktopWallpapers.Count}, Index: {_desktopCurrentIndex}");
                     }
                 }
                 else
                 {
-                    LogInfo("ERROR: No wallpapers in desktop collection");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"ERROR in NextDesktopWallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -256,12 +287,10 @@ namespace Aura.Services
         {
             try
             {
-                LogInfo($"NextLockScreenWallpaper called - Current index: {_lockScreenCurrentIndex}, Batch: {_lockScreenCurrentBatch}, Count: {_lockScreenWallpapers.Count}");
                 
                 if (_lockScreenWallpapers.Count > 0)
                 {
                     _lockScreenCurrentIndex++;
-                    LogInfo($"Incremented lock screen index to: {_lockScreenCurrentIndex}");
                     
                     // Check if we've reached the end of current batch
                     if (_lockScreenCurrentIndex >= _lockScreenWallpapers.Count)
@@ -269,32 +298,25 @@ namespace Aura.Services
                         // Load next batch
                         _lockScreenCurrentBatch++;
                         _lockScreenCurrentIndex = 0;
-                        LogInfo($"End of batch reached. Loading next lock screen batch: {_lockScreenCurrentBatch}, Platform: {_lockScreenPlatform}, Category: {_lockScreenCategory}");
                         await LoadWallpapersForLockScreen(_lockScreenPlatform, _lockScreenCategory);
                         SaveProgress(); // Save progress after loading new batch
-                        LogInfo($"After loading: Lock screen wallpapers count: {_lockScreenWallpapers.Count}");
                     }
                     
                     if (_lockScreenWallpapers.Count > 0 && _lockScreenCurrentIndex < _lockScreenWallpapers.Count)
                     {
-                        LogInfo($"Setting lock screen wallpaper at index {_lockScreenCurrentIndex}");
                         await SetLockScreenWallpaper(_lockScreenWallpapers[_lockScreenCurrentIndex]);
                         SaveProgress(); // Save progress after each wallpaper change
                     }
                     else
                     {
-                        LogInfo($"ERROR: Cannot set lock screen wallpaper - Count: {_lockScreenWallpapers.Count}, Index: {_lockScreenCurrentIndex}");
                     }
                 }
                 else
                 {
-                    LogInfo("ERROR: No wallpapers in lock screen collection");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"ERROR in NextLockScreenWallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -305,7 +327,6 @@ namespace Aura.Services
                 _desktopWallpapers.Clear();
                 _desktopPlatform = platform; // Store the platform
 
-                LogInfo($"Loading wallpapers - Platform: {platform}, Category: {category}, Batch: {_desktopCurrentBatch}");
 
                 if (platform == "AlphaCoders")
                 {
@@ -318,15 +339,12 @@ namespace Aura.Services
                         _ => "4k"
                     };
 
-                    LogInfo($"Fetching from AlphaCoders Scraper with category key: {categoryKey}, batch: {_desktopCurrentBatch}");
                     // Use scraper directly to avoid cache issues
                     var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
                     _desktopWallpapers.AddRange(wallpapers);
-                    LogInfo($"Loaded {wallpapers.Count} wallpapers from AlphaCoders Scraper");
                 }
                 else // Backiee
                 {
-                    LogInfo($"Fetching from Backiee API, batch: {_desktopCurrentBatch}");
                     
                     // Use batch number as page number (0-indexed so subtract 1)
                     int pageNumber = _desktopCurrentBatch - 1;
@@ -353,20 +371,15 @@ namespace Aura.Services
                                 });
                             }
                         }
-                        LogInfo($"Loaded {_desktopWallpapers.Count} wallpapers from Backiee API");
                     }
                     else
                     {
-                        LogInfo($"ERROR: Backiee API returned status {response.StatusCode}");
                     }
                 }
 
-                LogInfo($"Total wallpapers in collection: {_desktopWallpapers.Count}");
             }
             catch (Exception ex)
             {
-                LogInfo($"ERROR loading wallpapers: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -375,7 +388,6 @@ namespace Aura.Services
             _lockScreenWallpapers.Clear();
             _lockScreenPlatform = platform; // Store the platform
 
-            LogInfo($"Loading lock screen wallpapers - Platform: {platform}, Category: {category}, Batch: {_lockScreenCurrentBatch}");
 
             if (platform == "AlphaCoders")
             {
@@ -388,15 +400,12 @@ namespace Aura.Services
                     _ => "4k"
                 };
 
-                LogInfo($"Fetching from AlphaCoders Scraper with category key: {categoryKey}, batch: {_lockScreenCurrentBatch}");
                 // Use scraper directly to avoid cache issues
                 var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
                 _lockScreenWallpapers.AddRange(wallpapers);
-                LogInfo($"Loaded {wallpapers.Count} wallpapers from AlphaCoders Scraper for lock screen");
             }
             else // Backiee
             {
-                LogInfo($"Fetching from Backiee API for lock screen, batch: {_lockScreenCurrentBatch}");
                 
                 // Use batch number as page number (0-indexed so subtract 1)
                 int pageNumber = _lockScreenCurrentBatch - 1;
@@ -423,11 +432,9 @@ namespace Aura.Services
                             });
                         }
                     }
-                    LogInfo($"Loaded {_lockScreenWallpapers.Count} wallpapers from Backiee API for lock screen");
                 }
                 else
                 {
-                    LogInfo($"ERROR: Backiee API returned status {response.StatusCode} for lock screen");
                 }
             }
         }
@@ -448,7 +455,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting desktop wallpaper: {ex.Message}");
             }
         }
 
@@ -459,9 +465,10 @@ namespace Aura.Services
                 string imageUrl = wallpaper.FullPhotoUrl;
                 if (string.IsNullOrEmpty(imageUrl))
                 {
-                    LogInfo($"No image URL available for wallpaper: {wallpaper.Title}");
                     return;
                 }
+
+                LogInfo($"Downloading desktop wallpaper: {wallpaper.Title}");
 
                 // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
@@ -476,23 +483,19 @@ namespace Aura.Services
                     string appPath = AppDomain.CurrentDomain.BaseDirectory;
                     string fullLocalPath = Path.Combine(appPath, localPath);
                     
-                    LogInfo($"Attempting to load local file: {fullLocalPath}");
                     
                     if (File.Exists(fullLocalPath))
                     {
                         imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                        LogInfo($"Successfully loaded local file");
                     }
                     else
                     {
-                        LogInfo($"Local file not found: {fullLocalPath}");
                         return;
                     }
                 }
                 else
                 {
                     // Download from HTTP URL
-                    LogInfo($"Downloading from URL: {imageUrl}");
                     imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
                 }
 
@@ -516,11 +519,9 @@ namespace Aura.Services
                 try
                 {
                     success = await userProfilePersonalizationSettings.TrySetWallpaperImageAsync(wallpaperFile);
-                    LogInfo($"WinRT API result for desktop wallpaper: {success}");
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"WinRT API failed for desktop wallpaper: {ex.Message}");
                 }
 
                 // If WinRT API fails, try WallpaperHelper as fallback
@@ -528,13 +529,11 @@ namespace Aura.Services
                 {
                     try
                     {
-                        LogInfo("WinRT API failed, trying SystemParametersInfo fallback...");
                         SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, wallpaperFile.Path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
                         success = true;
                     }
                     catch (Exception ex)
                     {
-                        LogInfo($"SystemParametersInfo fallback also failed: {ex.Message}");
                     }
                 }
 
@@ -548,13 +547,10 @@ namespace Aura.Services
                 }
                 else
                 {
-                    LogInfo($"Failed to set desktop wallpaper: {wallpaper.Title}");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting desktop wallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -564,9 +560,10 @@ namespace Aura.Services
             {
                 if (string.IsNullOrEmpty(wallpaper.ImageUrl))
                 {
-                    LogInfo($"No image URL available for AlphaCoders wallpaper: {wallpaper.Title}");
                     return;
                 }
+
+                LogInfo($"Downloading desktop wallpaper: {wallpaper.Title}");
 
                 // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
@@ -578,7 +575,6 @@ namespace Aura.Services
 
                 if (string.IsNullOrEmpty(bigThumbUrl))
                 {
-                    LogInfo($"Could not get big image URL for AlphaCoders wallpaper: {wallpaper.Title}");
                     return;
                 }
 
@@ -595,7 +591,6 @@ namespace Aura.Services
 
                 var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
 
-                LogInfo($"Downloading AlphaCoders wallpaper from: {originalUrl}");
 
                 byte[] imageBytes;
                 try
@@ -605,7 +600,6 @@ namespace Aura.Services
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"Failed to download from {originalUrl}: {ex.Message}");
                     return;
                 }
 
@@ -632,11 +626,9 @@ namespace Aura.Services
                 try
                 {
                     success = await userProfilePersonalizationSettings.TrySetWallpaperImageAsync(wallpaperFile);
-                    LogInfo($"WinRT API result for AlphaCoders desktop wallpaper: {success}");
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"WinRT API failed for AlphaCoders desktop wallpaper: {ex.Message}");
                 }
 
                 // If WinRT API fails, try SystemParametersInfo as fallback
@@ -644,13 +636,11 @@ namespace Aura.Services
                 {
                     try
                     {
-                        LogInfo("WinRT API failed, trying SystemParametersInfo fallback for AlphaCoders...");
                         SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, wallpaperFile.Path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
                         success = true;
                     }
                     catch (Exception ex)
                     {
-                        LogInfo($"SystemParametersInfo fallback also failed for AlphaCoders: {ex.Message}");
                     }
                 }
 
@@ -664,13 +654,10 @@ namespace Aura.Services
                 }
                 else
                 {
-                    LogInfo($"Failed to set AlphaCoders desktop wallpaper: {wallpaper.Title}");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting AlphaCoders desktop wallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -690,7 +677,6 @@ namespace Aura.Services
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting lock screen wallpaper: {ex.Message}");
             }
         }
 
@@ -701,9 +687,10 @@ namespace Aura.Services
                 string imageUrl = wallpaper.FullPhotoUrl;
                 if (string.IsNullOrEmpty(imageUrl))
                 {
-                    LogInfo($"No image URL available for wallpaper: {wallpaper.Title}");
                     return;
                 }
+
+                LogInfo($"Downloading lock screen wallpaper: {wallpaper.Title}");
 
                 // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
@@ -718,23 +705,19 @@ namespace Aura.Services
                     string appPath = AppDomain.CurrentDomain.BaseDirectory;
                     string fullLocalPath = Path.Combine(appPath, localPath);
                     
-                    LogInfo($"Attempting to load local file: {fullLocalPath}");
                     
                     if (File.Exists(fullLocalPath))
                     {
                         imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                        LogInfo($"Successfully loaded local file");
                     }
                     else
                     {
-                        LogInfo($"Local file not found: {fullLocalPath}");
                         return;
                     }
                 }
                 else
                 {
                     // Download from HTTP URL
-                    LogInfo($"Downloading from URL: {imageUrl}");
                     imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
                 }
 
@@ -761,7 +744,6 @@ namespace Aura.Services
                 // Method: Using Registry for lock screen with LocalMachine
                 try
                 {
-                    LogInfo("Trying LocalMachine registry for lock screen...");
                     using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(PERSONALIZE_REG_KEY, true))
                     {
                         if (key == null)
@@ -775,7 +757,6 @@ namespace Aura.Services
                                     newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                     newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
                                     success = true;
-                                    LogInfo("Registry method for lock screen succeeded (created key in LocalMachine)");
                                 }
                             }
                         }
@@ -786,13 +767,11 @@ namespace Aura.Services
                             key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                             key.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
                             success = true;
-                            LogInfo("Registry method for lock screen succeeded (updated key in LocalMachine)");
                         }
                     }
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"Registry method for lock screen failed: {ex.Message}");
                 }
 
                 // If LocalMachine failed, try with CurrentUser as fallback
@@ -800,7 +779,6 @@ namespace Aura.Services
                 {
                     try
                     {
-                        LogInfo("Trying CurrentUser registry for lock screen...");
                         using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(PERSONALIZE_REG_KEY, true))
                         {
                             if (key == null)
@@ -814,7 +792,6 @@ namespace Aura.Services
                                         newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                         newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
                                         success = true;
-                                        LogInfo("Registry method for lock screen succeeded (created key in CurrentUser)");
                                     }
                                 }
                             }
@@ -825,13 +802,11 @@ namespace Aura.Services
                                 key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
                                 key.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
                                 success = true;
-                                LogInfo("Registry method for lock screen succeeded (updated key in CurrentUser)");
                             }
                         }
                     }
                     catch (Exception innerEx)
                     {
-                        LogInfo($"CurrentUser registry method for lock screen also failed: {innerEx.Message}");
                     }
                 }
 
@@ -845,13 +820,10 @@ namespace Aura.Services
                 }
                 else
                 {
-                    LogInfo($"Failed to set lock screen: {wallpaper.Title}");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting lock screen wallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -861,9 +833,10 @@ namespace Aura.Services
             {
                 if (string.IsNullOrEmpty(wallpaper.ImageUrl))
                 {
-                    LogInfo($"No image URL available for AlphaCoders wallpaper: {wallpaper.Title}");
                     return;
                 }
+
+                LogInfo($"Downloading lock screen wallpaper: {wallpaper.Title}");
 
                 // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
@@ -875,7 +848,6 @@ namespace Aura.Services
 
                 if (string.IsNullOrEmpty(bigThumbUrl))
                 {
-                    LogInfo($"Could not get big image URL for AlphaCoders wallpaper: {wallpaper.Title}");
                     return;
                 }
 
@@ -892,7 +864,6 @@ namespace Aura.Services
 
                 var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
 
-                LogInfo($"Downloading AlphaCoders wallpaper from: {originalUrl}");
 
                 byte[] imageBytes;
                 try
@@ -902,7 +873,6 @@ namespace Aura.Services
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"Failed to download from {originalUrl}: {ex.Message}");
                     return;
                 }
 
@@ -929,11 +899,9 @@ namespace Aura.Services
                 try
                 {
                     success = await userProfilePersonalizationSettings.TrySetLockScreenImageAsync(wallpaperFile);
-                    LogInfo($"WinRT API result for AlphaCoders lock screen: {success}");
                 }
                 catch (Exception ex)
                 {
-                    LogInfo($"WinRT API failed for AlphaCoders lock screen: {ex.Message}");
                 }
 
                 if (success)
@@ -946,13 +914,10 @@ namespace Aura.Services
                 }
                 else
                 {
-                    LogInfo($"Failed to set AlphaCoders lock screen: {wallpaper.Title}");
                 }
             }
             catch (Exception ex)
             {
-                LogInfo($"Error setting AlphaCoders lock screen wallpaper: {ex.Message}");
-                LogInfo($"Stack trace: {ex.StackTrace}");
             }
         }
 
@@ -1019,7 +984,6 @@ namespace Aura.Services
                 
                 if (!File.Exists(settingsPath))
                 {
-                    LogInfo("Settings file doesn't exist, skipping progress save");
                     return;
                 }
 
@@ -1060,11 +1024,9 @@ namespace Aura.Services
                 var updatedJson = JsonSerializer.Serialize(settingsObj, new JsonSerializerOptions { WriteIndented = true });
                 File.WriteAllText(settingsPath, updatedJson);
                 
-                LogInfo($"Progress saved - Desktop: Batch {_desktopCurrentBatch}, Index {_desktopCurrentIndex}; Lock: Batch {_lockScreenCurrentBatch}, Index {_lockScreenCurrentIndex}");
             }
             catch (Exception ex)
             {
-                LogInfo($"Error saving progress: {ex.Message}");
             }
         }
 
@@ -1076,7 +1038,6 @@ namespace Aura.Services
                 
                 if (!File.Exists(settingsPath))
                 {
-                    LogInfo("No saved progress found");
                     return;
                 }
 
@@ -1108,11 +1069,9 @@ namespace Aura.Services
                     _lockScreenCurrentIndex = settings["LockScreenCurrentIndex"].GetInt32();
                 }
                 
-                LogInfo($"Progress loaded - Desktop: Batch {_desktopCurrentBatch}, Index {_desktopCurrentIndex}; Lock: Batch {_lockScreenCurrentBatch}, Index {_lockScreenCurrentIndex}");
             }
             catch (Exception ex)
             {
-                LogInfo($"Error loading progress: {ex.Message}");
             }
         }
     }

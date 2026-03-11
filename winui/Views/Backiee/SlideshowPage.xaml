@@ -87,12 +87,21 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="12"
                             Padding="24">
-                        <TextBlock x:Name="DesktopStatusText"
-                                   Text="No slideshow set" 
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="16"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock x:Name="DesktopStatusText"
+                                       Text="No slideshow set" 
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="DesktopCountdownText"
+                                       Text=""
+                                       HorizontalAlignment="Center"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
                     </Border>
                 </StackPanel>
 
@@ -162,12 +171,21 @@
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="12"
                             Padding="24">
-                        <TextBlock x:Name="LockScreenStatusText"
-                                   Text="No slideshow set" 
-                                   HorizontalAlignment="Center"
-                                   VerticalAlignment="Center"
-                                   FontSize="16"
-                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                        <StackPanel Spacing="8" HorizontalAlignment="Center">
+                            <TextBlock x:Name="LockScreenStatusText"
+                                       Text="No slideshow set" 
+                                       HorizontalAlignment="Center"
+                                       VerticalAlignment="Center"
+                                       FontSize="16"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                            <TextBlock x:Name="LockScreenCountdownText"
+                                       Text=""
+                                       HorizontalAlignment="Center"
+                                       FontSize="14"
+                                       FontWeight="SemiBold"
+                                       Foreground="{ThemeResource AccentTextFillColorPrimaryBrush}"
+                                       Visibility="Collapsed"/>
+                        </StackPanel>
                     </Border>
                 </StackPanel>
             </Grid>

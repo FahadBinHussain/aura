@@ -58,6 +58,19 @@ cd winui
 dotnet run
 ```
 
+#### 🔥 Hot Reload / Dev Mode (Recommended)
+
+Since `dotnet watch` doesn't fully reload `.cs` file changes in WinUI 3, use the included `dev.bat` script instead. It acts like `pnpm dev` — automatically rebuilds and relaunches the app whenever it exits.
+
+```bash
+cd winui
+.\dev.bat
+```
+
+Once the app is running, click the **↺ (restart) button** next to the "Next Gen Edition" badge in the bottom-right corner of the Platform Selection page. The app will exit and `dev.bat` will automatically rebuild and relaunch it with your latest changes.
+
+> **Tip:** Always use `dev.bat` during development instead of plain `dotnet run`.
+
 #### Build Portable Versions
 
 **Self-Contained Portable Folder:**
