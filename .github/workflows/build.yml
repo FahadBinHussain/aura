@@ -1,0 +1,46 @@
+name: Build Aura
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Add msbuild to PATH
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Restore NuGet packages
+        run: dotnet restore winui/Aura.csproj -p:Platform=x64
+
+      - name: Publish single-file exe (x64)
+        run: >
+          dotnet publish winui/Aura.csproj
+          -c Release
+          -p:Platform=x64
+          -p:RuntimeIdentifier=win-x64
+          -p:SelfContained=true
+          -p:PublishSingleFile=true
+          -p:PublishReadyToRun=false
+          -p:IncludeNativeLibrariesForSelfExtract=true
+          -p:PublishDir=publish\x64
+          --no-restore
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aura-x64
+          path: winui/publish/x64/
+          if-no-files-found: error
