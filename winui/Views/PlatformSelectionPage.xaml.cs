@@ -69,6 +69,9 @@ namespace Aura.Views
                 // Get the main window and navigate
                 if (MainWindow.Instance != null)
                 {
+                    // Remember the selected platform for the Home button
+                    MainWindow.LastSelectedPlatform = selectedPlatform;
+
                     // Navigate to the appropriate page
                     if (selectedPlatform == "Alpha Coders")
                     {

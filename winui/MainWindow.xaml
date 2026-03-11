@@ -255,6 +255,7 @@
                             <Button x:Name="CollectionsButton"
                                     Click="NavButton_Click"
                                     Tag="Collections"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -288,6 +289,7 @@
                             <Button x:Name="AIGeneratedButton"
                                     Click="NavButton_Click"
                                     Tag="AIGenerated"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -321,6 +323,7 @@
                             <Button x:Name="PersonalButton"
                                     Click="NavButton_Click"
                                     Tag="Personal"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -383,10 +386,42 @@
                                 </StackPanel>
                             </Button>
 
+                            <!-- History Button -->
+                            <Button x:Name="HistoryButton"
+                                    Click="NavButton_Click"
+                                    Tag="History"
+                                    Style="{StaticResource NavButtonStyle}">
+                                <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                    <Grid Width="76" Height="76">
+                                        <Border Background="Transparent"
+                                                BorderThickness="0"
+                                                HorizontalAlignment="Stretch"
+                                                VerticalAlignment="Stretch"/>
+                                        <Rectangle Width="4"
+                                                   Fill="{StaticResource NavbarAccentBrush}"
+                                                   HorizontalAlignment="Left"
+                                                   VerticalAlignment="Stretch"
+                                                   Visibility="Collapsed"/>
+                                        <StackPanel Orientation="Vertical"
+                                                  HorizontalAlignment="Center"
+                                                  VerticalAlignment="Center">
+                                            <FontIcon FontFamily="Segoe Fluent Icons"
+                                                      Glyph="&#xE81C;"
+                                                      FontSize="22"
+                                                      Margin="0,0,0,4"
+                                                      Foreground="{StaticResource NavbarTextBrush}"/>
+                                            <TextBlock Text="History"
+                                                       Style="{StaticResource NavTextStyle}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </StackPanel>
+                            </Button>
+
                             <!-- Interactive Slideshow Button -->
                             <Button x:Name="InteractiveSlideshowButton"
                                     Click="NavButton_Click"
                                     Tag="InteractiveSlideshow"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -420,6 +455,7 @@
                             <Button x:Name="WidgetsButton"
                                     Click="NavButton_Click"
                                     Tag="Widgets"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -453,6 +489,7 @@
                             <Button x:Name="UploadWallpaperButton"
                                     Click="NavButton_Click"
                                     Tag="UploadWallpaper"
+                                    Visibility="Collapsed"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -493,6 +530,7 @@
                         <Button x:Name="MyAccountButton"
                                 Click="NavButton_Click"
                                 Tag="MyAccount"
+                                Visibility="Collapsed"
                                 Style="{StaticResource FooterNavButtonStyle}">
                             <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                 <Grid Width="76" Height="60">

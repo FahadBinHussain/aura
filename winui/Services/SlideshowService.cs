@@ -474,43 +474,45 @@ namespace Aura.Services
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
                 var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
 
-                // Download the image
-                byte[] imageBytes;
-                if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                string stableFileName = $"wallpaper-{wallpaper.Id}.jpg";
+                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
+
+                Windows.Storage.StorageFile wallpaperFile;
+                if (System.IO.File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Handle local app resources
-                    string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
-                    string appPath = AppDomain.CurrentDomain.BaseDirectory;
-                    string fullLocalPath = Path.Combine(appPath, localPath);
-                    
-                    
-                    if (File.Exists(fullLocalPath))
-                    {
-                        imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                    }
-                    else
-                    {
-                        return;
-                    }
+                    // Reuse existing file — skip download
+                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
                 }
                 else
                 {
-                    // Download from HTTP URL
-                    imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                    // Download the image
+                    byte[] imageBytes;
+                    if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
+                        string appPath = AppDomain.CurrentDomain.BaseDirectory;
+                        string fullLocalPath = Path.Combine(appPath, localPath);
+                        if (File.Exists(fullLocalPath))
+                            imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
+                        else
+                            return;
+                    }
+                    else
+                    {
+                        imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                    }
+
+                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                        stableFileName,
+                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                    {
+                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    }
+
+                    LogInfo($"Wallpaper saved to: {wallpaperFile.Path}");
                 }
-
-                // Create a file in Pictures folder
-                var wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                    $"wallpaper-{wallpaper.Id}.jpg",
-                    Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                // Write the image to the file
-                using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
-                {
-                    await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                }
-
-                LogInfo($"Wallpaper saved to: {wallpaperFile.Path}");
 
                 // Try to set the wallpaper using WinRT API
                 bool success = false;
@@ -540,6 +542,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow");
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
@@ -593,31 +596,41 @@ namespace Aura.Services
 
 
                 byte[] imageBytes;
-                try
-                {
-                    imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                    LogInfo($"Successfully downloaded AlphaCoders wallpaper");
-                }
-                catch (Exception ex)
-                {
-                    return;
-                }
-
-                // Create a file in Pictures folder with a unique name based on timestamp
-                string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
                 string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
+                string stableFileName = $"wallpaper-{wallpaper.Id}.{fileExtension}";
+                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
 
-                var wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                    $"wallpaper-{wallpaper.Id}-{timestamp}.{fileExtension}",
-                    Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                // Write the image to the file
-                using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                Windows.Storage.StorageFile wallpaperFile;
+                if (System.IO.File.Exists(stableFilePath))
                 {
-                    await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    // Reuse existing file — skip download
+                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
+                    LogInfo($"Reusing cached AlphaCoders wallpaper: {stableFileName}");
                 }
+                else
+                {
+                    try
+                    {
+                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
+                        LogInfo($"Successfully downloaded AlphaCoders wallpaper");
+                    }
+                    catch (Exception ex)
+                    {
+                        return;
+                    }
 
-                LogInfo($"AlphaCoders wallpaper saved to: {wallpaperFile.Path}");
+                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                        stableFileName,
+                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                    {
+                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    }
+
+                    LogInfo($"AlphaCoders wallpaper saved to: {wallpaperFile.Path}");
+                }
 
                 // Try to set the wallpaper using WinRT API
                 bool success = false;
@@ -647,6 +660,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders desktop wallpaper set to: {wallpaper.Title}");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow");
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
@@ -696,43 +710,43 @@ namespace Aura.Services
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
                 var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
 
-                // Download the image
-                byte[] imageBytes;
-                if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                string stableFileName = $"lockscreen-{wallpaper.Id}.jpg";
+                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
+
+                Windows.Storage.StorageFile wallpaperFile;
+                if (System.IO.File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Handle local app resources
-                    string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
-                    string appPath = AppDomain.CurrentDomain.BaseDirectory;
-                    string fullLocalPath = Path.Combine(appPath, localPath);
-                    
-                    
-                    if (File.Exists(fullLocalPath))
-                    {
-                        imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                    }
-                    else
-                    {
-                        return;
-                    }
+                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
                 }
                 else
                 {
-                    // Download from HTTP URL
-                    imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                    byte[] imageBytes;
+                    if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                    {
+                        string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
+                        string appPath = AppDomain.CurrentDomain.BaseDirectory;
+                        string fullLocalPath = Path.Combine(appPath, localPath);
+                        if (File.Exists(fullLocalPath))
+                            imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
+                        else
+                            return;
+                    }
+                    else
+                    {
+                        imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                    }
+
+                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                        stableFileName,
+                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                    {
+                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    }
+
+                    LogInfo($"Lock screen image saved to: {wallpaperFile.Path}");
                 }
-
-                // Create a file in Pictures folder
-                var wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                    $"lockscreen-{wallpaper.Id}.jpg",
-                    Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                // Write the image to the file
-                using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
-                {
-                    await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                }
-
-                LogInfo($"Lock screen image saved to: {wallpaperFile.Path}");
 
                 // Use registry method (same as WallpaperDetailPage)
                 bool success = false;
@@ -813,6 +827,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow");
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
@@ -866,31 +881,40 @@ namespace Aura.Services
 
 
                 byte[] imageBytes;
-                try
-                {
-                    imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                    LogInfo($"Successfully downloaded AlphaCoders wallpaper for lock screen");
-                }
-                catch (Exception ex)
-                {
-                    return;
-                }
-
-                // Create a file in Pictures folder with a unique name based on timestamp
-                string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
                 string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
+                string stableFileName = $"lockscreen-{wallpaper.Id}.{fileExtension}";
+                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
 
-                var wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                    $"lockscreen-{wallpaper.Id}-{timestamp}.{fileExtension}",
-                    Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                // Write the image to the file
-                using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                Windows.Storage.StorageFile wallpaperFile;
+                if (System.IO.File.Exists(stableFilePath))
                 {
-                    await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
+                    LogInfo($"Reusing cached AlphaCoders lock screen wallpaper: {stableFileName}");
                 }
+                else
+                {
+                    try
+                    {
+                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
+                        LogInfo($"Successfully downloaded AlphaCoders wallpaper for lock screen");
+                    }
+                    catch (Exception ex)
+                    {
+                        return;
+                    }
 
-                LogInfo($"AlphaCoders lock screen wallpaper saved to: {wallpaperFile.Path}");
+                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                        stableFileName,
+                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
+
+                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                    {
+                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    }
+
+                    LogInfo($"AlphaCoders lock screen wallpaper saved to: {wallpaperFile.Path}");
+                }
 
                 // Try to set the lock screen using WinRT API
                 bool success = false;
@@ -907,6 +931,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders lock screen set to: {wallpaper.Title}");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow");
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;

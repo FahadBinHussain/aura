@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text.Json;
+using Aura.Services;
 using System.Linq;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Microsoft.UI;
@@ -42,6 +44,9 @@ namespace Aura
 
         // Static reference to main window instance for navigation
         public static MainWindow Instance { get; private set; }
+
+        // Track the last selected platform so Home button returns to it
+        public static string LastSelectedPlatform { get; set; } = string.Empty;
 
         // Public property to access ContentFrame for navigation
         public Frame NavigationFrame => ContentFrame;
@@ -87,6 +92,17 @@ namespace Aura
             IntPtr hWnd = WinRT.Interop.WindowNative.GetWindowHandle(this);
             WindowId windowId = Win32Interop.GetWindowIdFromWindow(hWnd);
             m_appWindow = AppWindow.GetFromWindowId(windowId);
+
+            // Set the window icon
+            try
+            {
+                string iconPath = System.IO.Path.Combine(AppContext.BaseDirectory, "Assets", "logo.ico");
+                if (System.IO.File.Exists(iconPath))
+                {
+                    m_appWindow.SetIcon(iconPath);
+                }
+            }
+            catch { }
 
             // Initialize the last applied size with default minimum values
             lastAppliedSize = new SizeInt32(800, 600);
@@ -138,6 +154,9 @@ namespace Aura
 
             // Navigate to the platform selection page as home
             ContentFrame.Navigate(typeof(Views.PlatformSelectionPage));
+
+            // Auto-restore slideshows from saved settings on app launch
+            _ = RestoreSlideshowsOnStartupAsync();
             
             // Register for frame navigation to control back button visibility
             ContentFrame.Navigated += ContentFrame_Navigated;
@@ -650,10 +669,18 @@ namespace Aura
                     switch (navItemTag)
                     {
                         case "Home":
-                            ContentFrame.Navigate(typeof(HomePage));
+                            if (LastSelectedPlatform == "Alpha Coders")
+                                ContentFrame.Navigate(typeof(Views.AlphaCoders.AlphaCodersGridPage));
+                            else if (LastSelectedPlatform == "Backiee")
+                                ContentFrame.Navigate(typeof(Views.Backiee.HomePage));
+                            else
+                                ContentFrame.Navigate(typeof(Views.PlatformSelectionPage));
                             break;
                         case "Slideshow":
                             ContentFrame.Navigate(typeof(Views.Backiee.SlideshowPage));
+                            break;
+                        case "History":
+                            ContentFrame.Navigate(typeof(HistoryPage));
                             break;
                         case "Collections":
                         case "AIGenerated":
@@ -662,10 +689,11 @@ namespace Aura
                         case "Widgets":
                         case "UploadWallpaper":
                         case "MyAccount":
-                        case "Settings":
-                            // For now, navigate to Home page for all options
-                            // In a real app, you would navigate to the appropriate page
+                            // Not implemented yet
                             ContentFrame.Navigate(typeof(HomePage));
+                            break;
+                        case "Settings":
+                            ContentFrame.Navigate(typeof(Views.SettingsPage));
                             break;
                     }
                 }
@@ -958,6 +986,55 @@ namespace Aura
             }
         }
         // *** End Theme Change Handler ***
+
+        /// <summary>
+        /// Reads slideshow_settings.json and restores active slideshows on app startup,
+        /// so slideshows keep running even if the user never visits the Slideshow page.
+        /// </summary>
+        private async System.Threading.Tasks.Task RestoreSlideshowsOnStartupAsync()
+        {
+            try
+            {
+                var settingsPath = System.IO.Path.Combine(
+                    Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                    "Aura", "slideshow_settings.json");
+
+                if (!System.IO.File.Exists(settingsPath))
+                    return;
+
+                var json = System.IO.File.ReadAllText(settingsPath);
+                var settings = JsonSerializer.Deserialize<Dictionary<string, JsonElement>>(json);
+                if (settings == null) return;
+
+                bool desktopEnabled = settings.TryGetValue("DesktopSlideshowEnabled", out var de) && de.GetBoolean();
+                string desktopPlatform = settings.TryGetValue("DesktopSlideshowPlatform", out var dp) ? dp.GetString() ?? "" : "";
+                string desktopCategory = settings.TryGetValue("DesktopSlideshowCategory", out var dc) ? dc.GetString() ?? "" : "";
+                string desktopInterval = settings.TryGetValue("DesktopSlideshowInterval", out var di) ? di.GetString() ?? "12 hours" : "12 hours";
+
+                bool lockEnabled = settings.TryGetValue("LockScreenSlideshowEnabled", out var le) && le.GetBoolean();
+                string lockPlatform = settings.TryGetValue("LockScreenSlideshowPlatform", out var lp) ? lp.GetString() ?? "" : "";
+                string lockCategory = settings.TryGetValue("LockScreenSlideshowCategory", out var lc) ? lc.GetString() ?? "" : "";
+                string lockInterval = settings.TryGetValue("LockScreenSlideshowInterval", out var li) ? li.GetString() ?? "12 hours" : "12 hours";
+
+                var dispatcherQueue = App.MainDispatcherQueue ?? DispatcherQueue;
+
+                if (desktopEnabled && !string.IsNullOrEmpty(desktopPlatform) && !string.IsNullOrEmpty(desktopCategory))
+                {
+                    var interval = SlideshowService.ParseInterval(desktopInterval);
+                    await SlideshowService.Instance.StartDesktopSlideshow(desktopPlatform, desktopCategory, interval, dispatcherQueue);
+                }
+
+                if (lockEnabled && !string.IsNullOrEmpty(lockPlatform) && !string.IsNullOrEmpty(lockCategory))
+                {
+                    var interval = SlideshowService.ParseInterval(lockInterval);
+                    await SlideshowService.Instance.StartLockScreenSlideshow(lockPlatform, lockCategory, interval, dispatcherQueue);
+                }
+            }
+            catch (Exception)
+            {
+                // Silently ignore if settings can't be read
+            }
+        }
 
         private void HotReloadButton_Click(object sender, RoutedEventArgs e)
         {

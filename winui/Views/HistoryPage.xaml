@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Aura.Views.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Aura.Views"
+    xmlns:services="using:Aura.Services"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Grid Margin="24,16">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Header -->
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
+            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE81C;" FontSize="20" VerticalAlignment="Center"/>
+            <TextBlock Text="Wallpaper History" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
+        </StackPanel>
+
+        <!-- Subtitle + Clear button -->
+        <Grid Grid.Row="1" Margin="0,4,0,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+            <TextBlock x:Name="SubtitleText"
+                       Grid.Column="0"
+                       Text="All wallpaper changes — manual and slideshow"
+                       FontSize="13"
+                       Opacity="0.6"
+                       VerticalAlignment="Center"/>
+            <Button x:Name="ClearHistoryButton"
+                    Grid.Column="1"
+                    Content="Clear history"
+                    Click="ClearHistoryButton_Click"
+                    Style="{StaticResource DefaultButtonStyle}"/>
+        </Grid>
+
+        <!-- History List -->
+        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+            <StackPanel x:Name="HistoryListPanel" Spacing="4"/>
+        </ScrollViewer>
+
+    </Grid>
+</Page>

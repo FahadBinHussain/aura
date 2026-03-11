@@ -12,6 +12,9 @@ namespace Aura
         private Window? m_window;
         private readonly string logFile = Path.Combine(AppContext.BaseDirectory, "app.log");
 
+        // App-level dispatcher queue for use by background services
+        public static Microsoft.UI.Dispatching.DispatcherQueue? MainDispatcherQueue { get; private set; }
+
 #if DEBUG
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
@@ -36,6 +39,8 @@ namespace Aura
         {
             try
             {
+                // Capture the main UI thread dispatcher queue before creating the window
+                MainDispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
 
                 m_window = new MainWindow();
                 m_window.Activate();

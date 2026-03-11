@@ -23,6 +23,7 @@ using System.Linq;
 using System.Reflection; // For reflection functionality
 using Windows.System.UserProfile; // For wallpaper functionality
 using System.Runtime.InteropServices; // For P/Invoke
+using Aura.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -488,6 +489,7 @@ namespace Aura.Views.Backiee
                 // Start the background task to set wallpaper
                 bool success = false;
                 string errorMessage = string.Empty;
+                string savedFilePath = string.Empty;
                 try
                 {
                     // Get Pictures folder
@@ -501,6 +503,7 @@ namespace Aura.Views.Backiee
                     var wallpaperFile = await wallpapersFolder.CreateFileAsync(
                         $"wallpaper-{_currentWallpaper.Id}.jpg",
                         CreationCollisionOption.ReplaceExisting);
+                    savedFilePath = wallpaperFile.Path;
 
                     // Write the image to the file
                     using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
@@ -583,6 +586,12 @@ namespace Aura.Views.Backiee
                 // Show result to user
                 if (success)
                 {
+                    var wallpaperTypeLabel = wallpaperType == WallpaperType.Desktop ? "Desktop" : "Lock Screen";
+                    WallpaperHistoryService.Instance.AddEntry(
+                        _currentWallpaper.Title ?? "Unknown",
+                        !string.IsNullOrEmpty(savedFilePath) ? savedFilePath : (_currentWallpaper.FullPhotoUrl ?? ""),
+                        wallpaperTypeLabel,
+                        "Manual");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else

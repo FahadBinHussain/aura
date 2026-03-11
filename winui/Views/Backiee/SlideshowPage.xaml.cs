@@ -418,14 +418,14 @@ namespace Aura.Views.Backiee
                 if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                 {
                     var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                    await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
+                    await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
                 
                 // Restore lock screen slideshow if it was enabled
                 if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
                 {
                     var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                    await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, this.DispatcherQueue);
+                    await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
             }
             catch (Exception ex)
@@ -631,7 +631,7 @@ namespace Aura.Views.Backiee
                     if (isEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                     else
                     {
@@ -648,7 +648,7 @@ namespace Aura.Views.Backiee
                     if (isEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                     else
                     {
@@ -779,7 +779,7 @@ namespace Aura.Views.Backiee
                     // Restart desktop slideshow with new interval if enabled
                     if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
                     {
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                 }
                 else
@@ -789,7 +789,7 @@ namespace Aura.Views.Backiee
                     // Restart lock screen slideshow with new interval if enabled
                     if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                 }
                 

@@ -24,6 +24,7 @@ using System.Reflection; // For reflection functionality
 using Windows.System.UserProfile; // For wallpaper functionality
 using System.Runtime.InteropServices; // For P/Invoke
 using Windows.ApplicationModel; // For package detection
+using Aura.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -588,6 +589,7 @@ namespace Aura.Views.AlphaCoders
                 // Start the background task to set wallpaper
                 bool success = false;
                 string errorMessage = string.Empty;
+                string savedFilePath = string.Empty;
                 try
                 {
                     // Get Pictures folder
@@ -619,61 +621,40 @@ namespace Aura.Views.AlphaCoders
 
 
                     byte[] imageBytes;
-                    try
-                    {
-                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                    }
-                    catch (Exception ex)
-                    {
-                        throw new Exception($"Failed to download original image. Error: {ex.Message}");
-                    }
-
-                    // Create a file in Pictures folder with a unique name based on timestamp to avoid caching issues
-                    string timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-
-                    // Use the same extension as determined above
+                    // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
                     string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
+                    string stableFileName = $"wallpaper-{_currentWallpaper.Id}.{fileExtension}";
+                    string stableFilePath2 = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
 
-
-                    var wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                        $"wallpaper-{_currentWallpaper.Id}-{timestamp}.{fileExtension}",
-                        CreationCollisionOption.GenerateUniqueName);
-
-
-                    // Write the image to the file
-                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                    StorageFile wallpaperFile;
+                    if (System.IO.File.Exists(stableFilePath2))
                     {
-                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                        await stream.FlushAsync(); // Ensure data is written to disk
+                        // Reuse existing file
+                        wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
                     }
-
-                    // Make sure the file is accessible after restart by copying to a more permanent location
-                    StorageFolder localFolder;
-                    try
+                    else
                     {
-                        // Check if the app is packaged
-                        if (IsPackaged())
+                        try
                         {
-                            localFolder = ApplicationData.Current.LocalFolder;
+                            imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
                         }
-                        else
+                        catch (Exception ex)
                         {
-                            // For unpackaged apps, use a folder in the user's Documents
-                            var documentsFolder = KnownFolders.DocumentsLibrary;
-                            localFolder = await documentsFolder.CreateFolderAsync("Aura", CreationCollisionOption.OpenIfExists);
+                            throw new Exception($"Failed to download original image. Error: {ex.Message}");
+                        }
+
+                        wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                            stableFileName,
+                            CreationCollisionOption.ReplaceExisting);
+
+                        using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                        {
+                            await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                            await stream.FlushAsync();
                         }
                     }
-                    catch
-                    {
-                        // Fallback: use the same wallpapers folder we already created
-                        localFolder = wallpapersFolder;
-                    }
 
-                    var permanentWallpapersFolder = await localFolder.CreateFolderAsync("Wallpapers", CreationCollisionOption.OpenIfExists);
-                    var permanentWallpaperFile = await wallpaperFile.CopyAsync(permanentWallpapersFolder, wallpaperFile.Name, NameCollisionOption.ReplaceExisting);
-
-                    // Use the permanent file path for setting the wallpaper
-                    wallpaperFile = permanentWallpaperFile;
+                    savedFilePath = wallpaperFile.Path;
 
                     // Verify the file exists and has content
                     var fileProperties = await wallpaperFile.GetBasicPropertiesAsync();
@@ -751,6 +732,12 @@ namespace Aura.Views.AlphaCoders
                 // Show result to user
                 if (success)
                 {
+                    var wallpaperTypeLabel = wallpaperType == WallpaperType.Desktop ? "Desktop" : "Lock Screen";
+                    WallpaperHistoryService.Instance.AddEntry(
+                        _currentWallpaper.Title ?? "Unknown",
+                        !string.IsNullOrEmpty(savedFilePath) ? savedFilePath : (_currentWallpaper.ImageUrl ?? ""),
+                        wallpaperTypeLabel,
+                        "Manual");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else
