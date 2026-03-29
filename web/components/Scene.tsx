@@ -3,11 +3,11 @@
 import { Canvas, useFrame } from '@react-three/fiber';
 import { Environment, Float, RoundedBox, ScrollControls, Scroll, useScroll } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
-import { useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import Overlay from './Overlay';
 
-function DesktopScreen() {
+function DesktopScreen({ isMobile }: { isMobile: boolean }) {
   const meshRef = useRef<THREE.Group>(null);
   const scroll = useScroll();
 
@@ -60,9 +60,13 @@ function DesktopScreen() {
 
   return (
     <group ref={meshRef}>
-      <Float speed={2.5} rotationIntensity={0.2} floatIntensity={0.5}>
+      <Float
+        speed={isMobile ? 1.6 : 2.5}
+        rotationIntensity={isMobile ? 0.1 : 0.2}
+        floatIntensity={isMobile ? 0.25 : 0.5}
+      >
         {/* Outer Glass Frame */}
-        <RoundedBox args={[4.2, 2.6, 0.1]} radius={0.1} smoothness={4}>
+        <RoundedBox args={[4.2, 2.6, 0.1]} radius={0.1} smoothness={isMobile ? 2 : 4}>
           <meshPhysicalMaterial
             color="#ffffff"
             transmission={1}
@@ -79,13 +83,13 @@ function DesktopScreen() {
         </RoundedBox>
         
         {/* Inner Glowing Screen */}
-        <RoundedBox args={[4.0, 2.4, 0.05]} radius={0.05} smoothness={4} position={[0, 0, -0.02]}>
+        <RoundedBox args={[4.0, 2.4, 0.05]} radius={0.05} smoothness={isMobile ? 2 : 4} position={[0, 0, -0.02]}>
           {/* Using an array for color to boost intensity for bloom */}
           <meshBasicMaterial color={[0.3, 0.1, 1.5]} toneMapped={false} />
         </RoundedBox>
         
         {/* Screen Content / Abstract UI Elements */}
-        <RoundedBox args={[3.8, 2.2, 0.06]} radius={0.05} smoothness={4} position={[0, 0, -0.01]}>
+        <RoundedBox args={[3.8, 2.2, 0.06]} radius={0.05} smoothness={isMobile ? 2 : 4} position={[0, 0, -0.01]}>
           <meshBasicMaterial color={[0.1, 0.05, 0.5]} toneMapped={false} transparent opacity={0.8} />
         </RoundedBox>
         
@@ -110,25 +114,43 @@ function DesktopScreen() {
 }
 
 export default function Scene() {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(max-width: 768px)');
+    const apply = () => setIsMobile(mediaQuery.matches);
+    apply();
+    mediaQuery.addEventListener('change', apply);
+    return () => mediaQuery.removeEventListener('change', apply);
+  }, []);
+
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030305] z-0">
-      <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={[1, 2]}>
+      <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={isMobile ? 1 : [1, 2]}>
         <color attach="background" args={['#030305']} />
-        <ambientLight intensity={0.2} />
+        <ambientLight intensity={isMobile ? 0.15 : 0.2} />
         <directionalLight position={[10, 10, 10]} intensity={1} />
-        <spotLight position={[-10, 10, 10]} angle={0.15} penumbra={1} intensity={2} color="#4f46e5" />
+        <spotLight
+          position={[-10, 10, 10]}
+          angle={0.15}
+          penumbra={1}
+          intensity={isMobile ? 1.25 : 2}
+          color="#4f46e5"
+        />
         
         <ScrollControls pages={5} damping={0.2} distance={1.2}>
-          <DesktopScreen />
+          <DesktopScreen isMobile={isMobile} />
           <Scroll html style={{ width: '100%', height: '100%' }}>
             <Overlay />
           </Scroll>
         </ScrollControls>
 
-        <Environment preset="city" />
-        <EffectComposer>
-          <Bloom luminanceThreshold={0.2} mipmapBlur luminanceSmoothing={0.9} intensity={1.5} />
-        </EffectComposer>
+        {!isMobile && <Environment preset="city" />}
+        {!isMobile && (
+          <EffectComposer>
+            <Bloom luminanceThreshold={0.2} mipmapBlur luminanceSmoothing={0.9} intensity={1.5} />
+          </EffectComposer>
+        )}
       </Canvas>
     </div>
   );
