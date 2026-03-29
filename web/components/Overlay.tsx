@@ -124,11 +124,13 @@ function FadeIn({
 }
 
 export default function Overlay() {
+  const formatThemeLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
+
   const [theme, setTheme] = useState<string>(() => {
     if (typeof window === 'undefined') {
       return 'dark';
     }
-    const savedTheme = localStorage.getItem('theme');
+    const savedTheme = localStorage.getItem('theme')?.toLowerCase();
     if (savedTheme && DAISY_THEMES.includes(savedTheme as (typeof DAISY_THEMES)[number])) {
       return savedTheme;
     }
@@ -145,13 +147,13 @@ export default function Overlay() {
       <div className="fixed top-4 right-4 z-50 pointer-events-auto">
         <select
           value={theme}
-          onChange={(event) => setTheme(event.target.value)}
+          onChange={(event) => setTheme(event.target.value.toLowerCase())}
           className="select select-sm select-bordered w-44 bg-base-100 text-base-content"
           aria-label="Select theme"
         >
           {DAISY_THEMES.map((themeName) => (
-            <option key={themeName} value={themeName}>
-              {themeName}
+            <option key={themeName} value={themeName.toLowerCase()}>
+              {formatThemeLabel(themeName.toLowerCase())}
             </option>
           ))}
         </select>
