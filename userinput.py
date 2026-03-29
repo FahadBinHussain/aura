@@ -1,27 +1,48 @@
-import tkinter as tk
-from tkinter import scrolledtext
 import os
+import time
+import sys
 
-def submit():
-    global user_input
-    user_input = text_area.get("1.0", tk.END).strip()
-    root.destroy()
+input_file = "user_prompt.txt"
 
-# Set up the UI window
-root = tk.Tk()
-root.title("AI Agent Input")
-root.attributes('-topmost', True) # Keeps the window on top of your editor
+template = """Type your instructions below. Auto-save is safe!
+When you are completely finished, type  /go  at the very end and save.
 
-tk.Label(root, text="Write your prompt for the AI. Click Submit when done.", font=("Arial", 10)).pack(pady=5)
+--- TYPE BELOW THIS LINE ---
+"""
 
-text_area = scrolledtext.ScrolledText(root, wrap=tk.WORD, width=60, height=15, font=("Arial", 11))
-text_area.pack(padx=10, pady=5)
+with open(input_file, "w", encoding="utf-8") as f:
+    f.write(template)
 
-tk.Button(root, text="Submit to AI", command=submit, bg="green", fg="white", font=("Arial", 12, "bold")).pack(pady=10)
+print(f"\n[!] Agent paused. Please open '{input_file}' in your editor.")
+print("[!] Type your prompt, add '/go' at the end, and save.\n")
 
-user_input = ""
-root.mainloop() # This completely blocks the script until the window is closed
-
-# Write output to a file instead of stdout, because the detached window can't print directly back to the agent
-with open("agent_response.txt", "w", encoding="utf-8") as f:
-    f.write(user_input if user_input else "stop")
+# Infinite loop checking the file every 1 second
+while True:
+    time.sleep(1)
+    try:
+        with open(input_file, "r", encoding="utf-8") as f:
+            content = f.read().strip()
+        
+        # Trigger ONLY if the very last thing in the file is /go
+        if content.endswith("/go"):
+            # Extract only the user's text below the line
+            parts = content.split("--- TYPE BELOW THIS LINE ---")
+            if len(parts) > 1:
+                raw_input = parts[1].strip()
+                # Remove the '/go' from the final text the AI sees
+                user_input = raw_input[:-3].strip() 
+            else:
+                user_input = "stop"
+            
+            # Clean up the file
+            try:
+                os.remove(input_file)
+            except:
+                pass
+            
+            # Print the result so the agent reads it, then exit the script
+            print(f"User provided: {user_input if user_input else 'stop'}")
+            sys.exit(0)
+            
+    except Exception:
+        pass # Ignore file read errors if the editor is currently saving
