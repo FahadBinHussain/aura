@@ -1,4 +1,4 @@
-﻿# Aura / Wall-You-Need
+﻿# Aura
 <img src="https://wakapi-qt1b.onrender.com/api/badge/fahad/interval:any/project:Aura" 
      alt="Wakapi Time Tracking" 
      title="Time spent on this project">
