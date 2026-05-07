@@ -18,22 +18,28 @@
     "autoprefixer": "^10.4.21",
     "lucide-react": "^0.553.0",
     "motion": "^12.23.24",
-    "next": "^16.2.1",
-    "postcss": "^8.5.6",
+    "next": "^16.2.3",
+    "postcss": "^8.5.14",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "three": "^0.183.2"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "4.1.11",
+    "@tailwindcss/postcss": "4.2.4",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "daisyui": "^5.5.19",
     "eslint": "9.39.1",
-    "eslint-config-next": "16.2.1",
+    "eslint-config-next": "16.2.3",
     "knip": "^6.1.0",
-    "tailwindcss": "4.1.11",
+    "tailwindcss": "4.2.4",
     "typescript": "5.9.3"
+  },
+  "overrides": {
+    "brace-expansion": "1.1.13",
+    "flatted": "3.4.2",
+    "postcss": "8.5.14",
+    "yaml": "2.8.3"
   }
 }
