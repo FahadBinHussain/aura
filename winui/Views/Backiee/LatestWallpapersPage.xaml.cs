@@ -10,10 +10,10 @@ using System.Threading.Tasks;
 using Aura.Models;
 using System.Windows.Input;
 using System.Linq;
-using System.Net.Http;
 using System.Text.Json;
 using Microsoft.UI.Xaml.Media.Animation; // For Storyboard
 using Microsoft.UI.Xaml.Data; // For value converter
+using Aura.Services;
 
 namespace Aura.Views.Backiee
 {
@@ -21,9 +21,6 @@ namespace Aura.Views.Backiee
     {
         // Collection to hold the wallpapers
         private ObservableCollection<WallpaperItem> _wallpapers;
-
-        // For HTTP requests
-        private readonly HttpClient _httpClient = new HttpClient();
 
         // Preloaded placeholder image for faster loading
         private BitmapImage _placeholderImage;
@@ -138,12 +135,9 @@ namespace Aura.Views.Backiee
                 // Start the API call immediately
                 string apiUrl = $"{ApiBaseUrl}?action=paging_list&list_type=latest&page={_currentPage}&page_size={_itemsPerPage}&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
 
-                // Fetch data from API
-                HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-
-                if (response.IsSuccessStatusCode)
+                string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                if (!string.IsNullOrWhiteSpace(jsonContent))
                 {
-                    string jsonContent = await response.Content.ReadAsStringAsync();
                     using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                     {
                         // Process API response and create wallpaper items
@@ -151,60 +145,17 @@ namespace Aura.Views.Backiee
 
                         foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                         {
-                            // Extract wallpaper details from JSON
-                            string id = wallpaperElement.GetProperty("ID").GetString();
-                            string title = wallpaperElement.GetProperty("Title").GetString();
-
-                            // Debug output the full JSON for this wallpaper
-
-                            // Try to get MiniPhotoUrl
-                            string imageUrl;
                             try
                             {
-                                imageUrl = wallpaperElement.GetProperty("MiniPhotoUrl").GetString();
+                                var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement, _placeholderImage);
+                                if (!string.IsNullOrEmpty(wallpaper.Id) && !string.IsNullOrEmpty(wallpaper.ImageUrl))
+                                {
+                                    newWallpapers.Add(wallpaper);
+                                }
                             }
-                            catch (KeyNotFoundException)
+                            catch
                             {
-                                // If MiniPhotoUrl doesn't exist, use a default or the regular photo URL from the API
-                                imageUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
                             }
-
-                            // Get FullPhotoUrl with proper error handling
-                            string fullPhotoUrl = string.Empty;
-                            try
-                            {
-                                fullPhotoUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
-                            }
-                            catch (Exception ex)
-                            {
-                                // Fallback to using the thumbnail URL if full photo URL is not available
-                                fullPhotoUrl = imageUrl;
-                            }
-
-                            string resolution = wallpaperElement.GetProperty("Resolution").GetString();
-
-                            // Extract tag data
-                            string qualityTag = wallpaperElement.GetProperty("UltraHDType").GetString();
-                            bool isAI = wallpaperElement.GetProperty("AIGenerated").GetString() == "1";
-                            string likesCount = wallpaperElement.GetProperty("Rating").GetString();
-                            string downloadsCount = wallpaperElement.GetProperty("Downloads").GetString();
-
-                            // Create wallpaper item - don't try to load the image yet, just store the URL
-                            var wallpaper = new WallpaperItem
-                            {
-                                Id = id,
-                                Title = title,
-                                ImageUrl = imageUrl, // Store URL instead of trying to load now
-                                ImageSource = _placeholderImage, // Initially use placeholder
-                                Resolution = resolution,
-                                QualityTag = qualityTag,
-                                IsAI = isAI,
-                                Likes = likesCount,
-                                Downloads = downloadsCount,
-                                FullPhotoUrl = fullPhotoUrl // Store the full photo URL
-                            };
-
-                            newWallpapers.Add(wallpaper);
                         }
 
                         // Add all items at once for maximum speed
@@ -219,11 +170,6 @@ namespace Aura.Views.Backiee
 
                     // If we received fewer items than requested, we've reached the end
                     _hasMoreItems = true; // Always true for this API as it has many pages
-                }
-                else
-                {
-                    // If API request failed, mark that there are no more items
-                    _hasMoreItems = false;
                 }
             }
             catch (Exception ex)

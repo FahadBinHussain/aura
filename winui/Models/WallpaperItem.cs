@@ -10,6 +10,7 @@ using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using Aura.Services;
 
 namespace Aura.Models
 {
@@ -77,8 +78,11 @@ namespace Aura.Models
                 httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
 
 
-                // Download the image data
-                var imageBytes = await httpClient.GetByteArrayAsync(ImageUrl);
+                // Download the image data. Backiee currently needs a curl fallback on some
+                // Windows/.NET TLS stacks, while AlphaCoders continues through HttpClient.
+                var imageBytes = IsBackieeUrl(ImageUrl)
+                    ? await BackieeNetworkClient.GetByteArrayAsync(ImageUrl)
+                    : await httpClient.GetByteArrayAsync(ImageUrl);
 
                 // Convert WebP to PNG using ImageSharp
                 using (var inputStream = new MemoryStream(imageBytes))
@@ -128,8 +132,11 @@ namespace Aura.Models
                     httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
                     httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
 
-                    // Download the image data
-                    var imageBytes = await httpClient.GetByteArrayAsync(FullPhotoUrl);
+                    // Download the image data. Backiee currently needs a curl fallback on some
+                    // Windows/.NET TLS stacks, while AlphaCoders continues through HttpClient.
+                    var imageBytes = IsBackieeUrl(FullPhotoUrl)
+                        ? await BackieeNetworkClient.GetByteArrayAsync(FullPhotoUrl)
+                        : await httpClient.GetByteArrayAsync(FullPhotoUrl);
 
                     // Convert WebP to PNG using ImageSharp
                     using (var inputStream = new MemoryStream(imageBytes))
@@ -177,6 +184,12 @@ namespace Aura.Models
                 // This would download the wallpaper
                 // Not implemented in this placeholder version
             });
+        }
+
+        private static bool IsBackieeUrl(string url)
+        {
+            return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                   uri.Host.EndsWith("backiee.com", StringComparison.OrdinalIgnoreCase);
         }
     }
 

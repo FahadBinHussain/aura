@@ -92,7 +92,7 @@
                                         Foreground="White"
                                            TextAlignment="Center"
                                         FontWeight="SemiBold" />
-                            <TextBlock Text="The lastest wallpapers in one collection. You can find the freshest wallpapers here."
+                            <TextBlock Text="The latest wallpapers in one collection. You can find the freshest wallpapers here."
                                         Foreground="White"
                                         TextWrapping="Wrap"
                                            TextAlignment="Center"
@@ -116,7 +116,9 @@
                             <TextBlock Text="8K UltraHD wallpapers"
                                         Style="{StaticResource BodyTextBlockStyle}"
                                         Foreground="White"
-                                        FontWeight="SemiBold" />
+                                        FontWeight="SemiBold"
+                                        TextTrimming="CharacterEllipsis"
+                                        MaxLines="1" />
                         </Grid>
                     </Grid>
 
@@ -127,7 +129,9 @@
                             <TextBlock Text="AI generated"
                                         Style="{StaticResource BodyTextBlockStyle}"
                                         Foreground="White"
-                                        FontWeight="SemiBold" />
+                                        FontWeight="SemiBold"
+                                        TextTrimming="CharacterEllipsis"
+                                        MaxLines="1" />
                         </Grid>
                     </Grid>
                 </Grid>
@@ -143,7 +147,10 @@
 
                         <TextBlock Text="Daily popular wallpapers"
                                     Style="{StaticResource SubtitleTextBlockStyle}"
-                                    VerticalAlignment="Center" />
+                                    VerticalAlignment="Center"
+                                    Margin="0,0,12,0"
+                                    TextTrimming="CharacterEllipsis"
+                                    MaxLines="1" />
 
                         <Button Grid.Column="1" Content="&#xE974;"
                                 FontFamily="Segoe MDL2 Assets"

@@ -350,30 +350,20 @@ namespace Aura.Services
                     int pageNumber = _desktopCurrentBatch - 1;
                     string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
                     
-                    HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-                    
-                    if (response.IsSuccessStatusCode)
+                    string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                    if (!string.IsNullOrWhiteSpace(jsonContent))
                     {
-                        string jsonContent = await response.Content.ReadAsStringAsync();
                         using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                         {
                             foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                             {
-                                string id = wallpaperElement.GetProperty("ID").GetString();
-                                string title = wallpaperElement.GetProperty("Title").GetString();
-                                string fullPhotoUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
-                                
-                                _desktopWallpapers.Add(new WallpaperItem
+                                var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                                if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
                                 {
-                                    Id = id,
-                                    Title = title,
-                                    FullPhotoUrl = fullPhotoUrl
-                                });
+                                    _desktopWallpapers.Add(wallpaper);
+                                }
                             }
                         }
-                    }
-                    else
-                    {
                     }
                 }
 
@@ -411,30 +401,20 @@ namespace Aura.Services
                 int pageNumber = _lockScreenCurrentBatch - 1;
                 string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
                 
-                HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-                
-                if (response.IsSuccessStatusCode)
+                string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                if (!string.IsNullOrWhiteSpace(jsonContent))
                 {
-                    string jsonContent = await response.Content.ReadAsStringAsync();
                     using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                     {
                         foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                         {
-                            string id = wallpaperElement.GetProperty("ID").GetString();
-                            string title = wallpaperElement.GetProperty("Title").GetString();
-                            string fullPhotoUrl = wallpaperElement.GetProperty("FullPhotoUrl").GetString();
-                            
-                            _lockScreenWallpapers.Add(new WallpaperItem
+                            var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                            if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
                             {
-                                Id = id,
-                                Title = title,
-                                FullPhotoUrl = fullPhotoUrl
-                            });
+                                _lockScreenWallpapers.Add(wallpaper);
+                            }
                         }
                     }
-                }
-                else
-                {
                 }
             }
         }
@@ -499,7 +479,7 @@ namespace Aura.Services
                     }
                     else
                     {
-                        imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                        imageBytes = await BackieeNetworkClient.GetByteArrayAsync(imageUrl);
                     }
 
                     wallpaperFile = await wallpapersFolder.CreateFileAsync(
@@ -733,7 +713,7 @@ namespace Aura.Services
                     }
                     else
                     {
-                        imageBytes = await _httpClient.GetByteArrayAsync(imageUrl);
+                        imageBytes = await BackieeNetworkClient.GetByteArrayAsync(imageUrl);
                     }
 
                     wallpaperFile = await wallpapersFolder.CreateFileAsync(

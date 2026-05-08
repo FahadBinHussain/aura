@@ -46,7 +46,7 @@ namespace Aura.Services
             {
                 new Wallpaper { 
                     Title = "Lion with Cherry Blossoms", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 94, 
@@ -55,7 +55,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Heartbeat Pulse", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "8K UltraHD", 
                     IsAIGenerated = false, 
                     Likes = 76, 
@@ -64,7 +64,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Mystical Forest", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 83, 
@@ -73,7 +73,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Glowing Rhino", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "5K", 
                     IsAIGenerated = true, 
                     Likes = 23, 
@@ -82,7 +82,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Anime Character", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 22, 
@@ -91,7 +91,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Portal View", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 17, 
@@ -100,7 +100,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Night Sky", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "5K", 
                     IsAIGenerated = false, 
                     Likes = 45, 
@@ -109,7 +109,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Solar System", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "8K UltraHD", 
                     IsAIGenerated = false, 
                     Likes = 89, 
@@ -118,7 +118,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Cyberpunk City", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 103, 
@@ -127,7 +127,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Tropical Beach", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "5K", 
                     IsAIGenerated = false, 
                     Likes = 56, 
@@ -136,7 +136,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "Mountain Range", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = false, 
                     Likes = 67, 
@@ -145,7 +145,7 @@ namespace Aura.Services
                 },
                 new Wallpaper { 
                     Title = "AI Abstract Art", 
-                    ImagePath = "ms-appx:///Assets/placeholder-dark.png", 
+                    ImagePath = "ms-appx:///Assets/placeholder-wallpaper-1000.png",
                     Resolution = "4K", 
                     IsAIGenerated = true, 
                     Likes = 41, 

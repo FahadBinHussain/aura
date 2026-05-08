@@ -5,7 +5,6 @@ using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml;
 using Aura.Models;
 using System.Diagnostics;
-using System.Net.Http;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Microsoft.UI.Xaml.Shapes; // for Ellipse and Path shape
@@ -186,7 +185,6 @@ namespace Aura.Views.Backiee
     }
     public sealed partial class WallpaperDetailPage : Page
     {
-        private readonly HttpClient _httpClient = new HttpClient();
         private const string ApiBaseUrl = "https://atozmashprima.com/api/search-wall-papers?id=";
         private const string DetailApiBaseUrl = "https://backiee.com/api/wallpaper/list.php?action=detail_page_v2&wallpaper_id=";
         private WallpaperItem _currentWallpaper;
@@ -292,22 +290,20 @@ namespace Aura.Views.Backiee
             {
                 string apiUrl = $"{DetailApiBaseUrl}{wallpaperId}";
 
-                HttpResponseMessage response = await _httpClient.GetAsync(apiUrl);
-
-                if (response.IsSuccessStatusCode)
+                string jsonResponse = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                if (!string.IsNullOrWhiteSpace(jsonResponse))
                 {
-                    string jsonResponse = await response.Content.ReadAsStringAsync();
 
-                    using JsonDocument document = JsonDocument.Parse(jsonResponse);
+                    using JsonDocument document = BackieeApiParser.ParsePossiblyInvalidJson(jsonResponse);
 
                     // Extract publisher data and wallpaper source URL
                     if (document.RootElement.TryGetProperty("WallpaperPublisher", out JsonElement publisherElement))
                     {
                         // Check if there's a source URL in the response
                         if (document.RootElement.TryGetProperty("SourceUrl", out JsonElement sourceUrlElement) &&
-                            !string.IsNullOrEmpty(sourceUrlElement.GetString()))
+                            !string.IsNullOrEmpty(BackieeApiParser.GetValueString(sourceUrlElement)))
                         {
-                            string sourceUrl = sourceUrlElement.GetString();
+                            string sourceUrl = BackieeApiParser.GetValueString(sourceUrlElement);
                             // Update the SourceUrl property of the current wallpaper
                             _currentWallpaper.SourceUrl = sourceUrl;
                         }
@@ -327,9 +323,6 @@ namespace Aura.Views.Backiee
                     {
                     }
                 }
-                else
-                {
-                }
             }
             catch (Exception ex)
             {
@@ -342,30 +335,33 @@ namespace Aura.Views.Backiee
             {
                 // Extract publisher details
                 string publisherName = publisherElement.TryGetProperty("Name", out JsonElement nameElement)
-                    ? nameElement.GetString() : "Unknown Publisher";
+                    ? BackieeApiParser.GetValueString(nameElement, "Unknown Publisher") : "Unknown Publisher";
 
                 string gender = publisherElement.TryGetProperty("Gender", out JsonElement genderElement)
-                    ? genderElement.GetString() : "Private";
+                    ? BackieeApiParser.GetValueString(genderElement, "Private") : "Private";
 
                 string age = publisherElement.TryGetProperty("Age", out JsonElement ageElement)
-                    ? ageElement.GetString() : "Private";
+                    ? BackieeApiParser.GetValueString(ageElement, "Private") : "Private";
 
                 string country = publisherElement.TryGetProperty("Country", out JsonElement countryElement)
-                    ? countryElement.GetString() : "Private";
+                    ? BackieeApiParser.GetValueString(countryElement, "Private") : "Private";
 
                 // Publisher profile picture
-                string profileImageUrl = publisherElement.TryGetProperty("ProfileImage", out JsonElement profileImageElement)
-                    ? profileImageElement.GetString() : "";
+                string profileImageUrl = BackieeApiParser.GetFirstString(
+                    publisherElement,
+                    "ProfileImage",
+                    "PublisherImage",
+                    "MiniPhotoUrl");
 
                 // Statistics
                 string uploads = publisherElement.TryGetProperty("Uploads", out JsonElement uploadsElement)
-                    ? uploadsElement.GetString() : "0";
+                    ? BackieeApiParser.GetValueString(uploadsElement, "0") : "0";
 
                 string likes = publisherElement.TryGetProperty("Likes", out JsonElement likesElement)
-                    ? likesElement.GetString() : "0";
+                    ? BackieeApiParser.GetValueString(likesElement, "0") : "0";
 
                 string followers = publisherElement.TryGetProperty("Followers", out JsonElement followersElement)
-                    ? followersElement.GetString() : "0";
+                    ? BackieeApiParser.GetValueString(followersElement, "0") : "0";
 
                 // Update UI elements with publisher information
                 // Name
@@ -497,7 +493,7 @@ namespace Aura.Views.Backiee
                     var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", CreationCollisionOption.OpenIfExists);
 
                     // Download the image
-                    var imageBytes = await _httpClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
+                    var imageBytes = await BackieeNetworkClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
 
                     // Create a file in Pictures folder
                     var wallpaperFile = await wallpapersFolder.CreateFileAsync(
@@ -680,7 +676,7 @@ namespace Aura.Views.Backiee
                     var downloadFile = await appFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
 
                     // Download directly to the file
-                    var imageBytes = await _httpClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
+                    var imageBytes = await BackieeNetworkClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
                     using (var stream = await downloadFile.OpenStreamForWriteAsync())
                     {
                         await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
