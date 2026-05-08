@@ -110,7 +110,10 @@
                         </Grid.RowDefinitions>
 
                         <!-- 8K UltraHD Wallpapers (Remove Height, set Grid.Row) -->
-                        <Grid Grid.Row="0" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid Grid.Row="0"
+                              Tapped="UltraHdWallpapers_Tapped"
+                              CornerRadius="12"
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Image x:Name="UltraHdImage" Stretch="UniformToFill" CacheMode="BitmapCache" />
                             <Grid Background="#88000000" VerticalAlignment="Bottom" Padding="16">
                             <TextBlock Text="8K UltraHD wallpapers"
@@ -123,7 +126,10 @@
                     </Grid>
 
                         <!-- AI Generated (Remove Height, set Grid.Row) -->
-                        <Grid Grid.Row="1" CornerRadius="12" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <Grid Grid.Row="1"
+                              Tapped="AiGeneratedWallpapers_Tapped"
+                              CornerRadius="12"
+                              Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
                         <Image x:Name="AiGeneratedImage" Stretch="UniformToFill" CacheMode="BitmapCache" />
                             <Grid Background="#88000000" VerticalAlignment="Bottom" Padding="16">
                             <TextBlock Text="AI generated"
@@ -153,6 +159,7 @@
                                     MaxLines="1" />
 
                         <Button Grid.Column="1" Content="&#xE974;"
+                                Click="DailyPopularWallpapers_Click"
                                 FontFamily="Segoe MDL2 Assets"
                                 Background="Transparent"
                                 BorderThickness="0" />

@@ -302,6 +302,21 @@ namespace Aura.Views.Backiee
             this.Frame.Navigate(typeof(LatestWallpapersPage));
         }
 
+        private void UltraHdWallpapers_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            this.Frame.Navigate(typeof(LatestWallpapersPage), BackieeWallpaperSection.UltraHd8KKey);
+        }
+
+        private void AiGeneratedWallpapers_Tapped(object sender, Microsoft.UI.Xaml.Input.TappedRoutedEventArgs e)
+        {
+            this.Frame.Navigate(typeof(LatestWallpapersPage), BackieeWallpaperSection.AiGeneratedKey);
+        }
+
+        private void DailyPopularWallpapers_Click(object sender, RoutedEventArgs e)
+        {
+            this.Frame.Navigate(typeof(LatestWallpapersPage), BackieeWallpaperSection.DailyPopularKey);
+        }
+
         private void DailyWallpapersWrapGrid_SizeChanged(object sender, SizeChangedEventArgs e)
         {
             if (sender is ItemsWrapGrid wrapGrid)

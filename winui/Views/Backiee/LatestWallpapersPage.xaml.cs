@@ -13,12 +13,15 @@ using System.Linq;
 using System.Text.Json;
 using Microsoft.UI.Xaml.Media.Animation; // For Storyboard
 using Microsoft.UI.Xaml.Data; // For value converter
+using Microsoft.UI.Xaml.Navigation;
 using Aura.Services;
 
 namespace Aura.Views.Backiee
 {
     public sealed partial class LatestWallpapersPage : Page
     {
+        private BackieeWallpaperSection _section = BackieeWallpaperSection.Latest;
+
         // Collection to hold the wallpapers
         private ObservableCollection<WallpaperItem> _wallpapers;
 
@@ -48,6 +51,7 @@ namespace Aura.Views.Backiee
         public LatestWallpapersPage()
         {
             this.InitializeComponent();
+            PageTitleTextBlock.Text = _section.Title;
 
             // Initialize the wallpapers collection
             _wallpapers = new ObservableCollection<WallpaperItem>();
@@ -67,6 +71,14 @@ namespace Aura.Views.Backiee
             // Register for events
             Loaded += LatestWallpapersPage_Loaded;
             Unloaded += LatestWallpapersPage_Unloaded;
+        }
+
+        protected override void OnNavigatedTo(NavigationEventArgs e)
+        {
+            base.OnNavigatedTo(e);
+
+            _section = BackieeWallpaperSection.FromNavigationParameter(e.Parameter);
+            PageTitleTextBlock.Text = _section.Title;
         }
 
         private void InitializePlaceholderImage()
@@ -133,7 +145,7 @@ namespace Aura.Views.Backiee
                 LoadingProgressBar.Visibility = Visibility.Visible;
 
                 // Start the API call immediately
-                string apiUrl = $"{ApiBaseUrl}?action=paging_list&list_type=latest&page={_currentPage}&page_size={_itemsPerPage}&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+                string apiUrl = _section.BuildApiUrl(ApiBaseUrl, _currentPage, _itemsPerPage);
 
                 string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
                 if (!string.IsNullOrWhiteSpace(jsonContent))
@@ -148,7 +160,9 @@ namespace Aura.Views.Backiee
                             try
                             {
                                 var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement, _placeholderImage);
-                                if (!string.IsNullOrEmpty(wallpaper.Id) && !string.IsNullOrEmpty(wallpaper.ImageUrl))
+                                if (!string.IsNullOrEmpty(wallpaper.Id) &&
+                                    !string.IsNullOrEmpty(wallpaper.ImageUrl) &&
+                                    _section.Matches(wallpaper))
                                 {
                                     newWallpapers.Add(wallpaper);
                                 }
@@ -156,6 +170,13 @@ namespace Aura.Views.Backiee
                             catch
                             {
                             }
+                        }
+
+                        if (_section.SortScore != null)
+                        {
+                            newWallpapers = newWallpapers
+                                .OrderByDescending(_section.SortScore)
+                                .ToList();
                         }
 
                         // Add all items at once for maximum speed
