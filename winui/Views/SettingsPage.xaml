@@ -59,6 +59,65 @@
                 </Border>
             </StackPanel>
 
+            <!-- API Keys Section -->
+            <StackPanel Spacing="8">
+                <TextBlock Text="API Keys"
+                           FontSize="13"
+                           FontWeight="SemiBold"
+                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                           Margin="0,0,0,4"/>
+
+                <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8"
+                        Padding="16,14">
+                    <StackPanel Spacing="16">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Wallpaper source keys"
+                                       FontSize="14"
+                                       FontWeight="Medium"
+                                       Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+                            <TextBlock Text="Pexels and Pixabay require free API keys before Aura can load those platform pages. Keys are stored in local app data on this device."
+                                       FontSize="12"
+                                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                       TextWrapping="Wrap"/>
+                        </StackPanel>
+
+                        <StackPanel Spacing="10">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Pexels API key"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <PasswordBox x:Name="PexelsApiKeyBox"
+                                             PlaceholderText="Paste Pexels API key"
+                                             PasswordRevealMode="Peek"/>
+                            </StackPanel>
+
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Pixabay API key"
+                                           FontSize="12"
+                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <PasswordBox x:Name="PixabayApiKeyBox"
+                                             PlaceholderText="Paste Pixabay API key"
+                                             PasswordRevealMode="Peek"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Spacing="8">
+                            <Button Content="Save API keys"
+                                    Click="SaveApiKeysButton_Click"/>
+                            <Button Content="Clear"
+                                    Click="ClearApiKeysButton_Click"/>
+                        </StackPanel>
+
+                        <InfoBar x:Name="ApiKeyStatusInfoBar"
+                                 IsOpen="False"
+                                 IsClosable="True"/>
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+
         </StackPanel>
     </ScrollViewer>
 </Page>

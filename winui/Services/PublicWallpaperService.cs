@@ -79,8 +79,8 @@ namespace Aura.Services
                 Bing => "Recent daily Bing homepage wallpapers from Microsoft's public archive endpoint.",
                 SimpleDesktops => "Minimal, distraction-free wallpapers from Simple Desktops.",
                 WallpaperHub => "Microsoft, Surface, Windows, and Bing wallpapers from WallpaperHub.",
-                Pexels => "Free stock photos via the official Pexels API. Requires PEXELS_API_KEY.",
-                Pixabay => "Royalty-free images via the official Pixabay API. Requires PIXABAY_API_KEY.",
+                Pexels => "Free stock photos via the official Pexels API. Add a Pexels API key in Settings.",
+                Pixabay => "Royalty-free images via the official Pixabay API. Add a Pixabay API key in Settings.",
                 _ => "Browse wallpapers from this source."
             };
         }
@@ -320,10 +320,10 @@ namespace Aura.Services
 
         private async Task<List<WallpaperItem>> GetPexelsWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
-            var apiKey = Environment.GetEnvironmentVariable("PEXELS_API_KEY");
+            var apiKey = ApiKeySettingsService.GetPexelsApiKey();
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                throw new InvalidOperationException("Pexels support needs a PEXELS_API_KEY environment variable. Create a free Pexels API key, set it, then restart Aura.");
+                throw new InvalidOperationException("Pexels support needs a Pexels API key. Add it in Settings > API Keys, then try again.");
             }
 
             var requestUrl = string.Equals(mode, "Curated", StringComparison.OrdinalIgnoreCase)
@@ -376,10 +376,10 @@ namespace Aura.Services
 
         private async Task<List<WallpaperItem>> GetPixabayWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
-            var apiKey = Environment.GetEnvironmentVariable("PIXABAY_API_KEY");
+            var apiKey = ApiKeySettingsService.GetPixabayApiKey();
             if (string.IsNullOrWhiteSpace(apiKey))
             {
-                throw new InvalidOperationException("Pixabay support needs a PIXABAY_API_KEY environment variable. Create a free Pixabay API key, set it, then restart Aura.");
+                throw new InvalidOperationException("Pixabay support needs a Pixabay API key. Add it in Settings > API Keys, then try again.");
             }
 
             var category = mode switch

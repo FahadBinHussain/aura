@@ -88,7 +88,8 @@ namespace Aura.Views.PublicSources
                     return;
                 }
 
-                var file = await SaveImageToFolderAsync(ApplicationData.Current.LocalFolder, imageUrl);
+                var cacheFolder = await LocalFileStorageService.GetWallpaperCacheFolderAsync();
+                var file = await SaveImageToFolderAsync(cacheFolder, imageUrl);
                 var settings = UserProfilePersonalizationSettings.Current;
                 var success = isLockScreen
                     ? await settings.TrySetLockScreenImageAsync(file)

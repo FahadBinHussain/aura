@@ -1,4 +1,5 @@
 using System;
+using Aura.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.Win32;
@@ -23,6 +24,8 @@ namespace Aura.Views
             try
             {
                 StartWithWindowsToggle.IsOn = IsStartupEnabled();
+                PexelsApiKeyBox.Password = ApiKeySettingsService.GetStoredPexelsApiKey();
+                PixabayApiKeyBox.Password = ApiKeySettingsService.GetStoredPixabayApiKey();
             }
             catch { }
             finally
@@ -74,6 +77,41 @@ namespace Aura.Views
         {
             if (_isInitializing) return;
             SetStartupEnabled(StartWithWindowsToggle.IsOn);
+        }
+
+        private void SaveApiKeysButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ApiKeySettingsService.SaveApiKeys(PexelsApiKeyBox.Password, PixabayApiKeyBox.Password);
+                ShowApiKeyStatus("API keys saved. Platform pages will use them the next time they load.", InfoBarSeverity.Success);
+            }
+            catch (Exception ex)
+            {
+                ShowApiKeyStatus($"Could not save API keys: {ex.Message}", InfoBarSeverity.Error);
+            }
+        }
+
+        private void ClearApiKeysButton_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ApiKeySettingsService.ClearApiKeys();
+                PexelsApiKeyBox.Password = string.Empty;
+                PixabayApiKeyBox.Password = string.Empty;
+                ShowApiKeyStatus("Saved API keys cleared.", InfoBarSeverity.Informational);
+            }
+            catch (Exception ex)
+            {
+                ShowApiKeyStatus($"Could not clear API keys: {ex.Message}", InfoBarSeverity.Error);
+            }
+        }
+
+        private void ShowApiKeyStatus(string message, InfoBarSeverity severity)
+        {
+            ApiKeyStatusInfoBar.Message = message;
+            ApiKeyStatusInfoBar.Severity = severity;
+            ApiKeyStatusInfoBar.IsOpen = true;
         }
     }
 }
