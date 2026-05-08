@@ -671,6 +671,10 @@ namespace Aura
                         case "Home":
                             if (LastSelectedPlatform == "Alpha Coders")
                                 ContentFrame.Navigate(typeof(Views.AlphaCoders.AlphaCodersGridPage));
+                            else if (LastSelectedPlatform == "ArtStation")
+                                ContentFrame.Navigate(typeof(Views.ArtStation.ArtStationGridPage));
+                            else if (PublicWallpaperService.IsSupportedPlatform(LastSelectedPlatform))
+                                ContentFrame.Navigate(typeof(Views.PublicSources.PublicWallpaperGridPage), LastSelectedPlatform);
                             else if (LastSelectedPlatform == "Backiee")
                                 ContentFrame.Navigate(typeof(Views.Backiee.HomePage));
                             else

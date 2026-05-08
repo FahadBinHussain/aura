@@ -1,9 +1,12 @@
 using System;
 using System.Collections.Generic;
+using Aura.Services;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Aura.Views.AlphaCoders;
+using Aura.Views.ArtStation;
 using Aura.Views.Backiee;
+using Aura.Views.PublicSources;
 
 namespace Aura.Views
 {
@@ -21,7 +24,7 @@ namespace Aura.Views
                 "Alpha Coders",
                 "ArtFol",
                 "Artgram",
-                "Artstation",
+                "ArtStation",
                 "Backiee",
                 "Behance",
                 "Bing Wallpaper Archive",
@@ -63,8 +66,11 @@ namespace Aura.Views
                 selectedPlatform = button.DataContext?.ToString();
             }
 
-            // Special handling for Backiee and Alpha Coders platforms
-            if (selectedPlatform == "Backiee" || selectedPlatform == "Alpha Coders")
+            // Special handling for implemented platforms
+            if (selectedPlatform == "Backiee" ||
+                selectedPlatform == "Alpha Coders" ||
+                selectedPlatform == "ArtStation" ||
+                PublicWallpaperService.IsSupportedPlatform(selectedPlatform))
             {
                 // Get the main window and navigate
                 if (MainWindow.Instance != null)
@@ -78,10 +84,19 @@ namespace Aura.Views
                         // Navigate to Alpha Coders grid page
                         MainWindow.Instance.NavigationFrame.Navigate(typeof(AlphaCodersGridPage));
                     }
+                    else if (selectedPlatform == "ArtStation")
+                    {
+                        // Navigate to ArtStation grid page
+                        MainWindow.Instance.NavigationFrame.Navigate(typeof(ArtStationGridPage));
+                    }
                     else if (selectedPlatform == "Backiee")
                     {
                         // Navigate to Backiee home page
                         MainWindow.Instance.NavigationFrame.Navigate(typeof(HomePage));
+                    }
+                    else if (PublicWallpaperService.IsSupportedPlatform(selectedPlatform))
+                    {
+                        MainWindow.Instance.NavigationFrame.Navigate(typeof(PublicWallpaperGridPage), selectedPlatform);
                     }
                 }
             }
@@ -141,7 +156,7 @@ namespace Aura.Views
             ContentDialog dialog = new ContentDialog
             {
                 Title = "Platform Not Available",
-                Content = $"The {selectedPlatform} platform is not implemented yet. Please select Backiee or Alpha Coders for now.",
+                Content = $"The {selectedPlatform} platform is not implemented yet. Available now: Backiee, Alpha Coders, ArtStation, Bing Wallpaper Archive, Pexels, Pixabay, Simple Desktops, Wallhaven, and WallpaperHub.",
                 CloseButtonText = "OK",
                 XamlRoot = this.XamlRoot
             };

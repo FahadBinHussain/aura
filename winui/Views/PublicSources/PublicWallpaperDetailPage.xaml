@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Aura.Views.PublicSources.PublicWallpaperDetailPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="Transparent">
+
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <Grid Padding="28,24,28,32">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <InfoBar x:Name="StatusInfoBar"
+                     Grid.Row="0"
+                     IsOpen="False"
+                     IsClosable="True"
+                     Margin="0,0,0,16"/>
+
+            <Grid Grid.Row="1">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="2*"/>
+                    <ColumnDefinition Width="28"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="16"
+                        Padding="10">
+                    <Image x:Name="WallpaperImage"
+                           Stretch="Uniform"
+                           MinHeight="420"/>
+                </Border>
+
+                <StackPanel Grid.Column="2" Spacing="18">
+                    <StackPanel Spacing="6">
+                        <TextBlock x:Name="PlatformTextBlock"
+                                   Text="Platform"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   FontSize="13"/>
+                        <TextBlock x:Name="TitleTextBlock"
+                                   Text="Wallpaper"
+                                   TextWrapping="WrapWholeWords"
+                                   FontSize="30"
+                                   FontWeight="SemiBold"/>
+                        <TextBlock x:Name="DescriptionTextBlock"
+                                   Text=""
+                                   TextWrapping="WrapWholeWords"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                   FontSize="14"/>
+                    </StackPanel>
+
+                    <Grid ColumnSpacing="12" RowSpacing="12">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                        </Grid.RowDefinitions>
+
+                        <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="Resolution" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="ResolutionTextBlock" Text="-" FontSize="16" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="1" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="Likes" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="LikesTextBlock" Text="-" FontSize="16" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Row="1" Grid.ColumnSpan="2" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="12" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="Downloads / Views" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
+                                <TextBlock x:Name="DownloadsTextBlock" Text="-" FontSize="16" FontWeight="SemiBold"/>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Spacing="10">
+                        <Button x:Name="SetWallpaperButton"
+                                HorizontalAlignment="Stretch"
+                                Content="Set as desktop wallpaper"
+                                Click="SetAsDesktopWallpaperButton_Click"/>
+                        <Button x:Name="SetLockScreenButton"
+                                HorizontalAlignment="Stretch"
+                                Content="Set as lock screen"
+                                Click="SetAsLockScreenButton_Click"/>
+                        <Button x:Name="DownloadButton"
+                                HorizontalAlignment="Stretch"
+                                Content="Download"
+                                Click="DownloadButton_Click"/>
+                        <Button x:Name="ViewOnWebButton"
+                                HorizontalAlignment="Stretch"
+                                Content="View on web"
+                                Click="ViewOnWebButton_Click"/>
+                    </StackPanel>
+
+                    <ProgressBar x:Name="LoadingProgressBar"
+                                 IsIndeterminate="True"
+                                 Visibility="Collapsed"/>
+                </StackPanel>
+            </Grid>
+        </Grid>
+    </ScrollViewer>
+</Page>

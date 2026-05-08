@@ -1,0 +1,188 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Aura.Views.ArtStation.ArtStationGridPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:converters="using:Aura.Converters"
+    xmlns:models="using:Aura.Models"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Page.Resources>
+        <converters:BoolToVisibilityConverter x:Key="BoolToVisibilityConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <Grid Grid.Row="0"
+              Background="{ThemeResource LayerFillColorDefaultBrush}"
+              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+              BorderThickness="0,0,0,1"
+              Padding="24,16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*"/>
+                <ColumnDefinition Width="Auto"/>
+            </Grid.ColumnDefinitions>
+
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="12">
+                <TextBlock Text="ArtStation:"
+                           FontSize="16"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0"/>
+
+                <Button x:Name="TrendingButton"
+                        Content="Trending"
+                        Background="{ThemeResource AccentFillColorDefaultBrush}"
+                        Foreground="White"
+                        Padding="16,8"
+                        CornerRadius="4"
+                        Click="SortingButton_Click"
+                        Tag="trending"
+                        VerticalAlignment="Center"/>
+
+                <Button x:Name="LatestButton"
+                        Content="Latest"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        Padding="16,8"
+                        CornerRadius="4"
+                        Click="SortingButton_Click"
+                        Tag="latest"
+                        VerticalAlignment="Center"/>
+            </StackPanel>
+
+            <TextBlock Grid.Column="1"
+                       Text="ArtStation public projects"
+                       VerticalAlignment="Center"
+                       Opacity="0.72"
+                       TextTrimming="CharacterEllipsis"/>
+        </Grid>
+
+        <Grid Grid.Row="1">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <StackPanel Grid.Row="0" Margin="24,24,24,12" Spacing="4">
+                <TextBlock x:Name="PageTitleTextBlock"
+                           Text="ArtStation trending"
+                           Style="{StaticResource TitleTextBlockStyle}"/>
+                <TextBlock Text="Browse artwork projects from ArtStation. Open a card to preview the full image."
+                           Opacity="0.75"
+                           TextWrapping="Wrap"/>
+            </StackPanel>
+
+            <InfoBar x:Name="StatusInfoBar"
+                     Grid.Row="1"
+                     Margin="24,0,24,12"
+                     IsOpen="False"
+                     Severity="Informational"/>
+
+            <ScrollViewer x:Name="MainScrollViewer"
+                          Grid.Row="2"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled"
+                          ViewChanged="MainScrollViewer_ViewChanged">
+
+                <GridView x:Name="ProjectsGridView"
+                          Margin="12,8,12,12"
+                          SelectionMode="None"
+                          IsItemClickEnabled="True"
+                          ItemClick="ProjectsGridView_ItemClick"
+                          ContainerContentChanging="ProjectsGridView_ContainerContentChanging"
+                          HorizontalAlignment="Stretch"
+                          VerticalAlignment="Stretch">
+                    <GridView.ItemContainerStyle>
+                        <Style TargetType="GridViewItem">
+                            <Setter Property="Margin" Value="4"/>
+                            <Setter Property="Padding" Value="0"/>
+                            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                            <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                            <Setter Property="BorderThickness" Value="0"/>
+                        </Style>
+                    </GridView.ItemContainerStyle>
+
+                    <GridView.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <ItemsWrapGrid x:Name="ProjectsWrapGrid"
+                                           Orientation="Horizontal"
+                                           HorizontalAlignment="Stretch"
+                                           ItemWidth="NaN"
+                                           ItemHeight="NaN"
+                                           SizeChanged="ProjectsWrapGrid_SizeChanged"
+                                           MaximumRowsOrColumns="6"/>
+                        </ItemsPanelTemplate>
+                    </GridView.ItemsPanel>
+
+                    <GridView.ItemTemplate>
+                        <DataTemplate x:DataType="models:WallpaperItem">
+                            <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                                  CornerRadius="12"
+                                  BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                                  BorderThickness="0.5">
+                                <Image x:Name="ItemImage"
+                                       Source="ms-appx:///Assets/placeholder-wallpaper-1000.png"
+                                       Stretch="UniformToFill"
+                                       CacheMode="BitmapCache"/>
+
+                                <Border VerticalAlignment="Bottom"
+                                        Background="#AA000000"
+                                        Padding="12,8">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto"/>
+                                            <RowDefinition Height="Auto"/>
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Grid.Row="0"
+                                                   Text="{x:Bind Title, Mode=OneWay}"
+                                                   Foreground="White"
+                                                   FontWeight="SemiBold"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <StackPanel Grid.Row="1"
+                                                    Orientation="Horizontal"
+                                                    Spacing="12"
+                                                    Margin="0,4,0,0">
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                                          Glyph="&#xEB51;"
+                                                          FontSize="12"
+                                                          Foreground="White"/>
+                                                <TextBlock Text="{x:Bind Likes, Mode=OneWay}"
+                                                           Foreground="White"
+                                                           FontSize="12"/>
+                                            </StackPanel>
+                                            <StackPanel Orientation="Horizontal" Spacing="4">
+                                                <FontIcon FontFamily="Segoe Fluent Icons"
+                                                          Glyph="&#xE890;"
+                                                          FontSize="12"
+                                                          Foreground="White"/>
+                                                <TextBlock Text="{x:Bind Downloads, Mode=OneWay}"
+                                                           Foreground="White"
+                                                           FontSize="12"/>
+                                            </StackPanel>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </DataTemplate>
+                    </GridView.ItemTemplate>
+                </GridView>
+            </ScrollViewer>
+
+            <ProgressBar x:Name="LoadingProgressBar"
+                         Grid.Row="2"
+                         VerticalAlignment="Bottom"
+                         IsIndeterminate="True"
+                         Visibility="Collapsed"/>
+        </Grid>
+    </Grid>
+</Page>
