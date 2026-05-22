@@ -287,3 +287,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ---
 
 Built with ❤️ using WinUI 3 and Windows App SDK
+
+## Contributors
+
+<a href="https://github.com/FahadBinHussain/aura/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=FahadBinHussain/aura" alt="Contributors" />
+</a>
