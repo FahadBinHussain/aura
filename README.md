@@ -32,6 +32,33 @@ Browse, organize, and apply beautiful wallpapers from multiple sources including
 - **Lock Screen Support**: Set lock screen wallpapers
 - **DepotDownloader Integration**: Support for Wallpaper Engine workshop content
 
+## Comparison
+
+`✅` means the tool is built around that capability. `partial` means it has a related feature, but
+not the same scope or depth. `-` means it is not the point of that tool.
+
+| Capability | Aura | [Wallpaper Engine](https://store.steampowered.com/app/431960/Wallpaper_Engine/) | [Lively Wallpaper](https://livelywallpaper.io/) | [backiee](https://backiee.com/application) | [John's Background Switcher](https://johnsad.ventures/software/backgroundswitcher/) | [Variety](https://peterlevi.com/variety/) |
+| --- | --- | --- | --- | --- | --- | --- |
+| Static wallpaper browsing and applying | ✅ | partial | partial | ✅ | ✅ | ✅ |
+| Multiple online sources | ✅ | partial | partial | ✅ | ✅ | ✅ |
+| Native Windows desktop app | ✅ | ✅ | ✅ | ✅ | ✅ | - |
+| Multiple implementations in one repo | ✅ | - | - | - | - | - |
+| Slideshow / wallpaper rotation | ✅ | ✅ | partial | ✅ | ✅ | ✅ |
+| Lock screen support | ✅ | - | - | partial | - | - |
+| Live or interactive wallpaper engine | partial | ✅ | ✅ | partial | - | - |
+| Wallpaper Engine Workshop path | partial | ✅ | - | - | - | - |
+| Local collections and personalization | ✅ | ✅ | ✅ | ✅ | partial | partial |
+| Mobile/cloud account ecosystem | - | partial | - | ✅ | - | - |
+| Open-source core | ✅ | - | ✅ | - | - | ✅ |
+
+Aura overlaps most with backiee for wallpaper browsing and with Lively/Wallpaper Engine for
+desktop personalization. The difference is that Aura is a playground of implementations:
+WinUI 3, WPF, and Python paths live together while sharing the same wallpaper-management idea.
+
+The biggest gaps are a real live-wallpaper engine, cloud/mobile sync, a community gallery, and
+polished packaging across all three implementations. Lively and Wallpaper Engine are ahead on
+live/interactive wallpapers; backiee is ahead on consumer-ready wallpaper discovery.
+
 ## 🚀 Getting Started
 
 ### Choose Your Implementation
