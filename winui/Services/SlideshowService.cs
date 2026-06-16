@@ -380,6 +380,23 @@ namespace Aura.Services
                             }
                         }
                     }
+                    else if (platform == "ArtStation" || PublicWallpaperService.IsSupportedPlatform(platform))
+                    {
+                        // Use PublicWallpaperService for ArtStation and other public platforms
+                        var publicService = new PublicWallpaperService();
+                        
+                        // Get mode based on platform
+                        string mode = category == "All" || string.IsNullOrEmpty(category) ? "latest" : category.ToLower();
+                        
+                        var wallpapers = await publicService.GetWallpapersAsync(platform, _desktopCurrentBatch, mode);
+                        
+                        // Tag wallpapers with their platform
+                        foreach (var wallpaper in wallpapers)
+                        {
+                            wallpaper.Platform = platform;
+                            allWallpapers.Add(wallpaper);
+                        }
+                    }
                 }
 
                 // Shuffle wallpapers randomly to mix platforms
@@ -446,6 +463,23 @@ namespace Aura.Services
                                     }
                                 }
                             }
+                        }
+                    }
+                    else if (platform == "ArtStation" || PublicWallpaperService.IsSupportedPlatform(platform))
+                    {
+                        // Use PublicWallpaperService for ArtStation and other public platforms
+                        var publicService = new PublicWallpaperService();
+                        
+                        // Get mode based on platform
+                        string mode = category == "All" || string.IsNullOrEmpty(category) ? "latest" : category.ToLower();
+                        
+                        var wallpapers = await publicService.GetWallpapersAsync(platform, _lockScreenCurrentBatch, mode);
+                        
+                        // Tag wallpapers with their platform
+                        foreach (var wallpaper in wallpapers)
+                        {
+                            wallpaper.Platform = platform;
+                            allWallpapers.Add(wallpaper);
                         }
                     }
                 }

@@ -525,6 +525,55 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(platformCheckBoxAlphaCoders);
 
+            var platformCheckBoxArtStation = new CheckBox
+            {
+                Content = "ArtStation",
+                IsChecked = currentPlatforms.Contains("ArtStation")
+            };
+            contentPanel.Children.Add(platformCheckBoxArtStation);
+
+            var platformCheckBoxWallhaven = new CheckBox
+            {
+                Content = "Wallhaven",
+                IsChecked = currentPlatforms.Contains("Wallhaven")
+            };
+            contentPanel.Children.Add(platformCheckBoxWallhaven);
+
+            var platformCheckBoxBing = new CheckBox
+            {
+                Content = "Bing Wallpaper Archive",
+                IsChecked = currentPlatforms.Contains("Bing Wallpaper Archive")
+            };
+            contentPanel.Children.Add(platformCheckBoxBing);
+
+            var platformCheckBoxSimpleDesktops = new CheckBox
+            {
+                Content = "Simple Desktops",
+                IsChecked = currentPlatforms.Contains("Simple Desktops")
+            };
+            contentPanel.Children.Add(platformCheckBoxSimpleDesktops);
+
+            var platformCheckBoxWallpaperHub = new CheckBox
+            {
+                Content = "WallpaperHub",
+                IsChecked = currentPlatforms.Contains("WallpaperHub")
+            };
+            contentPanel.Children.Add(platformCheckBoxWallpaperHub);
+
+            var platformCheckBoxPexels = new CheckBox
+            {
+                Content = "Pexels",
+                IsChecked = currentPlatforms.Contains("Pexels")
+            };
+            contentPanel.Children.Add(platformCheckBoxPexels);
+
+            var platformCheckBoxPixabay = new CheckBox
+            {
+                Content = "Pixabay",
+                IsChecked = currentPlatforms.Contains("Pixabay")
+            };
+            contentPanel.Children.Add(platformCheckBoxPixabay);
+
             // Category dropdown
             var categoryComboBox = new ComboBox
             {
@@ -540,28 +589,37 @@ namespace Aura.Views.Backiee
                 categoryComboBox.Items.Clear();
                 bool hasBackiee = platformCheckBoxBackiee.IsChecked == true;
                 bool hasAlphaCoders = platformCheckBoxAlphaCoders.IsChecked == true;
+                bool hasArtStation = platformCheckBoxArtStation.IsChecked == true;
+                bool hasWallhaven = platformCheckBoxWallhaven.IsChecked == true;
+                bool hasBing = platformCheckBoxBing.IsChecked == true;
+                bool hasSimpleDesktops = platformCheckBoxSimpleDesktops.IsChecked == true;
+                bool hasWallpaperHub = platformCheckBoxWallpaperHub.IsChecked == true;
+                bool hasPexels = platformCheckBoxPexels.IsChecked == true;
+                bool hasPixabay = platformCheckBoxPixabay.IsChecked == true;
                 
-                if (hasBackiee && hasAlphaCoders)
-                {
-                    // Show categories for both platforms
-                    categoryComboBox.Items.Add("Latest Wallpapers");
-                    categoryComboBox.Items.Add("8K UltraHD");
-                    categoryComboBox.Items.Add("AI Generated");
-                    categoryComboBox.Items.Add("4K Wallpapers");
-                    categoryComboBox.Items.Add("Harvest Wallpapers");
-                    categoryComboBox.Items.Add("Rain Wallpapers");
-                }
-                else if (hasBackiee)
+                // Backiee categories
+                if (hasBackiee)
                 {
                     categoryComboBox.Items.Add("Latest Wallpapers");
                     categoryComboBox.Items.Add("8K UltraHD");
                     categoryComboBox.Items.Add("AI Generated");
                 }
-                else if (hasAlphaCoders)
+                
+                // AlphaCoders categories
+                if (hasAlphaCoders)
                 {
                     categoryComboBox.Items.Add("4K Wallpapers");
                     categoryComboBox.Items.Add("Harvest Wallpapers");
                     categoryComboBox.Items.Add("Rain Wallpapers");
+                }
+                
+                // For other platforms, add a generic "All" category
+                if (hasArtStation || hasWallhaven || hasBing || hasSimpleDesktops || hasWallpaperHub || hasPexels || hasPixabay)
+                {
+                    if (categoryComboBox.Items.Count == 0 || !categoryComboBox.Items.Contains("All"))
+                    {
+                        categoryComboBox.Items.Add("All");
+                    }
                 }
                 
                 // Set selected category based on saved settings
@@ -588,6 +646,20 @@ namespace Aura.Views.Backiee
             platformCheckBoxBackiee.Unchecked += (s, e) => updateCategories();
             platformCheckBoxAlphaCoders.Checked += (s, e) => updateCategories();
             platformCheckBoxAlphaCoders.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxArtStation.Checked += (s, e) => updateCategories();
+            platformCheckBoxArtStation.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxWallhaven.Checked += (s, e) => updateCategories();
+            platformCheckBoxWallhaven.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxBing.Checked += (s, e) => updateCategories();
+            platformCheckBoxBing.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxSimpleDesktops.Checked += (s, e) => updateCategories();
+            platformCheckBoxSimpleDesktops.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxWallpaperHub.Checked += (s, e) => updateCategories();
+            platformCheckBoxWallpaperHub.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxPexels.Checked += (s, e) => updateCategories();
+            platformCheckBoxPexels.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxPixabay.Checked += (s, e) => updateCategories();
+            platformCheckBoxPixabay.Unchecked += (s, e) => updateCategories();
             
             // Initial category setup
             updateCategories();
@@ -606,6 +678,20 @@ namespace Aura.Views.Backiee
                     selectedPlatforms.Add("Backiee");
                 if (platformCheckBoxAlphaCoders.IsChecked == true)
                     selectedPlatforms.Add("AlphaCoders");
+                if (platformCheckBoxArtStation.IsChecked == true)
+                    selectedPlatforms.Add("ArtStation");
+                if (platformCheckBoxWallhaven.IsChecked == true)
+                    selectedPlatforms.Add("Wallhaven");
+                if (platformCheckBoxBing.IsChecked == true)
+                    selectedPlatforms.Add("Bing Wallpaper Archive");
+                if (platformCheckBoxSimpleDesktops.IsChecked == true)
+                    selectedPlatforms.Add("Simple Desktops");
+                if (platformCheckBoxWallpaperHub.IsChecked == true)
+                    selectedPlatforms.Add("WallpaperHub");
+                if (platformCheckBoxPexels.IsChecked == true)
+                    selectedPlatforms.Add("Pexels");
+                if (platformCheckBoxPixabay.IsChecked == true)
+                    selectedPlatforms.Add("Pixabay");
 
                 // Validate at least one platform is selected
                 if (selectedPlatforms.Count == 0)
