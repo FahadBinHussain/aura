@@ -29,6 +29,7 @@ namespace Aura.Models
         public string ImageUrl { get; set; } = string.Empty; // URL for the thumbnail
         public string FullPhotoUrl { get; set; } = string.Empty; // URL for the full size image
         public string SourceUrl { get; set; } = string.Empty; // URL for the source webpage
+        public string Platform { get; set; } = string.Empty; // Platform source (e.g., "Backiee", "AlphaCoders")
         private BitmapImage _imageSource;
         public BitmapImage ImageSource
         {

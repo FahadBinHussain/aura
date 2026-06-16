@@ -16,12 +16,12 @@ namespace Aura.Views.Backiee
     {
         // Desktop slideshow settings
         private bool _desktopSlideshowEnabled = false;
-        private string _desktopPlatform = "";
+        private List<string> _desktopPlatforms = new List<string>();
         private string _desktopCategory = "";
 
         // Lock screen slideshow settings
         private bool _lockScreenSlideshowEnabled = false;
-        private string _lockScreenPlatform = "";
+        private List<string> _lockScreenPlatforms = new List<string>();
         private string _lockScreenCategory = "";
 
         // Separate refresh intervals for desktop and lock screen
@@ -300,9 +300,9 @@ namespace Aura.Views.Backiee
                 {
                     _desktopSlideshowEnabled = settings["DesktopSlideshowEnabled"].GetBoolean();
                 }
-                if (settings.ContainsKey("DesktopSlideshowPlatform"))
+                if (settings.ContainsKey("DesktopSlideshowPlatforms"))
                 {
-                    _desktopPlatform = settings["DesktopSlideshowPlatform"].GetString() ?? "Backiee";
+                    _desktopPlatforms = JsonSerializer.Deserialize<List<string>>(settings["DesktopSlideshowPlatforms"].GetRawText()) ?? new List<string>();
                 }
                 if (settings.ContainsKey("DesktopSlideshowCategory"))
                 {
@@ -318,9 +318,9 @@ namespace Aura.Views.Backiee
                 {
                     _lockScreenSlideshowEnabled = settings["LockScreenSlideshowEnabled"].GetBoolean();
                 }
-                if (settings.ContainsKey("LockScreenSlideshowPlatform"))
+                if (settings.ContainsKey("LockScreenSlideshowPlatforms"))
                 {
-                    _lockScreenPlatform = settings["LockScreenSlideshowPlatform"].GetString() ?? "Backiee";
+                    _lockScreenPlatforms = JsonSerializer.Deserialize<List<string>>(settings["LockScreenSlideshowPlatforms"].GetRawText()) ?? new List<string>();
                 }
                 if (settings.ContainsKey("LockScreenSlideshowCategory"))
                 {
@@ -346,9 +346,10 @@ namespace Aura.Views.Backiee
         {
             
             // Update desktop slideshow status
-            if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
+            if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
             {
-                DesktopStatusText.Text = $"{_desktopPlatform} - {_desktopCategory} (Refresh: {_desktopRefreshInterval})";
+                string platformsText = _desktopPlatforms.Count == 1 ? _desktopPlatforms[0] : $"{_desktopPlatforms.Count} platforms";
+                DesktopStatusText.Text = $"{platformsText} - {_desktopCategory} (Refresh: {_desktopRefreshInterval})";
             }
             else
             {
@@ -356,9 +357,10 @@ namespace Aura.Views.Backiee
             }
 
             // Update lock screen slideshow status
-            if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
+            if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
             {
-                LockScreenStatusText.Text = $"{_lockScreenPlatform} - {_lockScreenCategory} (Refresh: {_lockScreenRefreshInterval})";
+                string platformsText = _lockScreenPlatforms.Count == 1 ? _lockScreenPlatforms[0] : $"{_lockScreenPlatforms.Count} platforms";
+                LockScreenStatusText.Text = $"{platformsText} - {_lockScreenCategory} (Refresh: {_lockScreenRefreshInterval})";
             }
             else
             {
@@ -391,12 +393,12 @@ namespace Aura.Views.Backiee
                 var settings = new Dictionary<string, object>
                 {
                     ["DesktopSlideshowEnabled"] = _desktopSlideshowEnabled,
-                    ["DesktopSlideshowPlatform"] = string.IsNullOrEmpty(_desktopPlatform) ? "Backiee" : _desktopPlatform,
+                    ["DesktopSlideshowPlatforms"] = _desktopPlatforms.Count > 0 ? _desktopPlatforms : new List<string> { "Backiee" },
                     ["DesktopSlideshowCategory"] = string.IsNullOrEmpty(_desktopCategory) ? "Latest Wallpapers" : _desktopCategory,
                     ["DesktopSlideshowInterval"] = string.IsNullOrEmpty(_desktopRefreshInterval) ? "12 hours" : _desktopRefreshInterval,
                     
                     ["LockScreenSlideshowEnabled"] = _lockScreenSlideshowEnabled,
-                    ["LockScreenSlideshowPlatform"] = string.IsNullOrEmpty(_lockScreenPlatform) ? "Backiee" : _lockScreenPlatform,
+                    ["LockScreenSlideshowPlatforms"] = _lockScreenPlatforms.Count > 0 ? _lockScreenPlatforms : new List<string> { "Backiee" },
                     ["LockScreenSlideshowCategory"] = string.IsNullOrEmpty(_lockScreenCategory) ? "Latest Wallpapers" : _lockScreenCategory,
                     ["LockScreenSlideshowInterval"] = string.IsNullOrEmpty(_lockScreenRefreshInterval) ? "12 hours" : _lockScreenRefreshInterval
                 };
@@ -415,17 +417,17 @@ namespace Aura.Views.Backiee
             try
             {
                 // Restore desktop slideshow if it was enabled
-                if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
+                if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
                 {
                     var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                    await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
                 
                 // Restore lock screen slideshow if it was enabled
-                if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
+                if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
                 {
                     var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                    await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
             }
             catch (Exception ex)
@@ -475,7 +477,7 @@ namespace Aura.Views.Backiee
 
             // Load existing settings for this slideshow type
             bool currentEnabled = slideshowType == "Desktop" ? _desktopSlideshowEnabled : _lockScreenSlideshowEnabled;
-            string currentPlatform = slideshowType == "Desktop" ? _desktopPlatform : _lockScreenPlatform;
+            List<string> currentPlatforms = slideshowType == "Desktop" ? _desktopPlatforms : _lockScreenPlatforms;
             string currentCategory = slideshowType == "Desktop" ? _desktopCategory : _lockScreenCategory;
 
             var toggleSwitch = new ToggleSwitch
@@ -500,29 +502,28 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(changeSlideshowLabel);
 
-            // Platform dropdown
-            var platformComboBox = new ComboBox
+            // Platform selection with checkboxes
+            var platformLabel = new TextBlock
             {
-                Header = "Select Platform",
-                PlaceholderText = "Choose a platform",
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinWidth = 400
+                Text = "Select Platforms",
+                FontSize = 14,
+                Margin = new Thickness(0, 8, 0, 4)
             };
-            platformComboBox.Items.Add("Backiee");
-            platformComboBox.Items.Add("AlphaCoders");
-            
-            // Set selected platform based on saved settings
-            if (!string.IsNullOrEmpty(currentPlatform))
+            contentPanel.Children.Add(platformLabel);
+
+            var platformCheckBoxBackiee = new CheckBox
             {
-                int platformIndex = currentPlatform == "AlphaCoders" ? 1 : 0;
-                platformComboBox.SelectedIndex = platformIndex;
-            }
-            else
+                Content = "Backiee",
+                IsChecked = currentPlatforms.Contains("Backiee")
+            };
+            contentPanel.Children.Add(platformCheckBoxBackiee);
+
+            var platformCheckBoxAlphaCoders = new CheckBox
             {
-                platformComboBox.SelectedIndex = 0;
-            }
-            
-            contentPanel.Children.Add(platformComboBox);
+                Content = "AlphaCoders",
+                IsChecked = currentPlatforms.Contains("AlphaCoders")
+            };
+            contentPanel.Children.Add(platformCheckBoxAlphaCoders);
 
             // Category dropdown
             var categoryComboBox = new ComboBox
@@ -533,33 +534,44 @@ namespace Aura.Views.Backiee
                 MinWidth = 400
             };
             
-            // Update categories when platform changes
-            bool isInitializing = true;
-            platformComboBox.SelectionChanged += (s, e) =>
+            // Initialize categories based on current platforms selection
+            var updateCategories = new Action(() =>
             {
                 categoryComboBox.Items.Clear();
-                if (platformComboBox.SelectedIndex == 0) // Backiee
+                bool hasBackiee = platformCheckBoxBackiee.IsChecked == true;
+                bool hasAlphaCoders = platformCheckBoxAlphaCoders.IsChecked == true;
+                
+                if (hasBackiee && hasAlphaCoders)
+                {
+                    // Show categories for both platforms
+                    categoryComboBox.Items.Add("Latest Wallpapers");
+                    categoryComboBox.Items.Add("8K UltraHD");
+                    categoryComboBox.Items.Add("AI Generated");
+                    categoryComboBox.Items.Add("4K Wallpapers");
+                    categoryComboBox.Items.Add("Harvest Wallpapers");
+                    categoryComboBox.Items.Add("Rain Wallpapers");
+                }
+                else if (hasBackiee)
                 {
                     categoryComboBox.Items.Add("Latest Wallpapers");
                     categoryComboBox.Items.Add("8K UltraHD");
                     categoryComboBox.Items.Add("AI Generated");
                 }
-                else // AlphaCoders
+                else if (hasAlphaCoders)
                 {
                     categoryComboBox.Items.Add("4K Wallpapers");
                     categoryComboBox.Items.Add("Harvest Wallpapers");
                     categoryComboBox.Items.Add("Rain Wallpapers");
                 }
                 
-                // Set selected category if we have a saved one and we're initializing
-                if (isInitializing && !string.IsNullOrEmpty(currentCategory))
+                // Set selected category based on saved settings
+                if (!string.IsNullOrEmpty(currentCategory))
                 {
                     for (int i = 0; i < categoryComboBox.Items.Count; i++)
                     {
                         if (categoryComboBox.Items[i]?.ToString() == currentCategory)
                         {
                             categoryComboBox.SelectedIndex = i;
-                            isInitializing = false;
                             return;
                         }
                     }
@@ -569,41 +581,16 @@ namespace Aura.Views.Backiee
                 {
                     categoryComboBox.SelectedIndex = 0;
                 }
-                isInitializing = false;
-            };
+            });
             
-            // Initialize with current platform's categories
-            if (currentPlatform == "AlphaCoders")
-            {
-                categoryComboBox.Items.Add("4K Wallpapers");
-                categoryComboBox.Items.Add("Harvest Wallpapers");
-                categoryComboBox.Items.Add("Rain Wallpapers");
-            }
-            else
-            {
-                categoryComboBox.Items.Add("Latest Wallpapers");
-                categoryComboBox.Items.Add("8K UltraHD");
-                categoryComboBox.Items.Add("AI Generated");
-            }
+            // Update categories when platform checkboxes change
+            platformCheckBoxBackiee.Checked += (s, e) => updateCategories();
+            platformCheckBoxBackiee.Unchecked += (s, e) => updateCategories();
+            platformCheckBoxAlphaCoders.Checked += (s, e) => updateCategories();
+            platformCheckBoxAlphaCoders.Unchecked += (s, e) => updateCategories();
             
-            // Set selected category based on saved settings
-            if (!string.IsNullOrEmpty(currentCategory))
-            {
-                for (int i = 0; i < categoryComboBox.Items.Count; i++)
-                {
-                    if (categoryComboBox.Items[i]?.ToString() == currentCategory)
-                    {
-                        categoryComboBox.SelectedIndex = i;
-                        break;
-                    }
-                }
-            }
-            else if (categoryComboBox.Items.Count > 0)
-            {
-                categoryComboBox.SelectedIndex = 0;
-            }
-            
-            isInitializing = false;
+            // Initial category setup
+            updateCategories();
             
             contentPanel.Children.Add(categoryComboBox);
 
@@ -613,9 +600,30 @@ namespace Aura.Views.Backiee
 
             if (result == ContentDialogResult.Primary)
             {
+                // Collect selected platforms
+                var selectedPlatforms = new List<string>();
+                if (platformCheckBoxBackiee.IsChecked == true)
+                    selectedPlatforms.Add("Backiee");
+                if (platformCheckBoxAlphaCoders.IsChecked == true)
+                    selectedPlatforms.Add("AlphaCoders");
+
+                // Validate at least one platform is selected
+                if (selectedPlatforms.Count == 0)
+                {
+                    var errorDialog = new ContentDialog
+                    {
+                        XamlRoot = this.XamlRoot,
+                        Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+                        Title = "No Platform Selected",
+                        Content = "Please select at least one platform for the slideshow.",
+                        CloseButtonText = "OK"
+                    };
+                    await errorDialog.ShowAsync();
+                    return;
+                }
+
                 // Save slideshow settings
                 bool isEnabled = toggleSwitch.IsOn;
-                string selectedPlatform = platformComboBox.SelectedItem?.ToString() ?? "Backiee";
                 string selectedCategory = categoryComboBox.SelectedItem?.ToString() ?? "Latest Wallpapers";
 
 
@@ -623,15 +631,15 @@ namespace Aura.Views.Backiee
                 if (slideshowType == "Desktop")
                 {
                     _desktopSlideshowEnabled = isEnabled;
-                    _desktopPlatform = selectedPlatform;
+                    _desktopPlatforms = selectedPlatforms;
                     _desktopCategory = selectedCategory;
                     
 
                     // Start or stop slideshow
-                    if (isEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
+                    if (isEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                     else
                     {
@@ -641,14 +649,14 @@ namespace Aura.Views.Backiee
                 else
                 {
                     _lockScreenSlideshowEnabled = isEnabled;
-                    _lockScreenPlatform = selectedPlatform;
+                    _lockScreenPlatforms = selectedPlatforms;
                     _lockScreenCategory = selectedCategory;
 
                     // Start or stop slideshow
-                    if (isEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
+                    if (isEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                     else
                     {
@@ -777,9 +785,9 @@ namespace Aura.Views.Backiee
                     _desktopRefreshInterval = selectedInterval;
                     
                     // Restart desktop slideshow with new interval if enabled
-                    if (_desktopSlideshowEnabled && !string.IsNullOrEmpty(_desktopPlatform) && !string.IsNullOrEmpty(_desktopCategory))
+                    if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
                     {
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatform, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                 }
                 else
@@ -787,9 +795,9 @@ namespace Aura.Views.Backiee
                     _lockScreenRefreshInterval = selectedInterval;
                     
                     // Restart lock screen slideshow with new interval if enabled
-                    if (_lockScreenSlideshowEnabled && !string.IsNullOrEmpty(_lockScreenPlatform) && !string.IsNullOrEmpty(_lockScreenCategory))
+                    if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatform, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                     }
                 }
                 

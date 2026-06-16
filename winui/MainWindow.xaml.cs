@@ -1011,27 +1011,35 @@ namespace Aura
                 if (settings == null) return;
 
                 bool desktopEnabled = settings.TryGetValue("DesktopSlideshowEnabled", out var de) && de.GetBoolean();
-                string desktopPlatform = settings.TryGetValue("DesktopSlideshowPlatform", out var dp) ? dp.GetString() ?? "" : "";
+                List<string> desktopPlatforms = settings.TryGetValue("DesktopSlideshowPlatforms", out var dp)
+                    ? JsonSerializer.Deserialize<List<string>>(dp.GetRawText()) ?? new List<string>()
+                    : settings.TryGetValue("DesktopSlideshowPlatform", out var dpOld) && dpOld.GetString() is string dpOldVal && !string.IsNullOrEmpty(dpOldVal)
+                        ? new List<string> { dpOldVal }
+                        : new List<string>();
                 string desktopCategory = settings.TryGetValue("DesktopSlideshowCategory", out var dc) ? dc.GetString() ?? "" : "";
                 string desktopInterval = settings.TryGetValue("DesktopSlideshowInterval", out var di) ? di.GetString() ?? "12 hours" : "12 hours";
 
                 bool lockEnabled = settings.TryGetValue("LockScreenSlideshowEnabled", out var le) && le.GetBoolean();
-                string lockPlatform = settings.TryGetValue("LockScreenSlideshowPlatform", out var lp) ? lp.GetString() ?? "" : "";
+                List<string> lockPlatforms = settings.TryGetValue("LockScreenSlideshowPlatforms", out var lp)
+                    ? JsonSerializer.Deserialize<List<string>>(lp.GetRawText()) ?? new List<string>()
+                    : settings.TryGetValue("LockScreenSlideshowPlatform", out var lpOld) && lpOld.GetString() is string lpOldVal && !string.IsNullOrEmpty(lpOldVal)
+                        ? new List<string> { lpOldVal }
+                        : new List<string>();
                 string lockCategory = settings.TryGetValue("LockScreenSlideshowCategory", out var lc) ? lc.GetString() ?? "" : "";
                 string lockInterval = settings.TryGetValue("LockScreenSlideshowInterval", out var li) ? li.GetString() ?? "12 hours" : "12 hours";
 
                 var dispatcherQueue = App.MainDispatcherQueue ?? DispatcherQueue;
 
-                if (desktopEnabled && !string.IsNullOrEmpty(desktopPlatform) && !string.IsNullOrEmpty(desktopCategory))
+                if (desktopEnabled && desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(desktopCategory))
                 {
                     var interval = SlideshowService.ParseInterval(desktopInterval);
-                    await SlideshowService.Instance.StartDesktopSlideshow(desktopPlatform, desktopCategory, interval, dispatcherQueue);
+                    await SlideshowService.Instance.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue);
                 }
 
-                if (lockEnabled && !string.IsNullOrEmpty(lockPlatform) && !string.IsNullOrEmpty(lockCategory))
+                if (lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory))
                 {
                     var interval = SlideshowService.ParseInterval(lockInterval);
-                    await SlideshowService.Instance.StartLockScreenSlideshow(lockPlatform, lockCategory, interval, dispatcherQueue);
+                    await SlideshowService.Instance.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue);
                 }
             }
             catch (Exception)

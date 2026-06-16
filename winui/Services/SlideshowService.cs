@@ -49,9 +49,12 @@ namespace Aura.Services
         private bool _isChangingDesktop = false;
         private bool _isChangingLockScreen = false;
         
-        // Track current platform for desktop and lockscreen
-        private string _desktopPlatform = "";
-        private string _lockScreenPlatform = "";
+        // Track current platforms for desktop and lockscreen (multiple platforms support)
+        private List<string> _desktopPlatforms = new List<string>();
+        private List<string> _lockScreenPlatforms = new List<string>();
+        
+        // Random number generator for platform selection
+        private readonly Random _random = new Random();
         
         // Current wallpaper URLs for display
         private string _currentDesktopWallpaperUrl = "";
@@ -93,12 +96,13 @@ namespace Aura.Services
             }
         }
 
-        public async Task StartDesktopSlideshow(string platform, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
+        public async Task StartDesktopSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
         {
             try
             {
 
                 // Store parameters for batch loading
+                _desktopPlatforms = platforms;
                 _desktopCategory = category;
                 _desktopDispatcherQueue = dispatcherQueue;
                 _desktopInterval = interval;
@@ -109,8 +113,8 @@ namespace Aura.Services
                 // Load progress if exists
                 LoadProgress();
 
-                // Fetch wallpapers
-                await LoadWallpapersForDesktop(platform, category);
+                // Fetch wallpapers from multiple platforms
+                await LoadWallpapersForDesktop(platforms, category);
 
                 if (_desktopWallpapers.Count == 0)
                 {
@@ -164,10 +168,11 @@ namespace Aura.Services
             }
         }
 
-        public async Task StartLockScreenSlideshow(string platform, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
+        public async Task StartLockScreenSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
         {
 
             // Store parameters for batch loading
+            _lockScreenPlatforms = platforms;
             _lockScreenCategory = category;
             _lockScreenDispatcherQueue = dispatcherQueue;
             _lockScreenInterval = interval;
@@ -178,8 +183,8 @@ namespace Aura.Services
             // Load progress if exists
             LoadProgress();
 
-            // Fetch wallpapers
-            await LoadWallpapersForLockScreen(platform, category);
+            // Fetch wallpapers from multiple platforms
+            await LoadWallpapersForLockScreen(platforms, category);
 
             if (_lockScreenWallpapers.Count == 0)
             {
@@ -261,7 +266,7 @@ namespace Aura.Services
                         // Load next batch
                         _desktopCurrentBatch++;
                         _desktopCurrentIndex = 0;
-                        await LoadWallpapersForDesktop(_desktopPlatform, _desktopCategory);
+                        await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory);
                         SaveProgress(); // Save progress after loading new batch
                     }
                     
@@ -298,7 +303,7 @@ namespace Aura.Services
                         // Load next batch
                         _lockScreenCurrentBatch++;
                         _lockScreenCurrentIndex = 0;
-                        await LoadWallpapersForLockScreen(_lockScreenPlatform, _lockScreenCategory);
+                        await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory);
                         SaveProgress(); // Save progress after loading new batch
                     }
                     
@@ -320,102 +325,139 @@ namespace Aura.Services
             }
         }
 
-        private async Task LoadWallpapersForDesktop(string platform, string category)
+        private async Task LoadWallpapersForDesktop(List<string> platforms, string category)
         {
             try
             {
                 _desktopWallpapers.Clear();
-                _desktopPlatform = platform; // Store the platform
 
+                // Load wallpapers from all selected platforms
+                var allWallpapers = new List<WallpaperItem>();
 
-                if (platform == "AlphaCoders")
+                foreach (var platform in platforms)
                 {
-                    // Get wallpapers from AlphaCoders service
-                    string categoryKey = category switch
+                    if (platform == "AlphaCoders")
                     {
-                        "4K Wallpapers" => "4k",
-                        "Harvest Wallpapers" => "harvest",
-                        "Rain Wallpapers" => "rain",
-                        _ => "4k"
-                    };
-
-                    // Use scraper directly to avoid cache issues
-                    var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
-                    _desktopWallpapers.AddRange(wallpapers);
-                }
-                else // Backiee
-                {
-                    
-                    // Use batch number as page number (0-indexed so subtract 1)
-                    int pageNumber = _desktopCurrentBatch - 1;
-                    string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-                    
-                    string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                    if (!string.IsNullOrWhiteSpace(jsonContent))
-                    {
-                        using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                        // Get wallpapers from AlphaCoders service
+                        string categoryKey = category switch
                         {
-                            foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
+                            "4K Wallpapers" => "4k",
+                            "Harvest Wallpapers" => "harvest",
+                            "Rain Wallpapers" => "rain",
+                            _ => "4k"
+                        };
+
+                        // Use scraper directly to avoid cache issues
+                        var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
+                        
+                        // Tag wallpapers with their platform
+                        foreach (var wallpaper in wallpapers)
+                        {
+                            wallpaper.Platform = "AlphaCoders";
+                            allWallpapers.Add(wallpaper);
+                        }
+                    }
+                    else if (platform == "Backiee")
+                    {
+                        // Use batch number as page number (0-indexed so subtract 1)
+                        int pageNumber = _desktopCurrentBatch - 1;
+                        string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+                        
+                        string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                        if (!string.IsNullOrWhiteSpace(jsonContent))
+                        {
+                            using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                             {
-                                var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
-                                if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                                foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                                 {
-                                    _desktopWallpapers.Add(wallpaper);
+                                    var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                                    if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                                    {
+                                        wallpaper.Platform = "Backiee";
+                                        allWallpapers.Add(wallpaper);
+                                    }
                                 }
                             }
                         }
                     }
                 }
 
+                // Shuffle wallpapers randomly to mix platforms
+                var shuffled = allWallpapers.OrderBy(x => _random.Next()).ToList();
+                _desktopWallpapers.AddRange(shuffled);
+
+                LogInfo($"Loaded {_desktopWallpapers.Count} wallpapers from {platforms.Count} platform(s)");
             }
             catch (Exception ex)
             {
             }
         }
 
-        private async Task LoadWallpapersForLockScreen(string platform, string category)
+        private async Task LoadWallpapersForLockScreen(List<string> platforms, string category)
         {
-            _lockScreenWallpapers.Clear();
-            _lockScreenPlatform = platform; // Store the platform
-
-
-            if (platform == "AlphaCoders")
+            try
             {
-                // Get wallpapers from AlphaCoders service
-                string categoryKey = category switch
-                {
-                    "4K Wallpapers" => "4k",
-                    "Harvest Wallpapers" => "harvest",
-                    "Rain Wallpapers" => "rain",
-                    _ => "4k"
-                };
+                _lockScreenWallpapers.Clear();
 
-                // Use scraper directly to avoid cache issues
-                var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
-                _lockScreenWallpapers.AddRange(wallpapers);
-            }
-            else // Backiee
-            {
-                
-                // Use batch number as page number (0-indexed so subtract 1)
-                int pageNumber = _lockScreenCurrentBatch - 1;
-                string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-                
-                string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                if (!string.IsNullOrWhiteSpace(jsonContent))
+                // Load wallpapers from all selected platforms
+                var allWallpapers = new List<WallpaperItem>();
+
+                foreach (var platform in platforms)
                 {
-                    using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                    if (platform == "AlphaCoders")
                     {
-                        foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
+                        // Get wallpapers from AlphaCoders service
+                        string categoryKey = category switch
                         {
-                            var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
-                            if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                            "4K Wallpapers" => "4k",
+                            "Harvest Wallpapers" => "harvest",
+                            "Rain Wallpapers" => "rain",
+                            _ => "4k"
+                        };
+
+                        // Use scraper directly to avoid cache issues
+                        var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
+                        
+                        // Tag wallpapers with their platform
+                        foreach (var wallpaper in wallpapers)
+                        {
+                            wallpaper.Platform = "AlphaCoders";
+                            allWallpapers.Add(wallpaper);
+                        }
+                    }
+                    else if (platform == "Backiee")
+                    {
+                        // Use batch number as page number (0-indexed so subtract 1)
+                        int pageNumber = _lockScreenCurrentBatch - 1;
+                        string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+                        
+                        string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                        if (!string.IsNullOrWhiteSpace(jsonContent))
+                        {
+                            using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                             {
-                                _lockScreenWallpapers.Add(wallpaper);
+                                foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
+                                {
+                                    var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                                    if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                                    {
+                                        wallpaper.Platform = "Backiee";
+                                        allWallpapers.Add(wallpaper);
+                                    }
+                                }
                             }
                         }
                     }
                 }
+
+                // Shuffle wallpapers randomly to mix platforms
+                var shuffled = allWallpapers.OrderBy(x => _random.Next()).ToList();
+                _lockScreenWallpapers.AddRange(shuffled);
+
+                LogInfo($"Loaded {_lockScreenWallpapers.Count} wallpapers from {platforms.Count} platform(s)");
+            }
+            catch (Exception ex)
+            {
             }
         }
 
@@ -423,8 +465,8 @@ namespace Aura.Services
         {
             try
             {
-                // Use platform-specific logic
-                if (_desktopPlatform == "AlphaCoders")
+                // Use platform-specific logic based on wallpaper's platform tag
+                if (wallpaper.Platform == "AlphaCoders")
                 {
                     await SetDesktopWallpaper_AlphaCoders(wallpaper);
                 }
@@ -659,8 +701,8 @@ namespace Aura.Services
         {
             try
             {
-                // Use platform-specific logic
-                if (_lockScreenPlatform == "AlphaCoders")
+                // Use platform-specific logic based on wallpaper's platform tag
+                if (wallpaper.Platform == "AlphaCoders")
                 {
                     await SetLockScreenWallpaper_AlphaCoders(wallpaper);
                 }
