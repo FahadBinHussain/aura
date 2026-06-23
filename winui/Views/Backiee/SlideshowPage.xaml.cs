@@ -74,15 +74,22 @@ namespace Aura.Views.Backiee
             {
                 var timeRemaining = SlideshowService.Instance.DesktopNextChangeTime - DateTime.Now;
                 
+                // Only show "Changing wallpaper..." for up to 30 seconds after scheduled time
+                // After that, hide the countdown (wallpaper change might have failed or completed)
                 if (timeRemaining.TotalSeconds > 0)
                 {
                     DesktopCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
                     DesktopCountdownText.Visibility = Visibility.Visible;
                 }
-                else
+                else if (timeRemaining.TotalSeconds >= -30)
                 {
                     DesktopCountdownText.Text = "Changing wallpaper...";
                     DesktopCountdownText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // Hide after 30 seconds to avoid getting stuck
+                    DesktopCountdownText.Visibility = Visibility.Collapsed;
                 }
             }
             else
@@ -95,15 +102,21 @@ namespace Aura.Views.Backiee
             {
                 var timeRemaining = SlideshowService.Instance.LockScreenNextChangeTime - DateTime.Now;
                 
+                // Only show "Changing wallpaper..." for up to 30 seconds after scheduled time
                 if (timeRemaining.TotalSeconds > 0)
                 {
                     LockScreenCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
                     LockScreenCountdownText.Visibility = Visibility.Visible;
                 }
-                else
+                else if (timeRemaining.TotalSeconds >= -30)
                 {
                     LockScreenCountdownText.Text = "Changing wallpaper...";
                     LockScreenCountdownText.Visibility = Visibility.Visible;
+                }
+                else
+                {
+                    // Hide after 30 seconds to avoid getting stuck
+                    LockScreenCountdownText.Visibility = Visibility.Collapsed;
                 }
             }
             else
@@ -693,9 +706,12 @@ namespace Aura.Views.Backiee
                 if (platformCheckBoxPixabay.IsChecked == true)
                     selectedPlatforms.Add("Pixabay");
 
+                LogInfo($"Set button clicked. Selected platforms: {string.Join(", ", selectedPlatforms)}");
+
                 // Validate at least one platform is selected
                 if (selectedPlatforms.Count == 0)
                 {
+                    LogInfo("No platforms selected - showing error dialog");
                     var errorDialog = new ContentDialog
                     {
                         XamlRoot = this.XamlRoot,
@@ -711,6 +727,8 @@ namespace Aura.Views.Backiee
                 // Save slideshow settings
                 bool isEnabled = toggleSwitch.IsOn;
                 string selectedCategory = categoryComboBox.SelectedItem?.ToString() ?? "Latest Wallpapers";
+                
+                LogInfo($"Toggle enabled: {isEnabled}, Category: {selectedCategory}, Type: {slideshowType}");
 
 
                 // Save to class fields and start/stop slideshow
