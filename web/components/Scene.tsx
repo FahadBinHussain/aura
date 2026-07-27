@@ -115,8 +115,10 @@ function DesktopScreen({ isMobile }: { isMobile: boolean }) {
 
 export default function Scene() {
   const [isMobile, setIsMobile] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
     const mediaQuery = window.matchMedia('(max-width: 768px)');
     const apply = () => setIsMobile(mediaQuery.matches);
     apply();
@@ -126,6 +128,7 @@ export default function Scene() {
 
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030305] z-0">
+      {mounted && (
       <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={isMobile ? 1 : [1, 2]}>
         <color attach="background" args={['#030305']} />
         <ambientLight intensity={isMobile ? 0.15 : 0.2} />
@@ -151,6 +154,7 @@ export default function Scene() {
           </EffectComposer>
         )}
       </Canvas>
+      )}
     </div>
   );
 }

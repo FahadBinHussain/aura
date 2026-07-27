@@ -126,18 +126,13 @@ function FadeIn({
 export default function Overlay() {
   const formatThemeLabel = (name: string) => name.charAt(0).toUpperCase() + name.slice(1);
 
-  const [theme, setTheme] = useState<string>(() => {
-    if (typeof window === 'undefined') {
-      return 'dark';
-    }
-    const savedTheme = localStorage.getItem('theme')?.toLowerCase();
-    if (savedTheme && DAISY_THEMES.includes(savedTheme as (typeof DAISY_THEMES)[number])) {
-      return savedTheme;
-    }
-    return 'dark';
-  });
+  const [theme, setTheme] = useState<string>('dark');
 
   useEffect(() => {
+    const savedTheme = localStorage.getItem('theme')?.toLowerCase();
+    if (savedTheme && DAISY_THEMES.includes(savedTheme as (typeof DAISY_THEMES)[number])) {
+      setTheme(savedTheme);
+    }
     document.documentElement.setAttribute('data-theme', theme);
     localStorage.setItem('theme', theme);
   }, [theme]);
