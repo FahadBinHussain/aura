@@ -1,7 +1,7 @@
 'use client';
 
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Environment, Float, RoundedBox, ScrollControls, Scroll, useScroll } from '@react-three/drei';
+import { Float, RoundedBox, ScrollControls, Scroll, useScroll } from '@react-three/drei';
 import { EffectComposer, Bloom } from '@react-three/postprocessing';
 import { useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
@@ -145,7 +145,6 @@ export default function Scene() {
           </Scroll>
         </ScrollControls>
 
-        {!isMobile && <Environment preset="city" />}
         {!isMobile && (
           <EffectComposer>
             <Bloom luminanceThreshold={0.2} mipmapBlur luminanceSmoothing={0.9} intensity={1.5} />
