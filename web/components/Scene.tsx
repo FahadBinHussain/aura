@@ -129,7 +129,7 @@ export default function Scene() {
   return (
     <div className="fixed inset-0 w-full h-full bg-[#030305] z-0">
       {mounted && (
-      <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={isMobile ? 1 : [1, 2]}>
+      <Canvas camera={{ position: [0, 0, 6], fov: 45 }} dpr={[1, 2]}>
         <color attach="background" args={['#030305']} />
         <ambientLight intensity={isMobile ? 0.15 : 0.2} />
         <directionalLight position={[10, 10, 10]} intensity={1} />
@@ -148,11 +148,9 @@ export default function Scene() {
           </Scroll>
         </ScrollControls>
 
-        {!isMobile && (
-          <EffectComposer>
-            <Bloom luminanceThreshold={0.2} mipmapBlur luminanceSmoothing={0.9} intensity={1.5} />
-          </EffectComposer>
-        )}
+        <EffectComposer>
+          <Bloom luminanceThreshold={0.2} mipmapBlur luminanceSmoothing={0.9} intensity={isMobile ? 0.5 : 1.5} />
+        </EffectComposer>
       </Canvas>
       )}
     </div>
