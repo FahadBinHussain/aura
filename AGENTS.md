@@ -22,6 +22,29 @@
   regenerates `web/next-env.d.ts` - commit it with the bump.
 - dependabot alert clears on the next scan after the lockfile push.
 
+## backiee site reversing (2026-10-02)
+
+- plain fetchers get 403; a browser UA works. in-app, `BackieeNetworkClient`
+  (HttpClient UA `Mozilla/5.0 ... Aura/1.0` + curl fallback) is the only
+  sanctioned fetch path - use it for all backiee URLs.
+- category slugs are FLAT: `sitemap-categories.xml` lists exactly 19
+  `/categories/<slug>` pages, no nested subcategory URLs.
+- `api/wallpaper/list.php?action=paging_list&category=<slug>` filters
+  correctly (`ThemeCat` matches the slug) - categories grid reuses this via
+  `BackieeWallpaperSection.ForCategory()`.
+- per-category "Popular <cat> searches" chips link to `/search/<term>` - this
+  is the only subcategory-like level; search has NO api (`action=search` ->
+  550, `args=` ignored), it is server-rendered HTML with `?page=N` pagination
+  (rel=next, `data-pagination`), scraped by `BackieeHtmlParser`.
+- list markup (both `/categories/<slug>` and `/search/<term>` pages):
+  `a.wall-link[href=/wallpaper/<slug>/<id>]` > `.wall-body > h3` title,
+  `picture > img.wall-cover[src]` thumb, `.flag-pill` quality badge,
+  `.stat-pill` (heart, download) counts in that order.
+- category cards on `/categories`: `a.category-card` > img
+  `static/wallpapers/categories/<slug>.jpg` (url is derivable from slug),
+  accent `--category-accent: #hex`, name in `h3`.
+- chips on category pages: `a.detail-chip[href=/search/<term>]`.
+
 ## desktop app (winui)
 
 - run-from-CI build: artifact name is `Aura-x64` (no `.zip`), the file inside
