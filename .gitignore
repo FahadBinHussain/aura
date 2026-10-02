@@ -116,3 +116,5 @@ $RECYCLE.BIN/
 *.rsuser
 Portable/
 user_prompt.txt
+.vercel
+.env*
