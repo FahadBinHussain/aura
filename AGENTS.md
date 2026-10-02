@@ -22,6 +22,18 @@
   regenerates `web/next-env.d.ts` - commit it with the bump.
 - dependabot alert clears on the next scan after the lockfile push.
 
+## desktop app (winui)
+
+- run-from-CI build: artifact name is `Aura-x64` (no `.zip`), the file inside
+  is `Aura-x64.zip`; `gh run download <id> -n Aura-x64.zip` fails with "no
+  artifact matches". retention is 1 day - older runs must come from the
+  `latest` release asset instead.
+- startup autolaunch already ships: Settings -> "Start with Windows" toggle =
+  HKCU `...\CurrentVersion\Run` value `Aura` -> current exe path (unpackaged
+  app, so registry Run key, not StartupTask). no code change needed to add it;
+  just make sure the exe lives somewhere stable (temp dirs get wiped and the
+  Run key silently points at nothing).
+
 ## security: dependabot transitives (2026-10-02)
 
 - 18 open alerts fixed in one pass (commit `78583dd`): js-yaml (4.1.1 ->
