@@ -633,7 +633,9 @@ namespace Aura
                     case "Slideshow":
                         ContentFrame.Navigate(typeof(Views.Backiee.SlideshowPage));
                         break;
-                    case "Collections":
+                    case "Categories":
+                        ContentFrame.Navigate(typeof(Views.Backiee.CategoriesPage));
+                        break;
                     case "AIGenerated":
                     case "Personal":
                     case "InteractiveSlideshow":
@@ -686,7 +688,9 @@ namespace Aura
                         case "History":
                             ContentFrame.Navigate(typeof(HistoryPage));
                             break;
-                        case "Collections":
+                        case "Categories":
+                            ContentFrame.Navigate(typeof(Views.Backiee.CategoriesPage));
+                            break;
                         case "AIGenerated":
                         case "Personal":
                         case "InteractiveSlideshow":

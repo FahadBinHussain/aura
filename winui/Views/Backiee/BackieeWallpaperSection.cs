@@ -49,6 +49,14 @@ namespace Aura.Views.Backiee
                 SortScore = wallpaper => ParseMetric(wallpaper.Likes) + ParseMetric(wallpaper.Downloads)
             };
 
+        public static BackieeWallpaperSection ForCategory(string slug, string title)
+        {
+            return new BackieeWallpaperSection(title)
+            {
+                Category = slug
+            };
+        }
+
         public static BackieeWallpaperSection FromNavigationParameter(object? parameter)
         {
             if (parameter is BackieeWallpaperSection section)

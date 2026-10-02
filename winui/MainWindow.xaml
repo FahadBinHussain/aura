@@ -251,11 +251,10 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Collections Button -->
-                            <Button x:Name="CollectionsButton"
+                            <!-- Categories Button -->
+                            <Button x:Name="CategoriesButton"
                                     Click="NavButton_Click"
-                                    Tag="Collections"
-                                    Visibility="Collapsed"
+                                    Tag="Categories"
                                     Style="{StaticResource NavButtonStyle}">
                                 <StackPanel Orientation="Vertical" HorizontalAlignment="Center" VerticalAlignment="Center">
                                     <Grid Width="76" Height="76">
@@ -278,7 +277,7 @@
                                                   VerticalAlignment="Center">
                                             <Image Source="ms-appx:///Assets/collections.png"
                                                    Style="{StaticResource NavIconStyle}" />
-                                            <TextBlock Text="Collections"
+                                            <TextBlock Text="Categories"
                                                        Style="{StaticResource NavTextStyle}" />
                                         </StackPanel>
                                     </Grid>

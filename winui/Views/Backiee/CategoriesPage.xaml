@@ -1,0 +1,143 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Page
+    x:Class="Aura.Views.Backiee.CategoriesPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Aura.Views"
+    xmlns:converters="using:Aura.Converters"
+    xmlns:models="using:Aura.Models"
+    xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:ui="using:Microsoft.UI.Xaml"
+    xmlns:data="using:Microsoft.UI.Xaml.Data"
+    mc:Ignorable="d"
+    Background="Transparent">
+
+    <Page.Resources>
+        <converters:HexToSolidColorBrushConverter x:Key="HexToSolidColorBrushConverter"/>
+        <converters:StringToVisibilityConverter x:Key="StringToVisibilityConverter"/>
+    </Page.Resources>
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
+
+        <!-- Title -->
+        <Grid Grid.Row="0" Margin="24,24,24,12">
+            <TextBlock x:Name="PageTitleTextBlock"
+                       Text="Categories"
+                       Style="{StaticResource TitleTextBlockStyle}"
+                       VerticalAlignment="Center"/>
+        </Grid>
+
+        <!-- Category grid with adaptive layout -->
+        <ScrollViewer x:Name="MainScrollViewer"
+                      Grid.Row="1"
+                      VerticalScrollBarVisibility="Auto"
+                      HorizontalScrollBarVisibility="Disabled"
+                      Padding="0"
+                      Margin="0">
+
+            <GridView x:Name="CategoriesGridView"
+                     Margin="12,8,12,12"
+                     SelectionMode="None"
+                     IsItemClickEnabled="True"
+                     ItemClick="CategoriesGridView_ItemClick"
+                     HorizontalAlignment="Stretch"
+                     VerticalAlignment="Stretch">
+                <GridView.ItemContainerStyle>
+                    <Style TargetType="GridViewItem">
+                        <Setter Property="Margin" Value="4"/>
+                        <Setter Property="Padding" Value="0"/>
+                        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+                        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+                        <Setter Property="Width" Value="Auto"/>
+                        <Setter Property="Height" Value="Auto"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                    </Style>
+                </GridView.ItemContainerStyle>
+
+                <GridView.ItemsPanel>
+                    <ItemsPanelTemplate>
+                        <ItemsWrapGrid x:Name="CategoriesWrapGrid"
+                                     Orientation="Horizontal"
+                                     HorizontalAlignment="Stretch"
+                                     ItemWidth="NaN"
+                                     ItemHeight="NaN"
+                                     SizeChanged="CategoriesWrapGrid_SizeChanged"
+                                     MaximumRowsOrColumns="6"/>
+                    </ItemsPanelTemplate>
+                </GridView.ItemsPanel>
+
+                <GridView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                              CornerRadius="12"
+                              BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                              BorderThickness="0.5"
+                              Margin="0"
+                              Padding="0"
+                              HorizontalAlignment="Stretch"
+                              VerticalAlignment="Stretch">
+
+                            <!-- Category image -->
+                            <Image x:Name="ItemImage"
+                                   Source="ms-appx:///Assets/placeholder-wallpaper-1000.png"
+                                   Stretch="UniformToFill"
+                                   CacheMode="BitmapCache"
+                                   HorizontalAlignment="Stretch"
+                                   VerticalAlignment="Top"/>
+
+                            <!-- Category accent tint -->
+                            <Border Background="{Binding AccentHex, Converter={StaticResource HexToSolidColorBrushConverter}}"
+                                    Opacity="0.35"
+                                    HorizontalAlignment="Stretch"
+                                    VerticalAlignment="Stretch"/>
+
+                            <!-- Bottom scrim + name -->
+                            <Border VerticalAlignment="Bottom"
+                                    Height="44"
+                                    Background="#CC000000">
+                                <TextBlock Text="{Binding Name}"
+                                           Foreground="White"
+                                           FontWeight="SemiBold"
+                                           FontSize="15"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Left"
+                                           Margin="14,0,14,0"
+                                           TextTrimming="CharacterEllipsis"/>
+                            </Border>
+                        </Grid>
+                    </DataTemplate>
+                </GridView.ItemTemplate>
+            </GridView>
+        </ScrollViewer>
+
+        <!-- Error state -->
+        <TextBlock x:Name="ErrorTextBlock"
+                   Grid.Row="1"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center"
+                   Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                   FontSize="15"
+                   TextWrapping="Wrap"
+                   TextAlignment="Center"
+                   Margin="24,0"
+                   Visibility="Collapsed"/>
+
+        <!-- Loading bar -->
+        <ProgressBar x:Name="LoadingProgressBar"
+                    Grid.Row="1"
+                    VerticalAlignment="Bottom"
+                    IsIndeterminate="True"
+                    Height="3"
+                    Margin="0,0,0,4"
+                    Padding="0"
+                    BorderThickness="0"
+                    Background="Transparent"
+                    Foreground="Orange"
+                    Visibility="Collapsed"/>
+    </Grid>
+</Page>
