@@ -60,12 +60,19 @@ chip (24 search cards, orange active pill, server HTML `?page=N`).
   server page (`_itemsPerPage = 30`; api `page=0..N` verified disjoint by
   curl). it also auto-fires when the window is restored/resized while near the
   bottom, and works with the window minimized.
-- **KNOWN GAP (found 2026-10-06, not fixed)**: any exception in
-  `LoadMoreWallpapers` sets `_hasMoreItems = false` permanently and silently -
-  the error UI only renders when the grid is empty - so ONE transient network
-  failure kills load-more for the rest of that page session (later scrolls
-  early-return, no bar, no message); only re-navigation recovers. observed
-  live: first bottom-jump fetched nothing, fresh page load worked fine.
+- **load-more failure handling (fixed 2026-10-06)**: an exception in
+  `LoadMoreWallpapers` used to set `_hasMoreItems = false` permanently and
+  silently - the error line only rendered when the grid was empty - so ONE
+  transient network failure killed scroll-load for the rest of the page
+  session (observed live: first bottom-jump fetched nothing, no bar, no
+  message; only re-navigation recovered). now a failed page keeps
+  `_hasMoreItems` armed (retry happens on the next scroll/resize/restore near
+  the bottom; no storm possible because `ViewChanged` only fires on real view
+  changes) and ALWAYS shows `ErrorTextBlock` with the message, cleared on the
+  next successful page. `_currentPage` only increments on success, so a retry
+  re-requests the same page. `LatestWallpapersPage` had the identical catch
+  with NO error UI at all - same contract there plus a new `ErrorTextBlock`
+  overlay (same id/style as the category page).
 
 ## desktop app (winui)
 

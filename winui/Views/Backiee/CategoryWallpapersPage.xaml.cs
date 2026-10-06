@@ -231,25 +231,26 @@ namespace Aura.Views.Backiee
                 }
 
                 _currentPage++;
-            }
-            catch (Exception ex)
-            {
-                _hasMoreItems = false;
-                if (_wallpapers.Count == 0)
-                {
-                    ErrorTextBlock.Text = $"Couldn't load wallpapers: {ex.Message}";
-                    ErrorTextBlock.Visibility = Visibility.Visible;
-                }
-            }
-            finally
-            {
-                _isLoading = false;
-                LoadingProgressBar.Visibility = Visibility.Collapsed;
 
                 if (_wallpapers.Count > 0)
                 {
                     ErrorTextBlock.Visibility = Visibility.Collapsed;
                 }
+            }
+            catch (Exception ex)
+            {
+                // a failed page must NOT disarm load-more: one transient error used to
+                // set _hasMoreItems=false for the whole session while the error line
+                // stayed hidden whenever the grid had items (observed live 2026-10-06).
+                // ViewChanged only fires on real view changes, so retrying on the next
+                // scroll (or resize/restore near the bottom) cannot storm.
+                ErrorTextBlock.Text = $"Couldn't load wallpapers: {ex.Message}";
+                ErrorTextBlock.Visibility = Visibility.Visible;
+            }
+            finally
+            {
+                _isLoading = false;
+                LoadingProgressBar.Visibility = Visibility.Collapsed;
             }
         }
 

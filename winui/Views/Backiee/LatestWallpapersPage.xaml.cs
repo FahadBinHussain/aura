@@ -191,12 +191,20 @@ namespace Aura.Views.Backiee
 
                     // If we received fewer items than requested, we've reached the end
                     _hasMoreItems = true; // Always true for this API as it has many pages
+
+                    if (_wallpapers.Count > 0)
+                    {
+                        ErrorTextBlock.Visibility = Visibility.Collapsed;
+                    }
                 }
             }
             catch (Exception ex)
             {
-                // Log the exception
-                _hasMoreItems = false;
+                // same contract as CategoryWallpapersPage: keep _hasMoreItems armed so
+                // the next scroll retries, and show the failure - this catch used to
+                // swallow the error entirely and kill load-more for the whole session
+                ErrorTextBlock.Text = $"Couldn't load wallpapers: {ex.Message}";
+                ErrorTextBlock.Visibility = Visibility.Visible;
             }
             finally
             {
