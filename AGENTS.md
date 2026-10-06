@@ -72,7 +72,14 @@ chip (24 search cards, orange active pill, server HTML `?page=N`).
   next successful page. `_currentPage` only increments on success, so a retry
   re-requests the same page. `LatestWallpapersPage` had the identical catch
   with NO error UI at all - same contract there plus a new `ErrorTextBlock`
-  overlay (same id/style as the category page).
+  overlay (same id/style as the category page). live-verified on the CI build
+  (2026-10-06, hosts-blocked `backiee.com`): failed jump showed the error line
+  at **60 items** within 2.4s (the old code showed nothing there), and after
+  restoring the network the next bottom-jump retried the SAME page and
+  cleared the line (60 -> 90, error absent). retry needs a REAL view change:
+  a second jump from an already-bottom position is a no-op that fires no
+  `ViewChanged` (scroll away + back / resize / window restore are the
+  triggers).
 
 ## desktop app (winui)
 
