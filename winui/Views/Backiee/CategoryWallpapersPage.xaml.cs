@@ -160,9 +160,15 @@ namespace Aura.Views.Backiee
             }
             else
             {
+                // never assign null to Foreground - a null LOCAL value beats
+                // the theme style setter in WinUI, so the chip label painted
+                // nothing (UIA still exposed the text; the eye saw blanks).
+                // ClearValue removes the local override and restores the
+                // theme default foreground. Background stays null on purpose:
+                // transparent fill with the default outline.
                 button.Background = null;
-                button.Foreground = null;
-                button.FontWeight = Microsoft.UI.Text.FontWeights.Normal;
+                button.ClearValue(Control.ForegroundProperty);
+                button.ClearValue(Control.FontWeightProperty);
             }
         }
 
