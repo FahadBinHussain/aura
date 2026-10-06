@@ -45,6 +45,28 @@
   accent `--category-accent: #hex`, name in `h3`.
 - chips on category pages: `a.detail-chip[href=/search/<term>]`.
 
+## drill-down + infinite scroll, verified live (2026-10-06)
+
+end-to-end on the installed CI build (UIA + vision, see automata
+`windows-ui-automation`): Home -> `Categories` (19 cards) -> `Abstract`
+(`Abstract wallpapers` title, 30-card grid, 13 labeled chips) -> `digital+art`
+chip (24 search cards, orange active pill, server HTML `?page=N`).
+
+- chips had a blank-label bug (WinUI: `Foreground = null` local value beats the
+  theme style setter) - fixed in `ApplyChipStyle` via
+  `ClearValue(Control.ForegroundProperty)`, commit `6fd48cb`.
+- pagination (`CategoryWallpapersPage`): `MainScrollViewer.ViewChanged` ->
+  `offset >= ScrollableHeight * 0.4` (`_loadMoreThreshold`) -> +30 items per
+  server page (`_itemsPerPage = 30`; api `page=0..N` verified disjoint by
+  curl). it also auto-fires when the window is restored/resized while near the
+  bottom, and works with the window minimized.
+- **KNOWN GAP (found 2026-10-06, not fixed)**: any exception in
+  `LoadMoreWallpapers` sets `_hasMoreItems = false` permanently and silently -
+  the error UI only renders when the grid is empty - so ONE transient network
+  failure kills load-more for the rest of that page session (later scrolls
+  early-return, no bar, no message); only re-navigation recovers. observed
+  live: first bottom-jump fetched nothing, fresh page load worked fine.
+
 ## desktop app (winui)
 
 - run-from-CI build: artifact name is `Aura-x64` (no `.zip`), the file inside
