@@ -81,6 +81,34 @@ chip (24 search cards, orange active pill, server HTML `?page=N`).
   `ViewChanged` (scroll away + back / resize / window restore are the
   triggers).
 
+## merged global/local categories, verified live (2026-10-06)
+
+commit `544d27b` (CI run 37437947067 green, installed over the local build).
+one Categories page merges every platform's categories behind a scope button;
+everything below was driven shell-only (UIA patterns, zero synthetic input)
+against the installed build:
+
+- `ScopeButton` / `ScopeButtonTextBlock`: starts `Global` = **25 cards** (19
+  backiee categories + 4K + Harvest Rain + Backgrounds + Places + Curated);
+  flyout items `Global (all platforms) | Backiee | AlphaCoders | Pixabay |
+  Pexels`; pick `Backiee` -> label `Local · Backiee` + **19 cards**, pick
+  `Global` -> 25 again.
+- a merged card with >1 source opens a platform chooser (`Nature` =
+  `Backiee | Pixabay | Pexels`, `Space` = 2 sources); a card with exactly 1
+  source takes the direct-navigate fast path (`Sources.Count == 1`).
+- chooser -> `Pixabay` = title `Pixabay`, empty grid, and a LOUD
+  `StatusInfoBar` error (`Pixabay support needs a Pixabay API key. Add it in
+  Settings > API Keys, then try again.`) - never a silent empty state; chooser
+  -> `Backiee` = title `Nature wallpapers` + 30-card grid.
+- UIA ids for future checks: titles `PageTitleTextBlock` (backiee/alphacoders)
+  vs `TitleTextBlock` (public sources), grids `CategoriesGridView` /
+  `WallpapersGridView`, errors `StatusInfoBar` (read its child Texts - its own
+  Name is empty). `Nature` (3 sources) and `Space` (2) are the merged
+  canaries.
+- flyout menus need the offscreen-visible window protocol (while minimized
+  the popup is never even created) - recipe in automata
+  `windows-ui-automation` AGENTS.md.
+
 ## desktop app (winui)
 
 - run-from-CI build: artifact name is `Aura-x64` (no `.zip`), the file inside
