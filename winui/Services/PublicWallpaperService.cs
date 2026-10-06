@@ -20,6 +20,37 @@ namespace Aura.Services
         private const string Pexels = "Pexels";
         private const string Pixabay = "Pixabay";
 
+        // pixabay's documented category values (https://pixabay.com/api/docs/, "category str" row)
+        private static readonly string[] PixabayCategories =
+        {
+            "Backgrounds", "Fashion", "Nature", "Science", "Education", "Feelings",
+            "Health", "People", "Religion", "Places", "Animals", "Industry",
+            "Computer", "Food", "Sports", "Transportation", "Travel", "Buildings",
+            "Business", "Music"
+        };
+
+        // wallpaperhub's 17 collections (title is the browse key; id is the page path)
+        private static readonly (string Title, string Id)[] WallpaperHubCollections =
+        {
+            ("Windows 11", "9280"),
+            ("Surface Duo", "7716"),
+            ("Build 2020", "7058"),
+            ("October 2019 Event", "5472"),
+            ("Surface Collection", "1274"),
+            ("Windows Wallpapers", "6292"),
+            ("Office + Fluent Design", "2863"),
+            ("October 2018 Event", "1484"),
+            ("Ninja Cat Originals", "1386"),
+            ("Conference Collection", "1387"),
+            ("Xbox E3 2018 Collection", "1238"),
+            ("2019", "3692"),
+            ("idek", "4045"),
+            ("One World", "4636"),
+            ("Chat Backgrounds", "6401"),
+            ("Rainbows", "6638"),
+            ("Festive Wallpapers", "8318"),
+        };
+
         private static readonly HashSet<string> SupportedPlatforms = new(StringComparer.OrdinalIgnoreCase)
         {
             Wallhaven,
@@ -58,9 +89,15 @@ namespace Aura.Services
         {
             return platformName switch
             {
-                Wallhaven => new[] { "Toplist", "Latest", "Random" },
+                // wallhaven categories = the API's 3-bit mask (general/anime/people), see automata wallhaven.cc/AGENTS.md
+                Wallhaven => new[] { "General", "Anime", "People" },
+                // pexels' API has no taxonomy - query modes are all it offers (automata www.pexels.com/AGENTS.md)
                 Pexels => new[] { "Curated", "Nature", "Space" },
-                Pixabay => new[] { "Backgrounds", "Nature", "Places" },
+                Pixabay => PixabayCategories,
+                WallpaperHub => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
+                // bing/simpledesktops have no taxonomy at all - one honest entry each (their AGENTS.md)
+                Bing => new[] { "Daily" },
+                SimpleDesktops => new[] { "Minimal" },
                 _ => Array.Empty<string>()
             };
         }
@@ -75,10 +112,10 @@ namespace Aura.Services
         {
             return platformName switch
             {
-                Wallhaven => "High-resolution wallpapers from Wallhaven's public JSON search endpoint.",
+                Wallhaven => "Wallhaven's public JSON search, split into General / Anime / People categories.",
                 Bing => "Recent daily Bing homepage wallpapers from Microsoft's public archive endpoint.",
                 SimpleDesktops => "Minimal, distraction-free wallpapers from Simple Desktops.",
-                WallpaperHub => "Microsoft, Surface, Windows, and Bing wallpapers from WallpaperHub.",
+                WallpaperHub => "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
                 Pexels => "Free stock photos via the official Pexels API. Add a Pexels API key in Settings.",
                 Pixabay => "Royalty-free images via the official Pixabay API. Add a Pixabay API key in Settings.",
                 _ => "Browse wallpapers from this source."
@@ -98,7 +135,7 @@ namespace Aura.Services
                 Wallhaven => await GetWallhavenWallpapersAsync(page, mode, cancellationToken),
                 Bing => await GetBingWallpapersAsync(page, cancellationToken),
                 SimpleDesktops => await GetSimpleDesktopWallpapersAsync(page, cancellationToken),
-                WallpaperHub => await GetWallpaperHubWallpapersAsync(page, cancellationToken),
+                WallpaperHub => await GetWallpaperHubWallpapersAsync(page, mode, cancellationToken),
                 Pexels => await GetPexelsWallpapersAsync(page, mode, cancellationToken),
                 Pixabay => await GetPixabayWallpapersAsync(page, mode, cancellationToken),
                 _ => throw new NotSupportedException($"{platformName} is not implemented yet.")
@@ -115,14 +152,20 @@ namespace Aura.Services
             string mode,
             CancellationToken cancellationToken)
         {
-            var sorting = mode switch
+            // category -> 3-bit mask (general, anime, people); legacy sort modes still resolve
+            // (case-normalized: slideshow passes lowercase modes) - automata wallhaven.cc/AGENTS.md
+            var (categories, sorting) = mode?.ToLowerInvariant() switch
             {
-                "Latest" => "date_added",
-                "Random" => "random",
-                _ => "toplist"
+                "general" => ("100", "toplist"),
+                "anime" => ("010", "toplist"),
+                "people" => ("001", "toplist"),
+                "latest" => ("111", "date_added"),
+                "random" => ("111", "random"),
+                "toplist" => ("111", "toplist"),
+                _ => ("111", "toplist")
             };
 
-            var url = $"https://wallhaven.cc/api/v1/search?categories=111&purity=100&sorting={sorting}&order=desc&page={page}";
+            var url = $"https://wallhaven.cc/api/v1/search?categories={categories}&purity=100&sorting={sorting}&order=desc&page={page}";
             var json = await _httpClient.GetStringAsync(url, cancellationToken);
             var wallpapers = new List<WallpaperItem>();
 
@@ -256,14 +299,23 @@ namespace Aura.Services
             return wallpapers;
         }
 
-        private async Task<List<WallpaperItem>> GetWallpaperHubWallpapersAsync(int page, CancellationToken cancellationToken)
+        private async Task<List<WallpaperItem>> GetWallpaperHubWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
             if (page > 1)
             {
+                // both SSR shapes serve the complete list at page 1 (collections SSR all items; /wallpapers has no paging)
                 return new List<WallpaperItem>();
             }
 
-            var html = await _httpClient.GetStringAsync("https://www.wallpaperhub.app/wallpapers", cancellationToken);
+            // mode = a collection title -> its page; anything else -> the plain /wallpapers feed
+            var collectionId = WallpaperHubCollections
+                .FirstOrDefault(collection => string.Equals(collection.Title, mode, StringComparison.OrdinalIgnoreCase)).Id;
+            var requestPath = string.IsNullOrWhiteSpace(collectionId) ? "wallpapers" : $"collections/{collectionId}";
+            var wallpapersArrayPath = string.IsNullOrWhiteSpace(collectionId)
+                ? new[] { "props", "pageProps", "initWallpapers" }
+                : new[] { "props", "pageProps", "collectionWallpapers" };
+
+            var html = await _httpClient.GetStringAsync($"https://www.wallpaperhub.app/{requestPath}", cancellationToken);
             var match = Regex.Match(html, "<script id=\"__NEXT_DATA__\" type=\"application/json\">(?<json>.*?)</script>", RegexOptions.Singleline);
             if (!match.Success)
             {
@@ -274,7 +326,7 @@ namespace Aura.Services
             var wallpapers = new List<WallpaperItem>();
 
             using var document = JsonDocument.Parse(json);
-            if (!TryGetNestedProperty(document.RootElement, out var wallpapersElement, "props", "pageProps", "initWallpapers") ||
+            if (!TryGetNestedProperty(document.RootElement, out var wallpapersElement, wallpapersArrayPath) ||
                 wallpapersElement.ValueKind != JsonValueKind.Array)
             {
                 return wallpapers;
@@ -382,12 +434,10 @@ namespace Aura.Services
                 throw new InvalidOperationException("Pixabay support needs a Pixabay API key. Add it in Settings > API Keys, then try again.");
             }
 
-            var category = mode switch
-            {
-                "Nature" => "nature",
-                "Places" => "places",
-                _ => "backgrounds"
-            };
+            // every mode maps to a documented category value; unknown/empty -> docs default
+            var category = PixabayCategories.Contains(mode, StringComparer.OrdinalIgnoreCase)
+                ? mode.ToLowerInvariant()
+                : "backgrounds";
 
             var url = $"https://pixabay.com/api/?key={Uri.EscapeDataString(apiKey)}&image_type=photo&orientation=horizontal&safesearch=true&category={category}&page={page}&per_page=30";
             var json = await _httpClient.GetStringAsync(url, cancellationToken);

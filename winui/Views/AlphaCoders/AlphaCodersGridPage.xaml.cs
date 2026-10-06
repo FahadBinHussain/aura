@@ -80,7 +80,7 @@ namespace Aura.Views.AlphaCoders
             // update button styles
             UpdateCategoryButtonStyles(category);
 
-            // update title
+            // update title (deep-linked categories come from AlphaCodersService.Categories)
             var button = category switch
             {
                 "4k" => FourKButton,
@@ -88,7 +88,8 @@ namespace Aura.Views.AlphaCoders
                 "rain" => RainButton,
                 _ => null,
             };
-            PageTitleTextBlock.Text = button?.Content?.ToString() ?? "Alpha Coders Wallpapers";
+            var categoryName = button?.Content?.ToString() ?? AlphaCodersService.GetCategoryName(category);
+            PageTitleTextBlock.Text = string.IsNullOrWhiteSpace(categoryName) ? "Alpha Coders Wallpapers" : categoryName;
 
             // Reset and reload wallpapers for new category
             _currentCategory = category;
@@ -109,17 +110,21 @@ namespace Aura.Views.AlphaCoders
             RainButton.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
             RainButton.Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["TextFillColorPrimaryBrush"];
             
-            // Highlight selected button
-            Button selectedButton = selectedCategory switch
+            // Highlight selected button (null = a deep-linked category none of the quick
+            // buttons represent - keep them all unselected instead of faking 4K)
+            Button? selectedButton = selectedCategory switch
             {
                 "4k" => FourKButton,
                 "harvest" => HarvestButton,
                 "rain" => RainButton,
-                _ => FourKButton
+                _ => null
             };
-            
-            selectedButton.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
-            selectedButton.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+
+            if (selectedButton != null)
+            {
+                selectedButton.Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];
+                selectedButton.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White);
+            }
         }
 
         private async void LoadWallpapers()

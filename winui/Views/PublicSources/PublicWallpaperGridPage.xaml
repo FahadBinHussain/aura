@@ -43,9 +43,9 @@
             <InfoBar x:Name="StatusInfoBar"
                      IsOpen="False"
                      IsClosable="True"/>
-            <StackPanel x:Name="ModeButtonsPanel"
-                        Orientation="Horizontal"
-                        Spacing="8"/>
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" ZoomMode="Disabled">
+                <StackPanel x:Name="ModeButtonsPanel" Orientation="Horizontal" Spacing="8"/>
+            </ScrollViewer>
         </StackPanel>
 
         <GridView x:Name="WallpapersGridView"

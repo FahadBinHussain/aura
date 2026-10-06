@@ -114,12 +114,14 @@ namespace Aura.Services
 
         private string GetCategoryUrl(string category)
         {
-            return category.ToLower() switch
+            // uniform category form: https://alphacoders.com/<slug>-wallpapers?page=N (verified for any
+            // slug incl. harvest/rain); "4k" is a resolution page, not a slug (4k-wallpapers = 404).
+            // see automata-private/wall.alphacoders.com/AGENTS.md
+            var slug = category.ToLowerInvariant().Trim();
+            return slug switch
             {
                 "4k" => "https://alphacoders.com/resolution/4k-wallpapers?page={0}",
-                "harvest" => "https://alphacoders.com/search?search=harvest&page={0}",
-                "rain" => "https://alphacoders.com/search?search=rain&page={0}",
-                _ => "https://alphacoders.com/resolution/4k-wallpapers?page={0}"
+                _ => $"https://alphacoders.com/{slug}-wallpapers?page={{0}}"
             };
         }
 

@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Aura.Models;
 using Aura.Services;
 using Aura.Views.AlphaCoders;
+using Aura.Views.ArtStation;
 using Aura.Views.PublicSources;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -20,14 +21,23 @@ namespace Aura.Views.Backiee
         private const string CategoriesUrl = "https://backiee.com/categories";
         private const string DefaultAccentHex = "#FF8C00";
 
-        // platforms that have a real category list to browse (the rest only sort)
-        private static readonly string[] CategoryPlatforms = { "Backiee", "AlphaCoders", "Pixabay", "Pexels" };
-
-        private static readonly (string Key, string Name)[] AlphaCodersCategories =
+        // every platform the app implements - this array IS the scope menu.
+        // per-site reversal evidence: automata-private/<site>/AGENTS.md
+        private static readonly string[] CategoryPlatforms =
         {
-            ("4k", "4K Wallpapers"),
-            ("harvest", "Harvest Wallpapers"),
-            ("rain", "Rain Wallpapers"),
+            "Backiee", "AlphaCoders", "ArtStation", "Bing Wallpaper Archive",
+            "Pexels", "Pixabay", "Simple Desktops", "Wallhaven", "WallpaperHub"
+        };
+
+        // artstation: query entries - its subject-matter taxonomy is CSRF-blocked for
+        // anonymous sessions (automata-private/www.artstation.com/AGENTS.md)
+        private static readonly (string Key, string Name)[] ArtStationCategories =
+        {
+            ("wallpaper", "Wallpaper"),
+            ("landscape", "Landscape"),
+            ("nature", "Nature"),
+            ("space", "Space"),
+            ("abstract", "Abstract"),
         };
 
         private static readonly BitmapImage PlaceholderImage =
@@ -197,17 +207,23 @@ namespace Aura.Views.Backiee
             {
                 Add("Backiee", backiee.Slug, backiee.Name, backiee.AccentHex, backiee);
             }
-            foreach (var (key, name) in AlphaCodersCategories)
+            foreach (var (key, name) in AlphaCodersService.Categories)
             {
                 Add("AlphaCoders", key, name, DefaultAccentHex);
             }
-            foreach (var mode in PublicWallpaperService.GetModes("Pixabay"))
+            foreach (var (key, name) in ArtStationCategories)
             {
-                Add("Pixabay", mode, mode, DefaultAccentHex);
+                Add("ArtStation", key, name, DefaultAccentHex);
             }
-            foreach (var mode in PublicWallpaperService.GetModes("Pexels"))
+            // every other implemented platform contributes its GetModes() entries as categories
+            // (pixabay docs list, pexels query modes, wallhaven bitmask, wallpaperhub collections,
+            //  bing/simpledesktops single honest entry - key = the mode the fetcher consumes)
+            foreach (var platform in new[] { "Bing Wallpaper Archive", "Pexels", "Pixabay", "Simple Desktops", "Wallhaven", "WallpaperHub" })
             {
-                Add("Pexels", mode, mode, DefaultAccentHex);
+                foreach (var mode in PublicWallpaperService.GetModes(platform))
+                {
+                    Add(platform, mode, mode, DefaultAccentHex);
+                }
             }
         }
 
@@ -325,8 +341,16 @@ namespace Aura.Views.Backiee
                 case "AlphaCoders":
                     Frame.Navigate(typeof(AlphaCodersGridPage), source.Key);
                     break;
+                case "ArtStation":
+                    // source.Key = the search query the reversed GET endpoint accepts
+                    Frame.Navigate(typeof(ArtStationGridPage), source.Key);
+                    break;
                 case "Pixabay":
                 case "Pexels":
+                case "Bing Wallpaper Archive":
+                case "Simple Desktops":
+                case "Wallhaven":
+                case "WallpaperHub":
                     Frame.Navigate(typeof(PublicWallpaperGridPage), new PublicGridNavigationParameter(source.Platform, source.Key));
                     break;
                 default:

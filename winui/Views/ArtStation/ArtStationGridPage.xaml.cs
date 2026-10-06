@@ -18,6 +18,7 @@ namespace Aura.Views.ArtStation
         private bool _isLoading;
         private bool _hasMoreProjects = true;
         private string _currentSorting = "trending";
+        private string _currentQuery; // non-null = category/query mode (categories page deep-link)
 
         public ArtStationGridPage()
         {
@@ -28,6 +29,12 @@ namespace Aura.Views.ArtStation
         protected override async void OnNavigatedTo(Microsoft.UI.Xaml.Navigation.NavigationEventArgs e)
         {
             base.OnNavigatedTo(e);
+
+            if (e.Parameter is string query && !string.IsNullOrWhiteSpace(query))
+            {
+                _currentQuery = query;
+                PageTitleTextBlock.Text = $"ArtStation {char.ToUpperInvariant(query[0])}{query.Substring(1)}";
+            }
 
             if (_projects.Count == 0)
             {
@@ -43,12 +50,13 @@ namespace Aura.Views.ArtStation
             }
 
             var sorting = button.Tag?.ToString() ?? "trending";
-            if (sorting == _currentSorting && _projects.Count > 0)
+            if (sorting == _currentSorting && _currentQuery == null && _projects.Count > 0)
             {
                 return;
             }
 
             _currentSorting = sorting;
+            _currentQuery = null; // sorting buttons leave category/query mode
             _currentPage = 1;
             _hasMoreProjects = true;
             _projects.Clear();
@@ -71,7 +79,9 @@ namespace Aura.Views.ArtStation
                 LoadingProgressBar.Visibility = Visibility.Visible;
                 StatusInfoBar.IsOpen = false;
 
-                var newProjects = await _artStationService.GetProjectsAsync(_currentSorting, _currentPage);
+                var newProjects = _currentQuery == null
+                    ? await _artStationService.GetProjectsAsync(_currentSorting, _currentPage)
+                    : await _artStationService.SearchProjectsAsync(_currentQuery, _currentPage);
                 if (newProjects.Count == 0)
                 {
                     _hasMoreProjects = false;
@@ -202,6 +212,12 @@ namespace Aura.Views.ArtStation
         {
             ResetSortingButton(TrendingButton);
             ResetSortingButton(LatestButton);
+
+            if (_currentQuery != null)
+            {
+                // neither sort chip applies while a category query drives the grid
+                return;
+            }
 
             var selectedButton = _currentSorting == "latest" ? LatestButton : TrendingButton;
             selectedButton.Background = (Brush)Application.Current.Resources["AccentFillColorDefaultBrush"];

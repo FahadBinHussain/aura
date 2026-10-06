@@ -109,6 +109,71 @@ against the installed build:
   the popup is never even created) - recipe in automata
   `windows-ui-automation` AGENTS.md.
 
+## all-9-platform categories, reversed + ported (2026-10-06)
+
+the Categories page now scopes over **every implemented site** (supersedes the
+25-card state above): Global = **113 merged cards**; per-scope counts: backiee
+19, alphacoders 63, pixabay 20, wallpaperhub 17, artstation 5, pexels 3,
+wallhaven 3, bing 1, simple desktops 1. `CategoryPlatforms` (9 entries) is the
+scope menu; every other platform contributes `PublicWallpaperService.GetModes()`
+as its category cards. per-site reversal evidence + curl recipes live in
+`automata-private/<site>/AGENTS.md` (8 new folders + `wall.alphacoders.com`
+extended). key facts the code depends on:
+
+- **wallhaven**: `categories` bitmask order = general/anime/people (proven by
+  reading the per-result `category` field: `100`->only general, `010`->anime,
+  `001`->people) -> modes General/Anime/People; legacy Latest/Random/Toplist
+  still resolve with 111. the mode switch is lowercased (slideshow passes
+  lowercase modes).
+- **pixabay**: 20 documented category values (docs `category str` row) =
+  `PixabayCategories`; every mode maps lowercased-or-default `backgrounds`.
+- **wallpaperhub**: 17 collections (id+title) = `WallpaperHubCollections`; a
+  mode that matches a collection title routes to `/collections/<id>` and parses
+  `pageProps.collectionWallpapers` (identical `{entity:...}` wrappers as
+  `initWallpapers`); anything else = `/wallpapers` (`initWallpapers`). both
+  SSR shapes serve everything at page 1. `?tags=` is SSR-ignored - never build
+  fetch URLs on it.
+- **alphacoders**: uniform `https://alphacoders.com/<slug>-wallpapers?page=N`
+  (`4k` special -> `/resolution/4k-wallpapers`; plain `4k-wallpapers` = 404).
+  the 63-entry catalog lives in `AlphaCodersService.Categories` - the merged
+  grid AND `AlphaCodersGridPage` titles both read it; deep-linked categories
+  leave the 3 quick buttons unselected instead of faking 4K.
+- **artstation**: the subject-matter taxonomy is POST + CSRF (anonymous =
+  `Invalid CSRF Token`; GET filter params silently ignored - all baselines stay
+  47230) => honest **query entries** (wallpaper/landscape/nature/space/abstract)
+  through GET `api/v2/search/projects.json?query=` (`SearchProjectsAsync`,
+  cards map `smaller_square_cover_url`/`url`, `is_adult_content` filtered).
+  `ArtStationGridPage` takes the query as its navigation parameter; sorting
+  buttons exit query mode (and neither chip is highlighted while in it).
+- **bing + simple desktops**: proven zero taxonomy => one honest entry each
+  (`Daily` / `Minimal`) so no scope ever renders an empty grid; their fetchers
+  ignore the mode.
+- **pexels**: API has no categories at all (Curated/Nature/Space stay), the
+  website is Cloudflare-walled (403 / "Just a moment") - documented, not retried.
+- chips overflow fix: up to 17-20 mode chips per platform -> `ModeButtonsPanel`
+  now sits in a horizontal `ScrollViewer` (Auto horizontal bar, Disabled
+  vertical, ZoomMode Disabled).
+
+## xamlcompiler quirk: invalid property = SILENT exit 1 (2026-10-06)
+
+`Orientation="Horizontal"` on a `ScrollViewer` (no such property - `Orientation`
+belongs to `StackPanel`) makes `Microsoft.UI.Xaml.Markup.Compiler` **crash with
+exit code 1, empty stdout/stderr, and NO diagnostics anywhere** - not in
+`obj/**/output.json` (it keeps its last successful-run timestamp), not the
+event log. MSBuild only reports the wrapper `MSB3073`, so the failure reads
+like a broken toolchain or flaky env, not bad XAML (2+ builds + a direct
+XamlCompiler.exe run to confirm determinism).
+
+diagnosis order that worked: (1) verify `output.json` has zero `ErrorCode`
+entries, (2) revert the last XAML edit -> build -> green = the edit is guilty,
+(3) bisect that edit's attributes. the compiling form:
+
+```xml
+<ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" ZoomMode="Disabled">
+    <StackPanel x:Name="ModeButtonsPanel" Orientation="Horizontal" Spacing="8"/>
+</ScrollViewer>
+```
+
 ## desktop app (winui)
 
 - run-from-CI build: artifact name is `Aura-x64` (no `.zip`), the file inside

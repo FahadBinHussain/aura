@@ -27,6 +27,91 @@ namespace Aura.Services
             DebugLogger?.Invoke(message);
         }
 
+        // the homepage's curated desktop -wallpapers slugs + 4k/harvest/rain (63 total).
+        // key = browse slug -> https://alphacoders.com/<slug>-wallpapers?page=N ("4k" is the
+        // resolution page exception); portrait -phone twins are intentionally skipped.
+        // single source for the merged Categories grid AND the grid page titles.
+        // see automata-private/wall.alphacoders.com/AGENTS.md
+        public static readonly (string Key, string Name)[] Categories =
+        {
+            ("4k", "4K"),
+            ("abstract", "Abstract"),
+            ("animal", "Animal"),
+            ("anime", "Anime"),
+            ("anime-girl", "Anime Girl"),
+            ("artistic", "Artistic"),
+            ("attack-on-titan", "Attack On Titan"),
+            ("aura-farming", "Aura Farming"),
+            ("badger", "Badger"),
+            ("batman", "Batman"),
+            ("bird", "Bird"),
+            ("black", "Black"),
+            ("black-clover", "Black Clover"),
+            ("bleach", "Bleach"),
+            ("bmw", "BMW"),
+            ("car", "Car"),
+            ("cat", "Cat"),
+            ("celebrity", "Celebrity"),
+            ("city", "City"),
+            ("comic", "Comic"),
+            ("cyberpunk", "Cyberpunk"),
+            ("dark", "Dark"),
+            ("demon-slayer", "Demon Slayer"),
+            ("demon-slayer-kimetsu-no-yaiba", "Demon Slayer Kimetsu No Yaiba"),
+            ("dog", "Dog"),
+            ("fall-leaves", "Fall Leaves"),
+            ("fantasy", "Fantasy"),
+            ("fantasy-anime", "Fantasy Anime"),
+            ("fantasy-city", "Fantasy City"),
+            ("fantasy-girl", "Fantasy Girl"),
+            ("flower", "Flower"),
+            ("food", "Food"),
+            ("ford", "Ford"),
+            ("halloween", "Halloween"),
+            ("harvest", "Harvest"),
+            ("holiday", "Holiday"),
+            ("humor", "Humor"),
+            ("man-made", "Man Made"),
+            ("map-of-the-usa", "Map Of The USA"),
+            ("movie", "Movie"),
+            ("music", "Music"),
+            ("naruto", "Naruto"),
+            ("nature", "Nature"),
+            ("one-piece", "One Piece"),
+            ("photography", "Photography"),
+            ("pokemon", "Pokemon"),
+            ("rain", "Rain"),
+            ("red-dead", "Red Dead"),
+            ("religious", "Religious"),
+            ("satoru-gojo", "Satoru Gojo"),
+            ("sci-fi", "Sci-Fi"),
+            ("soccer", "Soccer"),
+            ("spider-man", "Spider-Man"),
+            ("spooky", "Spooky"),
+            ("sports", "Sports"),
+            ("star-wars", "Star Wars"),
+            ("sword-art-online", "Sword Art Online"),
+            ("technology", "Technology"),
+            ("tom-clancys", "Tom Clancys"),
+            ("tv-show", "TV Show"),
+            ("vehicle", "Vehicle"),
+            ("video-game", "Video Game"),
+            ("woman", "Woman"),
+        };
+
+        public static string GetCategoryName(string key)
+        {
+            foreach (var (catKey, name) in Categories)
+            {
+                if (string.Equals(catKey, key, StringComparison.OrdinalIgnoreCase))
+                {
+                    return name;
+                }
+            }
+
+            return string.Empty;
+        }
+
         public AlphaCodersService()
         {
             _httpClient = new HttpClient();
@@ -98,14 +183,8 @@ namespace Aura.Services
                     _currentCategory = category;
                 }
 
-                // Determine the search term based on category
-                string searchTerm = category switch
-                {
-                    "4k" => "4k",
-                    "harvest" => "harvest",
-                    "rain" => "rain",
-                    _ => "4k"
-                };
+                // the category slug IS the browse key (the scraper turns it into <slug>-wallpapers)
+                string searchTerm = category;
 
                 // Load the requested page with the specific search term
                 if (page > _lastScrapedPage)

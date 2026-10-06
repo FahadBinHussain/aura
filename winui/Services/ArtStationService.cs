@@ -56,6 +56,42 @@ namespace Aura.Services
             return wallpapers;
         }
 
+        public async Task<List<WallpaperItem>> SearchProjectsAsync(
+            string query,
+            int page,
+            CancellationToken cancellationToken = default)
+        {
+            // GET-only search: the subject-matter taxonomy filters are POST + CSRF-protected
+            // (anonymous sessions never get a token) - see automata-private/www.artstation.com/AGENTS.md
+            var url = $"{BaseUrl}/api/v2/search/projects.json?query={Uri.EscapeDataString(query)}&page={page}&per_page=50&sorting=relevance";
+            var json = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("data", out var dataElement) ||
+                dataElement.ValueKind != JsonValueKind.Array)
+            {
+                return wallpapers;
+            }
+
+            foreach (var projectElement in dataElement.EnumerateArray())
+            {
+                if (GetBool(projectElement, "is_adult_content"))
+                {
+                    continue;
+                }
+
+                var wallpaper = CreateSearchWallpaperItem(projectElement);
+                if (!string.IsNullOrWhiteSpace(wallpaper.Id) &&
+                    !string.IsNullOrWhiteSpace(wallpaper.ImageUrl))
+                {
+                    wallpapers.Add(wallpaper);
+                }
+            }
+
+            return wallpapers;
+        }
+
         public async Task<WallpaperItem> GetProjectDetailsAsync(
             WallpaperItem wallpaper,
             CancellationToken cancellationToken = default)
@@ -120,6 +156,36 @@ namespace Aura.Services
                 SourceUrl = GetString(projectElement, "permalink"),
                 Likes = GetMetric(projectElement, "likes_count", "0"),
                 Downloads = GetMetric(projectElement, "views_count", "0"),
+                Resolution = "ArtStation",
+                QualityTag = string.Empty,
+                IsAI = false
+            };
+        }
+
+        private static WallpaperItem CreateSearchWallpaperItem(JsonElement projectElement)
+        {
+            // search cards differ from projects.json cards: no cover object, no permalink,
+            // no like/view counts - thumb + url + user only
+            var hashId = GetString(projectElement, "hash_id");
+            var numericId = GetString(projectElement, "id");
+            var title = GetString(projectElement, "title", "ArtStation artwork");
+            var thumbnailUrl = GetFirstString(
+                projectElement,
+                "smaller_square_cover_url",
+                "smaller_cover_url",
+                "thumb_url");
+            var artistName = GetNestedString(projectElement, "user", "full_name");
+
+            return new WallpaperItem
+            {
+                Id = string.IsNullOrWhiteSpace(hashId) ? numericId : hashId,
+                Title = title,
+                Description = string.IsNullOrWhiteSpace(artistName) ? title : $"by {artistName}",
+                ImageUrl = thumbnailUrl,
+                FullPhotoUrl = thumbnailUrl,
+                SourceUrl = GetString(projectElement, "url", $"{BaseUrl}/search"),
+                Likes = "0",
+                Downloads = "0",
                 Resolution = "ArtStation",
                 QualityTag = string.Empty,
                 IsAI = false
