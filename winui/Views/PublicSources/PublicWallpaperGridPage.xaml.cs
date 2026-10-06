@@ -34,13 +34,33 @@ namespace Aura.Views.PublicSources
         {
             base.OnNavigatedTo(e);
 
-            if (e.Parameter is string platformName && PublicWallpaperService.IsSupportedPlatform(platformName))
+            string? requestedMode = null;
+
+            if (e.Parameter is PublicGridNavigationParameter gridParameter &&
+                PublicWallpaperService.IsSupportedPlatform(gridParameter.PlatformName))
+            {
+                _platformName = gridParameter.PlatformName;
+                requestedMode = gridParameter.Mode;
+            }
+            else if (e.Parameter is string platformName && PublicWallpaperService.IsSupportedPlatform(platformName))
             {
                 _platformName = platformName;
             }
 
             MainWindow.LastSelectedPlatform = _platformName;
-            _currentMode = PublicWallpaperService.GetDefaultMode(_platformName);
+
+            // a deep-linked category from the Categories grid wins; otherwise keep
+            // the mode chosen on a previous visit (back-navigation) and only apply
+            // the platform default on a fresh grid
+            if (!string.IsNullOrEmpty(requestedMode))
+            {
+                _currentMode = requestedMode;
+            }
+            else if (_wallpapers.Count == 0)
+            {
+                _currentMode = PublicWallpaperService.GetDefaultMode(_platformName);
+            }
+
             TitleTextBlock.Text = _platformName;
             DescriptionTextBlock.Text = PublicWallpaperService.GetPlatformDescription(_platformName);
             BuildModeButtons();

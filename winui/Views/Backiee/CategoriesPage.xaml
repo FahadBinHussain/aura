@@ -24,12 +24,23 @@
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
-        <!-- Title -->
+        <!-- Title + global/local scope -->
         <Grid Grid.Row="0" Margin="24,24,24,12">
             <TextBlock x:Name="PageTitleTextBlock"
                        Text="Categories"
                        Style="{StaticResource TitleTextBlockStyle}"
                        VerticalAlignment="Center"/>
+            <Button x:Name="ScopeButton"
+                    HorizontalAlignment="Right"
+                    VerticalAlignment="Center"
+                    Padding="14,6">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <FontIcon Glyph="&#xE70D;" FontSize="12"/>
+                    <TextBlock x:Name="ScopeButtonTextBlock"
+                               Text="Global"
+                               VerticalAlignment="Center"/>
+                </StackPanel>
+            </Button>
         </Grid>
 
         <!-- Category grid with adaptive layout -->
@@ -84,7 +95,7 @@
 
                             <!-- Category image -->
                             <Image x:Name="ItemImage"
-                                   Source="ms-appx:///Assets/placeholder-wallpaper-1000.png"
+                                   Source="{Binding ImageSource}"
                                    Stretch="UniformToFill"
                                    CacheMode="BitmapCache"
                                    HorizontalAlignment="Stretch"

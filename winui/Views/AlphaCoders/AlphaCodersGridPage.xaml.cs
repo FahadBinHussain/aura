@@ -51,14 +51,19 @@ namespace Aura.Views.AlphaCoders
         {
             base.OnNavigatedTo(e);
 
-            // Only load wallpapers if this is the first time navigating to this page
-            if (!_isInitialized)
+            string? requestedCategory = e.Parameter as string;
+
+            if (!string.IsNullOrEmpty(requestedCategory) && requestedCategory != _currentCategory)
             {
+                // deep link from the merged Categories grid (e.g. "harvest")
+                ApplyCategory(requestedCategory);
+                _isInitialized = true;
+            }
+            else if (!_isInitialized)
+            {
+                // Only load wallpapers if this is the first time navigating to this page
                 _isInitialized = true;
                 LoadWallpapers();
-            }
-            else
-            {
             }
         }
 
@@ -66,22 +71,32 @@ namespace Aura.Views.AlphaCoders
         {
             if (sender is Button button)
             {
-                string category = button.Tag?.ToString() ?? "4k";
-                
-                // Update button styles
-                UpdateCategoryButtonStyles(category);
-                
-                // Update title
-                PageTitleTextBlock.Text = button.Content?.ToString() ?? "Alpha Coders Wallpapers";
-                
-                // Reset and reload wallpapers for new category
-                _currentCategory = category;
-                _wallpapers.Clear();
-                _currentPage = 1;
-                _hasMoreWallpapers = true;
-                
-                LoadWallpapers();
+                ApplyCategory(button.Tag?.ToString() ?? "4k");
             }
+        }
+
+        private void ApplyCategory(string category)
+        {
+            // update button styles
+            UpdateCategoryButtonStyles(category);
+
+            // update title
+            var button = category switch
+            {
+                "4k" => FourKButton,
+                "harvest" => HarvestButton,
+                "rain" => RainButton,
+                _ => null,
+            };
+            PageTitleTextBlock.Text = button?.Content?.ToString() ?? "Alpha Coders Wallpapers";
+
+            // Reset and reload wallpapers for new category
+            _currentCategory = category;
+            _wallpapers.Clear();
+            _currentPage = 1;
+            _hasMoreWallpapers = true;
+
+            LoadWallpapers();
         }
 
         private void UpdateCategoryButtonStyles(string selectedCategory)
