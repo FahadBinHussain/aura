@@ -99,18 +99,19 @@ namespace Aura.Models
                             outputStream.Position = 0;
 
 
-                            // Create BitmapImage from PNG data
+                            // bytes -> stream the SAME way BackieeCategory does (proven on
+                            // 19/19 backiee thumbs): direct WriteAsync into the WinRT stream.
+                            // the old GetOutputStreamAt/AsStreamForWrite/Flush path threw
+                            // WIC 0x88982F50 with NO message on 3 of 93 thumbnail loads.
                             var bitmap = new BitmapImage();
                             bitmap.DecodePixelWidth = 500;
 
-                            // Convert to IRandomAccessStream
-                            var randomAccessStream = new InMemoryRandomAccessStream();
-                            var raOutputStream = randomAccessStream.GetOutputStreamAt(0);
-                            await outputStream.CopyToAsync(raOutputStream.AsStreamForWrite());
-                            await raOutputStream.FlushAsync();
-
-                            // Set bitmap source
-                            await bitmap.SetSourceAsync(randomAccessStream);
+                            using (var stream = new InMemoryRandomAccessStream())
+                            {
+                                await stream.WriteAsync(outputStream.ToArray().AsBuffer());
+                                stream.Seek(0);
+                                await bitmap.SetSourceAsync(stream);
+                            }
 
                             return bitmap;
                         }

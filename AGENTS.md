@@ -153,6 +153,39 @@ extended). key facts the code depends on:
 - chips overflow fix: up to 17-20 mode chips per platform -> `ModeButtonsPanel`
   now sits in a horizontal `ScrollViewer` (Auto horizontal bar, Disabled
   vertical, ZoomMode Disabled).
+- **category card thumbnails (fixed 2026-10-07)**: only backiee cards ever got
+  real art - `BuildMerged` left every other platform's card on the shared
+  placeholder forever (the reported bug: "cards after the first backiee ones
+  show the same placeholder"). now `FillThumbnailsAsync` (fire-and-forget
+  right after `ApplyScope`) gives every non-backiee card ONE representative
+  wallpaper = page 1's first item of its own drill-down fetch (alpha
+  `GetWallpapersByCategoryAsync(key,1,1)` / `ArtStationService
+  SearchProjectsAsync` / `PublicWallpaperService.GetWallpapersAsync`) through
+  `WallpaperItem.LoadImageAsync`, session-cached in a static
+  `ConcurrentDictionary`. three traps found live:
+  - **`AlphaCodersService`'s scrape cache is STATIC** (list + lastPage +
+    currentCategory) and NOT thread-safe: the first build fetched through a
+    4-wide gate and exactly the 4 simultaneous cards came back empty (plus
+    cross-category image mixups) while every sequential scrape - the grid
+    page, curl - worked. alpha fills therefore run through their own
+    `AlphaCodersThumbGate = 1` (alone); other platforms share the 4-wide gate
+    because each news its own service instance per fetch.
+  - **`WallpaperItem`'s `GetOutputStreamAt`/`AsStreamForWrite`/`FlushAsync`
+    stream path threw WIC `0x88982F50` with an EMPTY `ex.Message` on 3/93
+    loads** (an empty reason in the error bar) -> rewritten to
+    `BackieeCategory`'s proven `stream.WriteAsync(bytes.AsBuffer())` +
+    `Seek(0)` + `SetSourceAsync` (its 19/19 pattern); empty reasons now
+    coalesce to `<Type> hresult=0x<code>` so the bar can never go blank.
+  - loud contract: the bar lists EVERY platform with >= 1 failed card as
+    `<platform> category thumbnails: <n>/<total> failed - <first reason>`; a
+    keyless install shows exactly 2 lines (Pexels + Pixabay API keys). the
+    fill failure paths never touch the session cache, so the next Categories
+    open retries them. verified menuless + vision on the local build
+    (2026-10-07): the complaint cards `Aura Farming..Cyberpunk` all real,
+    alpha 0/63 failed, 0 duplicates except one honest source overlap -
+    `animal` and `cat` pages serve the SAME first thumb
+    (`thumbbig-20658.webp`, curl-verified), so those two cards legitimately
+    show one photo.
 
 ## focus-free verification: menuless protocol (2026-10-07)
 

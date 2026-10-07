@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Linq;
+using System.Runtime.InteropServices.WindowsRuntime;
+using System.Threading;
 using System.Threading.Tasks;
 using Aura.Models;
 using Aura.Services;
@@ -13,6 +16,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Microsoft.UI.Xaml.Navigation;
+using Windows.Storage.Streams;
 
 namespace Aura.Views.Backiee
 {
@@ -42,6 +46,16 @@ namespace Aura.Views.Backiee
 
         private static readonly BitmapImage PlaceholderImage =
             new BitmapImage(new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png"));
+
+        // only backiee ships static per-category art - every other platform's card pulls ONE
+        // representative wallpaper (page 1, first item) and uses its thumb instead. cached for
+        // the session so re-opening Categories is instant; the gate bounds the ~90-fetch fan-out.
+        private static readonly ConcurrentDictionary<string, BitmapImage> CategoryThumbCache = new();
+        private static readonly SemaphoreSlim CategoryThumbGate = new(4);
+        // AlphaCoders only: its service keeps the scrape cache in STATIC fields that are
+        // not thread-safe, so its fills run strictly one at a time (the grid page's proven
+        // mode) - concurrent fills raced the shared list and returned empty cards.
+        private static readonly SemaphoreSlim AlphaCodersThumbGate = new(1);
 
         // one category as it exists on a single platform (what a drill-down needs)
         public sealed class CategorySourceRef
@@ -147,6 +161,7 @@ namespace Aura.Views.Backiee
             _sourceError = errors.Count > 0 ? string.Join(Environment.NewLine, errors) : null;
             BuildMerged();
             ApplyScope();
+            _ = FillThumbnailsAsync(); // fire-and-forget: placeholder cards fill in as thumbs arrive
         }
 
         private async Task<int> LoadThumbnailsAsync(List<BackieeCategory> categories)
@@ -173,6 +188,127 @@ namespace Aura.Views.Backiee
             {
                 onFailure();
             }
+        }
+
+        // every non-backiee card starts on the placeholder (BuildMerged only ever gets an
+        // image from backiee) - give each ONE representative wallpaper thumb: page 1's first
+        // item, exactly what its drill-down grid would show first.
+        private async Task FillThumbnailsAsync()
+        {
+            try
+            {
+                var pending = _merged
+                    .Where(c => c.ImageSource == PlaceholderImage
+                        && c.Sources.Count > 0
+                        && c.Sources[0].Platform != "Backiee") // backiee was already tried eagerly above
+                    .ToList();
+
+                var outcomes = await Task.WhenAll(pending.Select(FillThumbnailAsync));
+
+                // loud contract: any platform with at least one failed card gets a bar line
+                // (count + first reason) - a lone flaky card must not hide behind the rest
+                var lines = new List<string>();
+                foreach (var g in outcomes.GroupBy(o => o.Platform))
+                {
+                    var failed = g.Where(o => !o.Ok).ToList();
+                    if (failed.Count > 0)
+                    {
+                        lines.Add($"{g.Key} category thumbnails: {failed.Count}/{g.Count()} failed - {failed[0].Error}");
+                    }
+                }
+
+                if (lines.Count == 0)
+                {
+                    return;
+                }
+
+                var allErrors = new List<string>();
+                if (!string.IsNullOrEmpty(_sourceError))
+                {
+                    allErrors.Add(_sourceError);
+                }
+                allErrors.AddRange(lines);
+                _sourceError = string.Join(Environment.NewLine, allErrors);
+
+                // the same scope rule ApplyScope uses, applied in place: rebuilding the item
+                // list here would wipe the user's scroll position mid-fill
+                if (_scopePlatform == null || _scopePlatform == "Backiee")
+                {
+                    ErrorTextBlock.Text = _sourceError;
+                    ErrorTextBlock.Visibility = Visibility.Visible;
+                }
+            }
+            catch (Exception ex)
+            {
+                ErrorTextBlock.Text = $"Category thumbnails failed: {ex.Message}";
+                ErrorTextBlock.Visibility = Visibility.Visible;
+            }
+        }
+
+        private async Task<(string Platform, bool Ok, string Error)> FillThumbnailAsync(MergedCategory card)
+        {
+            var source = card.Sources[0];
+            var cacheKey = $"{source.Platform}|{source.Key}";
+
+            if (CategoryThumbCache.TryGetValue(cacheKey, out var cached))
+            {
+                card.ImageSource = cached;
+                return (source.Platform, true, string.Empty);
+            }
+
+            // pick the gate: AlphaCoders must run alone (static scrape cache), everything
+            // else got fresh service instances and shares the bounded 4-wide gate
+            var gate = source.Platform == "AlphaCoders" ? AlphaCodersThumbGate : CategoryThumbGate;
+            await gate.WaitAsync();
+            try
+            {
+                var bitmap = await LoadRepresentativeThumbnailAsync(source);
+                if (bitmap == null)
+                {
+                    return (source.Platform, false, $"no items returned for \"{card.Name}\".");
+                }
+
+                CategoryThumbCache[cacheKey] = bitmap;
+                card.ImageSource = bitmap;
+                return (source.Platform, true, string.Empty);
+            }
+            catch (Exception ex)
+            {
+                // never surface an empty reason (observed on Simple Desktops + WallpaperHub:
+                // WinRT throws textless COMException) - the HRESULT is the diagnosable part
+                var reason = string.IsNullOrWhiteSpace(ex.Message)
+                    ? $"{ex.GetType().Name} hresult=0x{ex.HResult:X8} (no error detail)"
+                    : ex.Message;
+                return (source.Platform, false, reason);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }
+
+        private async Task<BitmapImage?> LoadRepresentativeThumbnailAsync(CategorySourceRef source)
+        {
+            WallpaperItem? first;
+            switch (source.Platform)
+            {
+                case "AlphaCoders":
+                    // one service instance per fetch: AlphaCodersService keeps a mutable
+                    // per-instance scrape cache that is not safe to share across categories
+                    first = (await new AlphaCodersService()
+                        .GetWallpapersByCategoryAsync(source.Key, 1, 1)).FirstOrDefault();
+                    break;
+                case "ArtStation":
+                    first = (await new ArtStationService().SearchProjectsAsync(source.Key, 1)).FirstOrDefault();
+                    break;
+                default:
+                    // every public platform's GetModes() entry IS the mode its fetcher consumes
+                    first = (await new PublicWallpaperService()
+                        .GetWallpapersAsync(source.Platform, 1, source.Key)).FirstOrDefault();
+                    break;
+            }
+
+            return first == null ? null : await first.LoadImageAsync();
         }
 
         // merge every platform's categories by case-insensitive name into one grid model
