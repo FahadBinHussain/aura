@@ -112,7 +112,7 @@ against the installed build:
 ## all-9-platform categories, reversed + ported (2026-10-06)
 
 the Categories page now scopes over **every implemented site** (supersedes the
-25-card state above): Global = **113 merged cards**; per-scope counts: backiee
+25-card state above): Global = **112 merged cards**; per-scope counts: backiee
 19, alphacoders 63, pixabay 20, wallpaperhub 17, artstation 5, pexels 3,
 wallhaven 3, bing 1, simple desktops 1. `CategoryPlatforms` (9 entries) is the
 scope menu; every other platform contributes `PublicWallpaperService.GetModes()`
@@ -153,6 +153,36 @@ extended). key facts the code depends on:
 - chips overflow fix: up to 17-20 mode chips per platform -> `ModeButtonsPanel`
   now sits in a horizontal `ScrollViewer` (Auto horizontal bar, Disabled
   vertical, ZoomMode Disabled).
+
+## focus-free verification: menuless protocol (2026-10-07)
+
+- **never open a flyout while the user is working**: with the window parked
+  offscreen (-4000,-4000) a `MenuFlyout` renders clamped at the screen's
+  TOP-LEFT corner, visibly, and it activates (focus steal) - the user called
+  it "dropdown coming in the top left and stealing focus". while minimized
+  the popup is never created at all. so the only acceptable interactive
+  check while the user is at the machine is MENULESS: Global card count +
+  direct-navigate drills (every single-source merged card skips the chooser:
+  `Celebration` `Batman` `General` `Windows 11` `Wallpaper` `Backgrounds`
+  `Curated` `Daily` `Minimal`) - zero scope menu, zero chooser, zero popup.
+- one menuless pass takes ~90s and verified everything on the CI build
+  (2026-10-07): Global = **112** cards, scope `Global`, no error; drill
+  titles `Celebration wallpapers` / `Batman` / `Wallhaven` / `WallpaperHub` /
+  `ArtStation Wallpaper` / `Pixabay` / `Pexels` / `Bing Wallpaper Archive` /
+  `Simple Desktops`; grids 30 / 15 / 18 / 6 / 44 / - / - / 8 / 18; loud
+  `StatusInfoBar` key errors on Pixabay + Pexels; wallhaven chips
+  `General` `Anime` `People` present; hygiene = 0 popups ever, 5ms max
+  focus exposure, foreground never left with the app. probe scripts ran
+  from `C:\tmp` (never committed) - rebuild from the recipe here if needed.
+- **open flake: silent process death during probing (2 of ~6 sessions,
+  2026-10-07)** - pid died mid-drill twice (once on the backiee drill of a
+  22h-old instance, once 525ms into the WallpaperHub drill of a fresh one)
+  with NO `app.log` entry, NO WER event (WER events still fire for other
+  apps - checked), no System/Defender/exit traces; 4 later full sessions +
+  3 single-drill sessions all survived. if it recurs, capture the truth
+  BEFORE theorizing: launch with `Start-Process -PassThru` and read
+  `$proc.ExitCode` on death (0 = clean in-app exit, 1 = external kill,
+  negative = NTSTATUS crash).
 
 ## xamlcompiler quirk: invalid property = SILENT exit 1 (2026-10-06)
 
