@@ -174,15 +174,31 @@ extended). key facts the code depends on:
   `General` `Anime` `People` present; hygiene = 0 popups ever, 5ms max
   focus exposure, foreground never left with the app. probe scripts ran
   from `C:\tmp` (never committed) - rebuild from the recipe here if needed.
-- **open flake: silent process death during probing (2 of ~6 sessions,
-  2026-10-07)** - pid died mid-drill twice (once on the backiee drill of a
-  22h-old instance, once 525ms into the WallpaperHub drill of a fresh one)
-  with NO `app.log` entry, NO WER event (WER events still fire for other
-  apps - checked), no System/Defender/exit traces; 4 later full sessions +
-  3 single-drill sessions all survived. if it recurs, capture the truth
-  BEFORE theorizing: launch with `Start-Process -PassThru` and read
-  `$proc.ExitCode` on death (0 = clean in-app exit, 1 = external kill,
-  negative = NTSTATUS crash).
+- **silent process death while probing - OPEN (2026-10-07, root cause not
+  found; the earlier "external close" resolution is DISPROVEN)**: three real
+  deaths, ALL while a probe drove rapid menuless drills (~5-10s per page for
+  minutes); idle instances never died on their own ("it's on for some time
+  now, not dying"). every real death had the same signature: **exit=0** off
+  the held handle, no `app.log`, no WER/System/Defender trace, and `main()`
+  returned normally (cdb stack: `ucrtbase!common_exit` <-
+  `Aura_exe!__scrt_common_main_seh`) = the WinUI message loop ended ITSELF
+  (not `Environment.Exit`, not a crash); the whole UIA tree reads ABSENT
+  ~500ms before the process exits, so the window dies first. ruled out:
+  external `WM_CLOSE` (the closing handler is `HKCU\SOFTWARE\Aura`'s only
+  writer and its last-write stayed at the PREVIOUS day's 20:49 on every
+  death day - nothing closed the window), `Environment.Exit`, the hot-reload
+  `Application.Current.Exit()` (invoke logs show only `CategoriesButton` +
+  `MergedCategory` were ever invoked), unhandled managed exceptions (they
+  log + dialog + survive). one run caught the app calling `PostThreadMessageW`
+  at the death moment (message value not captured). keep while parked:
+  `WS_EX_TOOLWINDOW` (hides taskbar + alt-tab entry, strip in the
+  end-restore). truth-first recipe: launch with `Start-Process -PassThru`,
+  read `$proc.ExitCode` off that held handle - **0 = clean main-return death
+  | 1 = external force kill | 0xC0000354 = STATUS_DEBUGGER_INACTIVE = a
+  debugger killed it (probe ARTIFACT, discard the run) | any other negative
+  = NTSTATUS crash** - and the registry last-write check (only a close
+  writes park coords). status: paused, nothing running; resume = the cdb
+  loop-ender catcher, recipe in automata `windows-ui-automation`.
 
 ## xamlcompiler quirk: invalid property = SILENT exit 1 (2026-10-06)
 
