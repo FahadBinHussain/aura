@@ -36,6 +36,113 @@ they get ported (17 as of 2026-10-08).
 | [Wallpaper Engine workshop](https://steamcommunity.com/workshop/browse/?appid=431960) | trending / tagged browse (preview resolution) |
 | [Artgram](https://www.artgram.co) | trending / latest / oldest (full resolution on detail open) |
 
+### Category links
+
+The URLs behind each site's category/mode entries (2026-10-08; source of truth
+is the code - mode tables + fetchers).
+
+- **backiee** - https://backiee.com/categories (19 slugs parse from there) ·
+  drill `https://backiee.com/api/wallpaper/list.php?action=paging_list&category=<slug>`
+- **alphacoders** - https://alphacoders.com/resolution/4k-wallpapers ·
+  https://alphacoders.com/abstract-wallpapers · https://alphacoders.com/animal-wallpapers ·
+  https://alphacoders.com/anime-wallpapers · https://alphacoders.com/anime-girl-wallpapers ·
+  https://alphacoders.com/artistic-wallpapers · https://alphacoders.com/attack-on-titan-wallpapers ·
+  https://alphacoders.com/aura-farming-wallpapers · https://alphacoders.com/badger-wallpapers ·
+  https://alphacoders.com/batman-wallpapers · https://alphacoders.com/bird-wallpapers ·
+  https://alphacoders.com/black-wallpapers · https://alphacoders.com/black-clover-wallpapers ·
+  https://alphacoders.com/bleach-wallpapers · https://alphacoders.com/bmw-wallpapers ·
+  https://alphacoders.com/car-wallpapers · https://alphacoders.com/cat-wallpapers ·
+  https://alphacoders.com/celebrity-wallpapers · https://alphacoders.com/city-wallpapers ·
+  https://alphacoders.com/comic-wallpapers · https://alphacoders.com/cyberpunk-wallpapers ·
+  https://alphacoders.com/dark-wallpapers · https://alphacoders.com/demon-slayer-wallpapers ·
+  https://alphacoders.com/demon-slayer-kimetsu-no-yaiba-wallpapers · https://alphacoders.com/dog-wallpapers ·
+  https://alphacoders.com/fall-leaves-wallpapers · https://alphacoders.com/fantasy-wallpapers ·
+  https://alphacoders.com/fantasy-anime-wallpapers · https://alphacoders.com/fantasy-city-wallpapers ·
+  https://alphacoders.com/fantasy-girl-wallpapers · https://alphacoders.com/flower-wallpapers ·
+  https://alphacoders.com/food-wallpapers · https://alphacoders.com/ford-wallpapers ·
+  https://alphacoders.com/halloween-wallpapers · https://alphacoders.com/harvest-wallpapers ·
+  https://alphacoders.com/holiday-wallpapers · https://alphacoders.com/humor-wallpapers ·
+  https://alphacoders.com/man-made-wallpapers · https://alphacoders.com/map-of-the-usa-wallpapers ·
+  https://alphacoders.com/movie-wallpapers · https://alphacoders.com/music-wallpapers ·
+  https://alphacoders.com/naruto-wallpapers · https://alphacoders.com/nature-wallpapers ·
+  https://alphacoders.com/one-piece-wallpapers · https://alphacoders.com/photography-wallpapers ·
+  https://alphacoders.com/pokemon-wallpapers · https://alphacoders.com/rain-wallpapers ·
+  https://alphacoders.com/red-dead-wallpapers · https://alphacoders.com/religious-wallpapers ·
+  https://alphacoders.com/satoru-gojo-wallpapers · https://alphacoders.com/sci-fi-wallpapers ·
+  https://alphacoders.com/soccer-wallpapers · https://alphacoders.com/spider-man-wallpapers ·
+  https://alphacoders.com/spooky-wallpapers · https://alphacoders.com/sports-wallpapers ·
+  https://alphacoders.com/star-wars-wallpapers · https://alphacoders.com/sword-art-online-wallpapers ·
+  https://alphacoders.com/technology-wallpapers · https://alphacoders.com/tom-clancys-wallpapers ·
+  https://alphacoders.com/tv-show-wallpapers · https://alphacoders.com/vehicle-wallpapers ·
+  https://alphacoders.com/video-game-wallpapers · https://alphacoders.com/woman-wallpapers
+- **pixabay** - `https://pixabay.com/api/?key=KEY&image_type=photo&orientation=horizontal&safesearch=true&category=<value>&page=1&per_page=30`
+  with values: backgrounds, fashion, nature, science, education, feelings, health, people,
+  religion, places, animals, industry, computer, food, sports, transportation, travel,
+  buildings, business, music
+- **wallpaperhub** - https://www.wallpaperhub.app/collections/9280 · https://www.wallpaperhub.app/collections/7716 ·
+  https://www.wallpaperhub.app/collections/7058 · https://www.wallpaperhub.app/collections/5472 ·
+  https://www.wallpaperhub.app/collections/1274 · https://www.wallpaperhub.app/collections/6292 ·
+  https://www.wallpaperhub.app/collections/2863 · https://www.wallpaperhub.app/collections/1484 ·
+  https://www.wallpaperhub.app/collections/1386 · https://www.wallpaperhub.app/collections/1387 ·
+  https://www.wallpaperhub.app/collections/1238 · https://www.wallpaperhub.app/collections/3692 ·
+  https://www.wallpaperhub.app/collections/4045 · https://www.wallpaperhub.app/collections/4636 ·
+  https://www.wallpaperhub.app/collections/6401 · https://www.wallpaperhub.app/collections/6638 ·
+  https://www.wallpaperhub.app/collections/8318 · https://www.wallpaperhub.app/wallpapers
+- **artstation** - https://www.artstation.com/api/v2/search/projects.json?query=wallpaper&page=1&per_page=50&sorting=relevance ·
+  https://www.artstation.com/api/v2/search/projects.json?query=landscape&page=1&per_page=50&sorting=relevance ·
+  https://www.artstation.com/api/v2/search/projects.json?query=nature&page=1&per_page=50&sorting=relevance ·
+  https://www.artstation.com/api/v2/search/projects.json?query=space&page=1&per_page=50&sorting=relevance ·
+  https://www.artstation.com/api/v2/search/projects.json?query=abstract&page=1&per_page=50&sorting=relevance
+- **pexels** - `https://api.pexels.com/v1/curated?page=1&per_page=30` ·
+  `https://api.pexels.com/v1/search?query=nature&orientation=landscape&page=1&per_page=30` ·
+  `https://api.pexels.com/v1/search?query=space&orientation=landscape&page=1&per_page=30`
+- **wallhaven** - https://wallhaven.cc/api/v1/search?categories=100&purity=100&sorting=toplist&order=desc&page=1 ·
+  https://wallhaven.cc/api/v1/search?categories=010&purity=100&sorting=toplist&order=desc&page=1 ·
+  https://wallhaven.cc/api/v1/search?categories=001&purity=100&sorting=toplist&order=desc&page=1
+- **bing** - https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US
+- **simple desktops** - https://simpledesktops.com/browse/1/
+- **desktopnexus** - https://www.desktopnexus.com/all/ · https://abstract.desktopnexus.com/all/ ·
+  https://aircraft.desktopnexus.com/all/ · https://animals.desktopnexus.com/all/ ·
+  https://anime.desktopnexus.com/all/ · https://architecture.desktopnexus.com/all/ ·
+  https://boats.desktopnexus.com/all/ · https://cars.desktopnexus.com/all/ ·
+  https://entertainment.desktopnexus.com/all/ · https://motorcycles.desktopnexus.com/all/ ·
+  https://nature.desktopnexus.com/all/ · https://people.desktopnexus.com/all/ ·
+  https://space.desktopnexus.com/all/ · https://sports.desktopnexus.com/all/ ·
+  https://technology.desktopnexus.com/all/ · https://videogames.desktopnexus.com/all/
+- **digital blasphemy** - https://digitalblasphemy.com/product-category/wallpapers/ ·
+  https://digitalblasphemy.com/product-tag/free/
+- **hdwallpapers** - https://www.hdwallpapers.net/latest-wallpapers · https://www.hdwallpapers.net/3d ·
+  https://www.hdwallpapers.net/abstract · https://www.hdwallpapers.net/animals ·
+  https://www.hdwallpapers.net/anime · https://www.hdwallpapers.net/bikes ·
+  https://www.hdwallpapers.net/brands · https://www.hdwallpapers.net/cars ·
+  https://www.hdwallpapers.net/celebrations · https://www.hdwallpapers.net/celebrities ·
+  https://www.hdwallpapers.net/city-and-architecture · https://www.hdwallpapers.net/digital-art ·
+  https://www.hdwallpapers.net/flowers · https://www.hdwallpapers.net/funny ·
+  https://www.hdwallpapers.net/games · https://www.hdwallpapers.net/love ·
+  https://www.hdwallpapers.net/nature · https://www.hdwallpapers.net/people ·
+  https://www.hdwallpapers.net/quotes · https://www.hdwallpapers.net/space ·
+  https://www.hdwallpapers.net/sports · https://www.hdwallpapers.net/technology ·
+  https://www.hdwallpapers.net/tv-and-movies · https://www.hdwallpapers.net/typography ·
+  https://www.hdwallpapers.net/world
+- **pixiv** - https://www.pixiv.net/ajax/search/artworks/Wallpaper?word=Wallpaper&restrict=safe&p=1&order=date_d ·
+  https://www.pixiv.net/ajax/search/artworks/Landscape?word=Landscape&restrict=safe&p=1&order=date_d ·
+  https://www.pixiv.net/ajax/search/artworks/Nature?word=Nature&restrict=safe&p=1&order=date_d
+- **cara** - https://cara.app/explore
+- **wallpaper cave** - https://wallpapercave.com/wallpapers · https://wallpapercave.com/cloud-wallpapers ·
+  https://wallpapercave.com/desert-wallpapers · https://wallpapercave.com/fire-wallpapers ·
+  https://wallpapercave.com/ice-wallpapers · https://wallpapercave.com/lake-wallpapers ·
+  https://wallpapercave.com/ocean-wallpapers · https://wallpapercave.com/sunshine-wallpapers ·
+  https://wallpapercave.com/soulslike-wallpapers
+- **wallpaper engine** - https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1 ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Scene ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Anime ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=3D ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Video ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Interactive ·
+  https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Audio%20Responsive
+- **artgram** - https://www.artgram.co/ · https://www.artgram.co/?sortBy=latest ·
+  https://www.artgram.co/?sortBy=oldest
+
 ## 🌟 Features
 
 ### All Implementations
