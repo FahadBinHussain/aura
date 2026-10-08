@@ -966,7 +966,7 @@ namespace Aura.Services
                     Id = id,
                     Title = $"{albumTitle} #{index}",
                     Description = "Wallpaper Cave wallpaper",
-                    ImageUrl = $"https://wallpapercave.com/mwp/{file.Substring(4)}", // mobile srcset = the small thumb
+                    ImageUrl = $"https://wallpapercave.com/dwp1x/{file.Substring(4)}", // desktop <source> thumb: JPEG (/mwp/ now transcodes to image/avif - WinUI has no AVIF decoder, tiles decode-fail)
                     FullPhotoUrl = $"https://wallpapercave.com{file}",               // 1980px original
                     SourceUrl = $"https://wallpapercave.com/w/{id}",
                     Likes = string.Empty,

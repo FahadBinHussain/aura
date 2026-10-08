@@ -130,6 +130,27 @@ namespace Aura.Views.Backiee
             LoadingProgressBar.Visibility = Visibility.Visible;
 
             var errors = new List<string>();
+
+            // alphacoders: its REAL category page is the single source (live load with
+            // the same loud contract as backiee - the service holds no static list,
+            // a failed fetch leaves the platform empty AND explained in the error bar)
+            try
+            {
+                var alphaCategories = await new AlphaCodersService().GetCategoryIndexAsync();
+                if (alphaCategories.Count == 0)
+                {
+                    errors.Add("alphacoders returned no categories - the /tag/is-category markup may have changed.");
+                }
+                else
+                {
+                    AlphaCodersService.SetCategories(alphaCategories);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Couldn't load alphacoders categories: {ex.Message}");
+            }
+
             try
             {
                 var html = await BackieeNetworkClient.GetStringAsync(CategoriesUrl);
@@ -233,7 +254,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee")
+                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders")
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -384,7 +405,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee"))
+            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders"))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;

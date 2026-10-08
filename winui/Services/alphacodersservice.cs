@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Text.Json;
 using System.Threading.Tasks;
 using Aura.Models;
@@ -27,77 +28,81 @@ namespace Aura.Services
             DebugLogger?.Invoke(message);
         }
 
-        // the homepage's curated desktop -wallpapers slugs + 4k/harvest/rain (63 total).
-        // key = browse slug -> https://alphacoders.com/<slug>-wallpapers?page=N ("4k" is the
-        // resolution page exception); portrait -phone twins are intentionally skipped.
-        // single source for the merged Categories grid AND the grid page titles.
+        // the site's REAL category page = https://alphacoders.com/tag/is-category
+        // ("Explore Alpha Coders Category Tags"): one <h3> row per desktop category,
+        // row text = display name, row's "Desktop Wallpapers" cell = the browse target
+        // (https://alphacoders.com/<slug>-wallpapers?page=N). live-loaded by the
+        // Categories page (GetCategoryIndexAsync + SetCategories) with the same
+        // contract as backiee's /categories: NO static fallback list - a failed fetch
+        // leaves this empty and the failure shows in the loud error bar. "4k" is the
+        // resolution-page exception for the grid page's quick button, not a category
+        // row. single source for the merged Categories grid AND the grid page titles.
         // see automata-private/wall.alphacoders.com/AGENTS.md
-        public static readonly (string Key, string Name)[] Categories =
+        public const string CategoryIndexUrl = "https://alphacoders.com/tag/is-category";
+
+        private static readonly object CategoryListLock = new object();
+        private static readonly List<(string Key, string Name)> CategoryList =
+            new List<(string Key, string Name)>();
+
+        public static IReadOnlyList<(string Key, string Name)> Categories
         {
-            ("4k", "4K"),
-            ("abstract", "Abstract"),
-            ("animal", "Animal"),
-            ("anime", "Anime"),
-            ("anime-girl", "Anime Girl"),
-            ("artistic", "Artistic"),
-            ("attack-on-titan", "Attack On Titan"),
-            ("aura-farming", "Aura Farming"),
-            ("badger", "Badger"),
-            ("batman", "Batman"),
-            ("bird", "Bird"),
-            ("black", "Black"),
-            ("black-clover", "Black Clover"),
-            ("bleach", "Bleach"),
-            ("bmw", "BMW"),
-            ("car", "Car"),
-            ("cat", "Cat"),
-            ("celebrity", "Celebrity"),
-            ("city", "City"),
-            ("comic", "Comic"),
-            ("cyberpunk", "Cyberpunk"),
-            ("dark", "Dark"),
-            ("demon-slayer", "Demon Slayer"),
-            ("demon-slayer-kimetsu-no-yaiba", "Demon Slayer Kimetsu No Yaiba"),
-            ("dog", "Dog"),
-            ("fall-leaves", "Fall Leaves"),
-            ("fantasy", "Fantasy"),
-            ("fantasy-anime", "Fantasy Anime"),
-            ("fantasy-city", "Fantasy City"),
-            ("fantasy-girl", "Fantasy Girl"),
-            ("flower", "Flower"),
-            ("food", "Food"),
-            ("ford", "Ford"),
-            ("halloween", "Halloween"),
-            ("harvest", "Harvest"),
-            ("holiday", "Holiday"),
-            ("humor", "Humor"),
-            ("man-made", "Man Made"),
-            ("map-of-the-usa", "Map Of The USA"),
-            ("movie", "Movie"),
-            ("music", "Music"),
-            ("naruto", "Naruto"),
-            ("nature", "Nature"),
-            ("one-piece", "One Piece"),
-            ("photography", "Photography"),
-            ("pokemon", "Pokemon"),
-            ("rain", "Rain"),
-            ("red-dead", "Red Dead"),
-            ("religious", "Religious"),
-            ("satoru-gojo", "Satoru Gojo"),
-            ("sci-fi", "Sci-Fi"),
-            ("soccer", "Soccer"),
-            ("spider-man", "Spider-Man"),
-            ("spooky", "Spooky"),
-            ("sports", "Sports"),
-            ("star-wars", "Star Wars"),
-            ("sword-art-online", "Sword Art Online"),
-            ("technology", "Technology"),
-            ("tom-clancys", "Tom Clancys"),
-            ("tv-show", "TV Show"),
-            ("vehicle", "Vehicle"),
-            ("video-game", "Video Game"),
-            ("woman", "Woman"),
-        };
+            get
+            {
+                lock (CategoryListLock)
+                {
+                    return CategoryList.ToArray();
+                }
+            }
+        }
+
+        public static void SetCategories(IReadOnlyList<(string Key, string Name)> categories)
+        {
+            lock (CategoryListLock)
+            {
+                CategoryList.Clear();
+                CategoryList.AddRange(categories);
+            }
+        }
+
+        // fetch the real category page and parse its <h3> rows: only row headers parse,
+        // so the -phone / pfp / gif cells in those rows never become category cards.
+        public async Task<List<(string Key, string Name)>> GetCategoryIndexAsync()
+        {
+            var html = await _httpClient.GetStringAsync(CategoryIndexUrl);
+            var result = new List<(string Key, string Name)>();
+            var matches = Regex.Matches(
+                html,
+                @"<h3[^>]*>\s*<a[^>]+href=""https://alphacoders\.com/([a-z0-9-]+)""[^>]*>(.*?)</a>",
+                RegexOptions.Singleline);
+
+            foreach (Match m in matches)
+            {
+                var key = m.Groups[1].Value;
+                if (key.EndsWith("-phone", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var raw = Regex.Replace(m.Groups[2].Value, "<[^>]+>", " ");
+                var words = raw.Split(new[] { ' ', '\t', '\r', '\n' },
+                    StringSplitOptions.RemoveEmptyEntries);
+                if (words.Length == 0)
+                {
+                    continue;
+                }
+
+                for (int i = 0; i < words.Length; i++)
+                {
+                    // first letter up, rest of the word untouched ("video game" -> "Video Game",
+                    // the page's own "TV Show" casing survives)
+                    words[i] = char.ToUpperInvariant(words[i][0]) + words[i].Substring(1);
+                }
+
+                result.Add((key, string.Join(" ", words)));
+            }
+
+            return result;
+        }
 
         public static string GetCategoryName(string key)
         {

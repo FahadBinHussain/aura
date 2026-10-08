@@ -135,9 +135,14 @@ extended). key facts the code depends on:
   fetch URLs on it.
 - **alphacoders**: uniform `https://alphacoders.com/<slug>-wallpapers?page=N`
   (`4k` special -> `/resolution/4k-wallpapers`; plain `4k-wallpapers` = 404).
-  the 63-entry catalog lives in `AlphaCodersService.Categories` - the merged
-  grid AND `AlphaCodersGridPage` titles both read it; deep-linked categories
-  leave the 3 quick buttons unselected instead of faking 4K.
+  the category list is LIVE-LOADED from the site's real category page
+  `https://alphacoders.com/tag/is-category` (20 desktop rows; `GetCategoryIndexAsync`
+  + `SetCategories`, same loud contract as backiee - a failed fetch = a loud
+  error line, never a silent empty list) - the merged grid AND
+  `AlphaCodersGridPage` titles both read `AlphaCodersService.Categories`;
+  deep-linked categories leave the 3 quick buttons unselected instead of faking
+  4K. the old 63-entry homepage-curated table was REMOVED 2026-10-08 (see the
+  dated section below).
 - **artstation**: the subject-matter taxonomy is POST + CSRF (anonymous =
   `Invalid CSRF Token`; GET filter params silently ignored - all baselines stay
   47230) => honest **query entries** (wallpaper/landscape/nature/space/abstract)
@@ -288,6 +293,48 @@ HDwallpapers cards (same mode titles), so only **Oldest** adds a card.
 - known limit: the slideshow never opens detail pages, so it shows Artgram's
   512 covers (documented, not silently broken).
 
+## alphacoders categories now live from the real category page (2026-10-08)
+
+user audit: the 63-card AlphaCoders set was derived from the homepage's
+curated slug links, not the site's own category taxonomy. fixed at the source:
+`AlphaCodersService` holds NO static category list now -
+`CategoriesPage.LoadCategoriesAsync` fetches
+`https://alphacoders.com/tag/is-category` (runs alongside the backiee load)
+through `GetCategoryIndexAsync` + `SetCategories` and parses its **20 `<h3>`
+rows** (name = row text, first letter of each word up-cased - "video game" ->
+"Video Game", the page's own "TV Show" casing survives; browse key = the h3
+slug -> `<slug>-wallpapers?page=N`, which is exactly the row's own "Desktop
+Wallpapers" cell href). the `-phone`/pfp/gif cells can never parse (h3-anchored
+regex). fetch failure = a loud error bar line (same contract as backiee), and
+the error bar now also shows under the Local - AlphaCoders scope (visibility
+conditions extended to it).
+
+- counts: per-scope AlphaCoders = **20** (was 63), Global = **110 merged
+  cards** (was 150 - 40 cards were alpha-only legacy names; `Technology`
+  survives via hdwallpapers). the grid page's `4k`/`harvest`/`rain` quick
+  buttons are page chips, not category rows - unaffected (`4k` still resolves
+  to the resolution page).
+- menuless canary: `Batman` is gone (not a real category) - drill **`Vehicle`**
+  for the alpha single-source check. verified menuless twice: 110 cards,
+  20/20 real names on the grid, 0 legacy names, `Vehicle` title + 15 items,
+  bar clean, stable under a 60s watch.
+- one probe run landed on Home/picker after a back; never reproduced in 2
+  full follow-up runs + the 60s watch - logged as observed-once, root cause
+  unknown.
+
+## wallpaper cave thumbs hit an AVIF wall (2026-10-08)
+
+`wallpapercave.com/mwp/<file>` now transcodes to **image/avif
+unconditionally** (`Accept: image/jpeg` does NOT negotiate it back; file magic
+`ftypavif`), and WinUI has no AVIF decoder (its decoder list: TGA/QOI/GIF/
+JPEG/TIFF/PBM/BMP/Webp/PNG) - so every Wallpaper Cave card decode-failed and
+the loud bar showed `Wallpaper Cave category thumbnails: 8/8 failed - Image
+cannot be loaded. Available decoders: ...` at ~35s into every fill. fix =
+`ImageUrl` now uses the site's OWN desktop `<source>`
+`https://wallpapercave.com/dwp1x/<file>` (JPEG, 12/12 verified across 4
+albums); `FullPhotoUrl` stays `/wp/` (JPEG original). re-verified menuless:
+bar clean through the full 60s fill watch.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked
@@ -389,7 +436,7 @@ entries, (2) revert the last XAML edit -> build -> green = the edit is guilty,
 ## deploy (vercel)
 
 - project: `aura`, domain `https://aura2027.vercel.app`. owner account: check
-  `mainframe\vercel-usage-table.ps1` (repo -> profile mapping) - no hardcoded
+  `automata-private\vercel.com\vercel-usage-table.ps1` (repo -> profile mapping) - no hardcoded
   emails here, this repo is PUBLIC.
 - **Root Directory is `web`** -> `vercel link` and `vercel deploy --prod` must
   run from the REPO ROOT, never from `web/` (deploying from inside `web/`
