@@ -8,12 +8,38 @@ A modern wallpaper management and personalization application available in **thr
 - **WPF** - Traditional Windows desktop application  
 - **Python** - Cross-platform GUI with Tkinter
 
-Browse, organize, and apply beautiful wallpapers from multiple sources including Backiee, AlphaCoders, Unsplash, Pexels, and Wallpaper Engine.
+Browse, organize, and apply beautiful wallpapers from **17 supported sites** -
+see [Supported sites](#supported-sites) below, more get added over time.
+
+## Supported sites
+
+Wallpaper sources wired into the WinUI app. New sites land in this table as
+they get ported (17 as of 2026-10-08).
+
+| Site | What Aura browses |
+| --- | --- |
+| [Backiee](https://backiee.com) | 19 categories, tag search, latest feed |
+| [Alpha Coders](https://wall.alphacoders.com) | 63 categories incl. 4K |
+| [Pixabay](https://pixabay.com) | 20 categories (API key in Settings) |
+| [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections |
+| [ArtStation](https://www.artstation.com) | wallpaper / landscape / nature / space / abstract queries |
+| [Pexels](https://www.pexels.com) | curated / nature / space queries (API key in Settings) |
+| [Wallhaven](https://wallhaven.cc) | General / Anime / People |
+| [Bing Wallpaper Archive](https://www.bing.com) | daily homepage wallpapers |
+| [Simple Desktops](https://simpledesktops.com) | minimal desktop sets |
+| [DesktopNexus](https://desktopnexus.com) | All + 15 category galleries |
+| [Digital Blasphemy](https://digitalblasphemy.com) | wallpapers + free set (640x480 preview cap) |
+| [HDwallpapers](https://www.hdwallpapers.net) | latest feed + category listings |
+| [Pixiv](https://www.pixiv.net) | safe-search illustration tags |
+| [Cara](https://cara.app) | explore feed |
+| [Wallpaper Cave](https://wallpapercave.com) | curated albums |
+| [Wallpaper Engine workshop](https://steamcommunity.com/workshop/browse/?appid=431960) | trending / tagged browse (preview resolution) |
+| [Artgram](https://www.artgram.co) | trending / latest / oldest (full resolution on detail open) |
 
 ## 🌟 Features
 
 ### All Implementations
-- **Multiple Wallpaper Sources**: Backiee, AlphaCoders, Unsplash, Pexels, and Wallpaper Engine
+- **Multiple Wallpaper Sources**: 17 sites and counting - see [Supported sites](#supported-sites)
 - **Intelligent Categorization**: Browse wallpapers by collections, AI-generated content, and more
 - **Adaptive Layout**: Responsive grid that adapts to any screen size
 - **Visual Tagging System**: Identify wallpaper qualities (4K, 5K, 8K) and AI-generated content
