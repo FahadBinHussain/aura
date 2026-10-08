@@ -1,6 +1,9 @@
 using System;
 using System.IO;
 using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Aura.Models;
 using Aura.Services;
@@ -57,6 +60,48 @@ namespace Aura.Views.PublicSources
             if (!string.IsNullOrWhiteSpace(imageUrl))
             {
                 WallpaperImage.Source = new BitmapImage(new Uri(imageUrl));
+            }
+
+            // artgram: list pages only carry the presigned 512x512 cover - upgrade to the
+            // original (the artworks/ url exists only on the art's own detail page). the
+            // mutation below feeds GetBestImageUrl, so render, set, and download all flip
+            // to full res together (automata-private/www.artgram.co/AGENTS.md)
+            if (_wallpaper != null &&
+                !string.IsNullOrEmpty(_wallpaper.SourceUrl) &&
+                _wallpaper.SourceUrl.Contains("artgram.co/a/", StringComparison.OrdinalIgnoreCase))
+            {
+                _ = UpgradeArtgramImageAsync();
+            }
+        }
+
+        // the artworks/ url is presigned with a 1h expiry and minted by THIS fetch, so it is
+        // always fresh on success; a failure keeps the cover and says so loudly in the InfoBar
+        private async Task UpgradeArtgramImageAsync()
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0");
+                var html = await client.GetStringAsync(_wallpaper!.SourceUrl);
+                var match = Regex.Match(
+                    html,
+                    "https://fsn1\\.your-objectstorage\\.com/artgram-media/artworks/[^\"'\\s]+",
+                    RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    var fullUrl = WebUtility.HtmlDecode(match.Value);
+                    _wallpaper.FullPhotoUrl = fullUrl;
+                    WallpaperImage.Source = new BitmapImage(new Uri(fullUrl));
+                    ShowStatus("Artgram original image loaded.", InfoBarSeverity.Success);
+                }
+                else
+                {
+                    ShowStatus("Artgram: original not found on the detail page - showing the 512px cover.", InfoBarSeverity.Warning);
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowStatus($"Artgram: full-res fetch failed ({ex.Message}) - showing the 512px cover.", InfoBarSeverity.Warning);
             }
         }
 

@@ -233,15 +233,15 @@ per-site reversal evidence + curl recipes live in
   exception, clean bar. the parse harness missed it by mirroring patterns;
   the check that works is decoding the `@"..."` literal out of the C# SOURCE
   (`""` -> `"`) and asserting IsMatch against a captured body.
-- the other 10 listed platforms stay unimplemented ON PURPOSE: 8 are
+- the other 9 listed platforms stay unimplemented ON PURPOSE: 7 are
   WAF/anti-bot-walled (Dribbble, Newgrounds, Peakpx, CGSociety, Behance,
-  Artgram, ArtFol, CharacterDesignReferences) and 2 need credentials (Unsplash
+  ArtFol, CharacterDesignReferences) and 2 need credentials (Unsplash
   = API key with hosting-terms caveat, DeviantArt = OAuth). the dead 2 were
-  dropped from the list (see above). the picker dialog text derives from
+  dropped from the list (see above), and Artgram left this list the same day
+  (see the Artgram section below). the picker dialog text derives from
   SupportedPlatforms, so it always matches reality.
 - verification recipe (menuless, zero focus steal, ~9 min):
-  `C:\tmp\aura-platformcheck.ps1` (probes stay in C:\tmp, never committed).
-  it: waits for a window handle that HOSTS UIA text and is still the main
+  `C:\tmp\aura-platformcheck.ps1` (probes stay in C:\tmp, never committed).  it: waits for a window handle that HOSTS UIA text and is still the main
   window (the splash/transient window hands you a stale handle whose tree
   reads empty forever), drills the picker for Pixiv via a 900x3600 resize
   (the picker's ItemsRepeater realizes only the visible 16/28 otherwise),
@@ -255,6 +255,38 @@ per-site reversal evidence + curl recipes live in
   items>=5 per drill, bar clean, cards>=100. the known open silent death
   (exit=0) fired on 2 of 7 runs - paced re-runs pass; root cause still open
   (see the menuless section below).
+
+## 17th platform: Artgram, reversed + ported (2026-10-08, same day)
+
+Artgram had been triaged as WAF-blocked - that was wrong: a live re-probe found
+the gallery fully anonymous-reachable (reversal + curl recipes in
+`automata-private/www.artgram.co/AGENTS.md`). ported as platform **17**; all
+derived lists (picker dialog, categories, drill routing) follow
+SupportedPlatforms automatically. Global categories = **150 merged cards**:
+Artgram's Trending and Latest MERGE into the existing Wallpaper Engine /
+HDwallpapers cards (same mode titles), so only **Oldest** adds a card.
+
+- images: `fsn1.your-objectstorage.com` presigned urls, 1h expiry, minted per
+  page render - covers (512x512) go on the grid and FullPhotoUrl; opening an
+  item runs `PublicWallpaperDetailPage.UpgradeArtgramImageAsync()`, which
+  refetches the art's detail page, swaps FullPhotoUrl to the artworks/
+  original (render/set/download all flip together via GetBestImageUrl) and
+  posts `Artgram original image loaded.` - failure keeps the cover and posts
+  the reason as a Warning InfoBar. public-source items open the PUBLIC detail
+  page (`Views/PublicSources/PublicWallpaperDetailPage`) - the AlphaCoders
+  `WallpaperDetailPage` never sees artgram items (its DebugBigThumbTextBlock
+  hook read ABSENT in the first verify run for exactly that reason).
+- **verification recipe impact**: `aura-platformcheck.ps1`'s drill list
+  `Explore, Trending, Soulslike, All, Free, Latest` is no longer chooser-free -
+  Trending now has 2 sources (Wallpaper Engine + Artgram) and Latest 2
+  (HDwallpapers + Artgram): clicking either would OPEN the chooser MenuFlyout
+  (forbidden while the user works). swap both for `Oldest` (Artgram-only) in
+  future full runs. verified menuless the same day: cards=150, Oldest drill
+  items=20 (viewport-realized; grid is virtualized) title=`Artgram` bar clean,
+  detail upgrade Success line exact, both backs OK, 90s fill clean, focus
+  restored.
+- known limit: the slideshow never opens detail pages, so it shows Artgram's
+  512 covers (documented, not silently broken).
 
 ## focus-free verification: menuless protocol (2026-10-07)
 

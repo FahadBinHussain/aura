@@ -26,6 +26,7 @@ namespace Aura.Services
         private const string Cara = "Cara";
         private const string WallpaperCave = "Wallpaper Cave";
         private const string WallpaperEngine = "Wallpaper Engine";
+        private const string Artgram = "Artgram";
 
         // pixabay's documented category values (https://pixabay.com/api/docs/, "category str" row)
         private static readonly string[] PixabayCategories =
@@ -145,6 +146,13 @@ namespace Aura.Services
             "Trending", "Scene", "Anime", "3D", "Video", "Interactive", "Audio Responsive"
         };
 
+        // artgram: the livewire gallery's own sortBy values via GET ?sortBy= (default = trending),
+        // 50 cards/page (automata-private/www.artgram.co/AGENTS.md)
+        private static readonly string[] ArtgramModes =
+        {
+            "Trending", "Latest", "Oldest"
+        };
+
         private static readonly HashSet<string> SupportedPlatforms = new(StringComparer.OrdinalIgnoreCase)
         {
             Wallhaven,
@@ -159,7 +167,8 @@ namespace Aura.Services
             Pixiv,
             Cara,
             WallpaperCave,
-            WallpaperEngine
+            WallpaperEngine,
+            Artgram
         };
 
         private readonly HttpClient _httpClient;
@@ -206,6 +215,7 @@ namespace Aura.Services
                 Cara => new[] { "Explore" },
                 WallpaperCave => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
                 WallpaperEngine => WallpaperEngineModes,
+                Artgram => ArtgramModes,
                 _ => Array.Empty<string>()
             };
         }
@@ -233,6 +243,7 @@ namespace Aura.Services
                 Cara => "Explore feed from the Cara art community's server-rendered page.",
                 WallpaperCave => "Curated albums from Wallpaper Cave (single-shot album pages).",
                 WallpaperEngine => "Wallpaper Engine's Steam Workshop browse pages with public preview images.",
+                Artgram => "Trending, latest, and oldest gallery feeds from the Artgram art community (50 cards per page).",
                 _ => "Browse wallpapers from this source."
             };
         }
@@ -260,6 +271,7 @@ namespace Aura.Services
                 Cara => await GetCaraWallpapersAsync(page, mode, cancellationToken),
                 WallpaperCave => await GetWallpaperCaveWallpapersAsync(page, mode, cancellationToken),
                 WallpaperEngine => await GetWallpaperEngineWallpapersAsync(page, mode, cancellationToken),
+                Artgram => await GetArtgramWallpapersAsync(page, mode, cancellationToken),
                 _ => throw new NotSupportedException($"{platformName} is not implemented yet.")
             };
         }
@@ -1022,6 +1034,64 @@ namespace Aura.Services
                     Downloads = string.Empty,
                     Resolution = resolution,
                     QualityTag = GetQualityTag(resolution),
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // artgram: livewire "gallery" at / with GET ?sortBy=trending|latest|oldest + ?page=N (50
+        // cards). cards carry title + artist + a presigned 512x512 fsn1 cover inline - the
+        // X-Amz-Expires=3600 urls are minted per page request, so they must never be cached
+        // across sessions. originals only exist on the detail page: FullPhotoUrl keeps the cover
+        // and WallpaperDetailPage upgrades it to the original on demand
+        // (automata-private/www.artgram.co/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetArtgramWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            var sort = mode?.Trim().ToLowerInvariant() switch
+            {
+                "latest" => "latest",
+                "oldest" => "oldest",
+                _ => "trending"
+            };
+
+            var url = $"https://www.artgram.co/?sortBy={sort}" + (page > 1 ? $"&page={page}" : string.Empty);
+            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var matches = Regex.Matches(
+                html,
+                "<a x-data=\"\" wire:key=\"\\d+\"[^>]*href=\"https://www\\.artgram\\.co/a/(?<slug>[A-Za-z0-9-]+)\"[^>]*>.*?<div class=\"text-sm font-semibold\">(?<title>[^<]*)</div>\\s*<div class=\"text-xs font-medium mt-1\">(?<artist>[^<]*)</div>.*?<img[^>]*src=\"(?<img>https://fsn1\\.your-objectstorage\\.com[^\"]+)\"",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match match in matches)
+            {
+                var slug = match.Groups["slug"].Value;
+                if (!seen.Add(slug))
+                {
+                    continue;
+                }
+
+                var title = WebUtility.HtmlDecode(match.Groups["title"].Value).Trim();
+                var artist = WebUtility.HtmlDecode(match.Groups["artist"].Value).Trim();
+                var cover = WebUtility.HtmlDecode(match.Groups["img"].Value);
+                if (title.Length == 0)
+                {
+                    title = slug;
+                }
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = slug,
+                    Title = title,
+                    Description = artist.Length > 0 ? $"Artgram \u00b7 {artist}" : "Artgram artwork",
+                    ImageUrl = cover,
+                    FullPhotoUrl = cover, // 512x512 cover; WallpaperDetailPage upgrades to the original
+                    SourceUrl = $"https://www.artgram.co/a/{slug}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
                     IsAI = false
                 });
             }
