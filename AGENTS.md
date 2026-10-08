@@ -185,7 +185,12 @@ extended). key facts the code depends on:
     alpha 0/63 failed, 0 duplicates except one honest source overlap -
     `animal` and `cat` pages serve the SAME first thumb
     (`thumbbig-20658.webp`, curl-verified), so those two cards legitimately
-    show one photo.
+    show one photo. second instance (2026-10-08): pixabay `people` and
+    `travel` both serve photo id `10506740` first (identical bytes, verified
+    live) - pixabay's per-request random url prefix makes the first-hit URLs
+    LOOK different while serving the same image, so compare hit ids (or file
+    hashes), never url strings. duplicate thumbs are honest source overlap,
+    not a cache bug, unless hit ids differ.
 
 ## focus-free verification: menuless protocol (2026-10-07)
 
