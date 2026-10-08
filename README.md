@@ -1,4 +1,4 @@
-﻿# Aura
+# Aura
 <img src="https://wakapi-qt1b.onrender.com/api/badge/fahad/interval:any/project:Aura" 
      alt="Wakapi Time Tracking" 
      title="Time spent on this project">
@@ -43,39 +43,7 @@ is the code - mode tables + fetchers).
 
 - **backiee** - https://backiee.com/categories (19 slugs parse from there) ·
   drill `https://backiee.com/api/wallpaper/list.php?action=paging_list&category=<slug>`
-- **alphacoders** - master list of category tags: https://alphacoders.com/tag/is-category ·
-  https://alphacoders.com/resolution/4k-wallpapers ·
-  https://alphacoders.com/abstract-wallpapers · https://alphacoders.com/animal-wallpapers ·
-  https://alphacoders.com/anime-wallpapers · https://alphacoders.com/anime-girl-wallpapers ·
-  https://alphacoders.com/artistic-wallpapers · https://alphacoders.com/attack-on-titan-wallpapers ·
-  https://alphacoders.com/aura-farming-wallpapers · https://alphacoders.com/badger-wallpapers ·
-  https://alphacoders.com/batman-wallpapers · https://alphacoders.com/bird-wallpapers ·
-  https://alphacoders.com/black-wallpapers · https://alphacoders.com/black-clover-wallpapers ·
-  https://alphacoders.com/bleach-wallpapers · https://alphacoders.com/bmw-wallpapers ·
-  https://alphacoders.com/car-wallpapers · https://alphacoders.com/cat-wallpapers ·
-  https://alphacoders.com/celebrity-wallpapers · https://alphacoders.com/city-wallpapers ·
-  https://alphacoders.com/comic-wallpapers · https://alphacoders.com/cyberpunk-wallpapers ·
-  https://alphacoders.com/dark-wallpapers · https://alphacoders.com/demon-slayer-wallpapers ·
-  https://alphacoders.com/demon-slayer-kimetsu-no-yaiba-wallpapers · https://alphacoders.com/dog-wallpapers ·
-  https://alphacoders.com/fall-leaves-wallpapers · https://alphacoders.com/fantasy-wallpapers ·
-  https://alphacoders.com/fantasy-anime-wallpapers · https://alphacoders.com/fantasy-city-wallpapers ·
-  https://alphacoders.com/fantasy-girl-wallpapers · https://alphacoders.com/flower-wallpapers ·
-  https://alphacoders.com/food-wallpapers · https://alphacoders.com/ford-wallpapers ·
-  https://alphacoders.com/halloween-wallpapers · https://alphacoders.com/harvest-wallpapers ·
-  https://alphacoders.com/holiday-wallpapers · https://alphacoders.com/humor-wallpapers ·
-  https://alphacoders.com/man-made-wallpapers · https://alphacoders.com/map-of-the-usa-wallpapers ·
-  https://alphacoders.com/movie-wallpapers · https://alphacoders.com/music-wallpapers ·
-  https://alphacoders.com/naruto-wallpapers · https://alphacoders.com/nature-wallpapers ·
-  https://alphacoders.com/one-piece-wallpapers · https://alphacoders.com/photography-wallpapers ·
-  https://alphacoders.com/pokemon-wallpapers · https://alphacoders.com/rain-wallpapers ·
-  https://alphacoders.com/red-dead-wallpapers · https://alphacoders.com/religious-wallpapers ·
-  https://alphacoders.com/satoru-gojo-wallpapers · https://alphacoders.com/sci-fi-wallpapers ·
-  https://alphacoders.com/soccer-wallpapers · https://alphacoders.com/spider-man-wallpapers ·
-  https://alphacoders.com/spooky-wallpapers · https://alphacoders.com/sports-wallpapers ·
-  https://alphacoders.com/star-wars-wallpapers · https://alphacoders.com/sword-art-online-wallpapers ·
-  https://alphacoders.com/technology-wallpapers · https://alphacoders.com/tom-clancys-wallpapers ·
-  https://alphacoders.com/tv-show-wallpapers · https://alphacoders.com/vehicle-wallpapers ·
-  https://alphacoders.com/video-game-wallpapers · https://alphacoders.com/woman-wallpapers
+- **alphacoders** - https://alphacoders.com/tag/is-category
 - **pixabay** - `https://pixabay.com/api/?key=KEY&image_type=photo&orientation=horizontal&safesearch=true&category=<value>&page=1&per_page=30`
   with values: backgrounds, fashion, nature, science, education, feelings, health, people,
   religion, places, animals, industry, computer, food, sports, transportation, travel,
