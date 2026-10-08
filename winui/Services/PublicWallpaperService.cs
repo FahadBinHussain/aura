@@ -28,14 +28,128 @@ namespace Aura.Services
         private const string WallpaperEngine = "Wallpaper Engine";
         private const string Artgram = "Artgram";
 
-        // pixabay's documented category values (https://pixabay.com/api/docs/, "category str" row)
-        private static readonly string[] PixabayCategories =
+        // pixabay categories = the site's curated Collections index
+        // (https://pixabay.com/collections/ - 2 pages: pagi=1 = 40 + pagi=2 = 23 = 63
+        // collections; TRAP: ?pagi>=3 silently WRAPS to page 1, so the index loader
+        // stops at the first page with no NEW slugs). live-loaded by the Categories
+        // page (GetPixabayCollectionsIndexAsync + SetPixabayCollections), same loud
+        // contract as backiee/alphacoders - NO static list, a failed fetch = a loud
+        // error line, never a silent empty list. cards and tiles both come from the
+        // collection's own page, fetched through CurlClient (like cara - Cloudflare 403s
+        // .NET's TLS fingerprint) with Sec-Fetch-Mode: navigate + Sec-Fetch-Site: none
+        // REQUIRED on every request (bare UA = 403 even through curl); a challenge
+        // page ("Just a moment" - rapid-fire requests trip it) is a thrown error ->
+        // the loud bar, never an empty grid. tile = cdn __340.jpg, full = _1280.jpg
+        // (single underscore - __1280/__640 = 403). the old API category list is gone:
+        // the API cannot filter by collection. (automata-private/pixabay.com/AGENTS.md)
+        private static readonly object PixabayCollectionsLock = new object();
+        private static readonly List<(string Name, string Slug)> PixabayCollectionList =
+            new List<(string Name, string Slug)>();
+
+        public static IReadOnlyList<(string Name, string Slug)> PixabayCollections
         {
-            "Backgrounds", "Fashion", "Nature", "Science", "Education", "Feelings",
-            "Health", "People", "Religion", "Places", "Animals", "Industry",
-            "Computer", "Food", "Sports", "Transportation", "Travel", "Buildings",
-            "Business", "Music"
+            get
+            {
+                lock (PixabayCollectionsLock)
+                {
+                    return PixabayCollectionList.ToArray();
+                }
+            }
+        }
+
+        public static void SetPixabayCollections(IReadOnlyList<(string Name, string Slug)> collections)
+        {
+            lock (PixabayCollectionsLock)
+            {
+                PixabayCollectionList.Clear();
+                PixabayCollectionList.AddRange(collections);
+            }
+        }
+
+        // walk the collections index page by page: page 1 = the bare url, then ?pagi=N.
+        // stops at the first page that yields no NEW slugs (the index wraps ?pagi>=3
+        // back to page 1 - a pure "stop when empty" loop would spin there forever).
+        public async Task<List<(string Name, string Slug)>> GetPixabayCollectionsIndexAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var result = new List<(string Name, string Slug)>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int page = 1; page <= 10; page++)
+            {
+                var url = page == 1
+                    ? "https://pixabay.com/collections/"
+                    : $"https://pixabay.com/collections/?pagi={page}";
+                var html = await GetPixabayHtmlAsync(url, cancellationToken);
+                var rows = ParsePixabayCollectionRows(html);
+                int added = 0;
+                foreach (var row in rows)
+                {
+                    if (seen.Add(row.Slug))
+                    {
+                        result.Add(row);
+                        added++;
+                    }
+                }
+
+                if (added == 0)
+                {
+                    return result;
+                }
+            }
+
+            throw new InvalidOperationException(
+                "pixabay collections index did not end within 10 pages - refusing to ship a truncated category list.");
+        }
+
+        private static List<(string Name, string Slug)> ParsePixabayCollectionRows(string html)
+        {
+            var result = new List<(string Name, string Slug)>();
+            var matches = Regex.Matches(
+                html,
+                @"<a href=""/collections/(?<slug>[a-z0-9-]+-\d+)/"">(.*?)<span>(?<name>[^<]+)</span>",
+                RegexOptions.Singleline);
+
+            foreach (Match m in matches)
+            {
+                var name = WebUtility.HtmlDecode(m.Groups["name"].Value).Trim();
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+
+                result.Add((name, m.Groups["slug"].Value));
+            }
+
+            return result;
+        }
+
+        // the two Sec-Fetch-* headers pixabay's Cloudflare edge REQUIRES on top of any
+        // browser-ish UA - a plain curl GET = 403 (verified live 2026-10-08).
+        private static readonly string[] PixabaySecFetchHeaders =
+        {
+            "Sec-Fetch-Mode: navigate",
+            "Sec-Fetch-Site: none"
         };
+
+        // the only sanctioned pixabay html fetch - through CurlClient, same as cara:
+        // Cloudflare 403s .NET's TLS fingerprint on pixabay's HTML pages even with perfect
+        // browser headers (identical request passes through curl.exe and 403s through
+        // SocketsHttpHandler - verified side by side 2026-10-08), and the app cannot solve
+        // a Turnstile challenge. curl's --fail makes a block/challenge status throw with
+        // exit code + stderr (loud bar); a 200 challenge body is caught below.
+        private async Task<string> GetPixabayHtmlAsync(string url, CancellationToken cancellationToken)
+        {
+            var html = await CurlClient.GetStringAsync(url, cancellationToken, PixabaySecFetchHeaders);
+
+            if (html.Contains("Just a moment", StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Cloudflare challenged {url} (rapid-fire requests trip it) - the next Categories open or grid scroll retries.");
+            }
+
+            return html;
+        }
 
         // wallpaperhub's 17 collections (title is the browse key; id is the page path)
         private static readonly (string Title, string Id)[] WallpaperHubCollections =
@@ -203,7 +317,7 @@ namespace Aura.Services
                 Wallhaven => new[] { "General", "Anime", "People" },
                 // pexels' API has no taxonomy - query modes are all it offers (automata www.pexels.com/AGENTS.md)
                 Pexels => new[] { "Curated", "Nature", "Space" },
-                Pixabay => PixabayCategories,
+                Pixabay => PixabayCollections.Select(collection => collection.Name).ToArray(),
                 WallpaperHub => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
                 // bing/simpledesktops have no taxonomy at all - one honest entry each (their AGENTS.md)
                 Bing => new[] { "Daily" },
@@ -235,7 +349,7 @@ namespace Aura.Services
                 SimpleDesktops => "Minimal, distraction-free wallpapers from Simple Desktops.",
                 WallpaperHub => "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
                 Pexels => "Free stock photos via the official Pexels API. Add a Pexels API key in Settings.",
-                Pixabay => "Royalty-free images via the official Pixabay API. Add a Pixabay API key in Settings.",
+                Pixabay => "Pixabay's curated collections, live from pixabay.com/collections (no key needed).",
                 DesktopNexus => "15 category galleries plus All from Desktop Nexus's public browse pages.",
                 DigitalBlasphemy => "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
                 Hdwallpapers => "Latest feed plus 25 category listings from HDwallpapers.net.",
@@ -560,53 +674,50 @@ namespace Aura.Services
             return wallpapers;
         }
 
+        // tiles = the collection's own page (scraped - the API cannot filter by
+        // collection, so it is gone from this path entirely). mode = the collection
+        // NAME, resolved against the live-loaded list; a name with no slug = loud
+        // throw (the index fetch failed - no silent empty grid, no stale default).
         private async Task<List<WallpaperItem>> GetPixabayWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
-            var apiKey = ApiKeySettingsService.GetPixabayApiKey();
-            if (string.IsNullOrWhiteSpace(apiKey))
+            var slug = PixabayCollections
+                .FirstOrDefault(collection => collection.Name.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Slug;
+            if (string.IsNullOrEmpty(slug))
             {
-                throw new InvalidOperationException("Pixabay support needs a Pixabay API key. Add it in Settings > API Keys, then try again.");
+                throw new InvalidOperationException($"No pixabay collection named '{mode}' is loaded - the collections index fetch failed, so this grid cannot honestly fetch anything.");
             }
 
-            // every mode maps to a documented category value; unknown/empty -> docs default
-            var category = PixabayCategories.Contains(mode, StringComparer.OrdinalIgnoreCase)
-                ? mode.ToLowerInvariant()
-                : "backgrounds";
-
-            var url = $"https://pixabay.com/api/?key={Uri.EscapeDataString(apiKey)}&image_type=photo&orientation=horizontal&safesearch=true&category={category}&page={page}&per_page=30";
-            var json = await _httpClient.GetStringAsync(url, cancellationToken);
+            var url = $"https://pixabay.com/collections/{slug}/?pagi={page}";
+            var html = await GetPixabayHtmlAsync(url, cancellationToken);
             var wallpapers = new List<WallpaperItem>();
 
-            using var document = JsonDocument.Parse(json);
-            if (!document.RootElement.TryGetProperty("hits", out var hitsElement) || hitsElement.ValueKind != JsonValueKind.Array)
-            {
-                return wallpapers;
-            }
+            var matches = Regex.Matches(
+                html,
+                "<div id=\"item-\\d+\" data-pk=\"(?<id>\\d+)\" class=\"item\">\\s*<a href=\"(?<href>/(?:photos|illustrations)/[^\\\"]+)\">\\s*<img[^>]+src=\"(?<img>https://cdn\\.pixabay\\.com/photo/[^\\\"]+__340\\.jpg)\"[^>]+alt=\"(?<alt>[^\\\"]*)\"",
+                RegexOptions.Singleline);
 
-            foreach (var hit in hitsElement.EnumerateArray())
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (Match match in matches)
             {
-                var id = GetString(hit, "id");
-                var tags = GetString(hit, "tags", "Pixabay photo");
-                var user = GetString(hit, "user", "Pixabay contributor");
-                var preview = GetString(hit, "webformatURL");
-                var full = GetString(hit, "largeImageURL", preview);
-                var sourceUrl = GetString(hit, "pageURL");
-                var width = GetString(hit, "imageWidth");
-                var height = GetString(hit, "imageHeight");
-                var resolution = !string.IsNullOrWhiteSpace(width) && !string.IsNullOrWhiteSpace(height) ? $"{width}x{height}" : string.Empty;
+                var id = match.Groups["id"].Value;
+                if (!seen.Add(id))
+                {
+                    continue;
+                }
 
+                var preview = match.Groups["img"].Value;
                 wallpapers.Add(new WallpaperItem
                 {
                     Id = id,
-                    Title = ToTitleCase(tags.Split(',').FirstOrDefault()?.Trim() ?? "Pixabay photo"),
-                    Description = $"Photo by {user} on Pixabay. Tags: {tags}",
+                    Title = WebUtility.HtmlDecode(match.Groups["alt"].Value).Trim(),
+                    Description = "Pixabay collection item",
                     ImageUrl = preview,
-                    FullPhotoUrl = full,
-                    SourceUrl = sourceUrl,
-                    Likes = GetString(hit, "likes", "0"),
-                    Downloads = GetString(hit, "downloads", "0"),
-                    Resolution = resolution,
-                    QualityTag = GetQualityTag(resolution),
+                    // __340 preview -> _1280 original (single underscore; __1280 = 403)
+                    FullPhotoUrl = preview.Replace("__340", "_1280"),
+                    SourceUrl = $"https://pixabay.com{WebUtility.HtmlDecode(match.Groups["href"].Value)}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
                     IsAI = false
                 });
             }

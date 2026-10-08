@@ -78,7 +78,7 @@
                                        FontSize="14"
                                        FontWeight="Medium"
                                        Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
-                            <TextBlock Text="Pexels and Pixabay require free API keys before Aura can load those platform pages. Keys are stored in local app data on this device."
+                            <TextBlock Text="Pexels requires a free API key before Aura can load its platform page. Keys are stored in local app data on this device."
                                        FontSize="12"
                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                                        TextWrapping="Wrap"/>
@@ -91,15 +91,6 @@
                                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
                                 <PasswordBox x:Name="PexelsApiKeyBox"
                                              PlaceholderText="Paste Pexels API key"
-                                             PasswordRevealMode="Peek"/>
-                            </StackPanel>
-
-                            <StackPanel Spacing="4">
-                                <TextBlock Text="Pixabay API key"
-                                           FontSize="12"
-                                           Foreground="{ThemeResource TextFillColorSecondaryBrush}"/>
-                                <PasswordBox x:Name="PixabayApiKeyBox"
-                                             PlaceholderText="Paste Pixabay API key"
                                              PasswordRevealMode="Peek"/>
                             </StackPanel>
                         </StackPanel>

@@ -20,7 +20,7 @@ they get ported (17 as of 2026-10-08).
 | --- | --- |
 | [Backiee](https://backiee.com) | 19 categories, tag search, latest feed |
 | [Alpha Coders](https://wall.alphacoders.com) | 24 categories, live from the site's category index |
-| [Pixabay](https://pixabay.com) | 20 categories (API key in Settings) |
+| [Pixabay](https://pixabay.com) | 63 curated collections (live) |
 | [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections |
 | [ArtStation](https://www.artstation.com) | wallpaper / landscape / nature / space / abstract queries |
 | [Pexels](https://www.pexels.com) | curated / nature / space queries (API key in Settings) |
@@ -44,10 +44,9 @@ is the code - mode tables + fetchers).
 - **backiee** - https://backiee.com/categories (19 slugs parse from there) ·
   drill `https://backiee.com/api/wallpaper/list.php?action=paging_list&category=<slug>`
 - **alphacoders** - https://alphacoders.com/tag/is-category
-- **pixabay** - `https://pixabay.com/api/?key=KEY&image_type=photo&orientation=horizontal&safesearch=true&category=<value>&page=1&per_page=30`
-  with values: backgrounds, fashion, nature, science, education, feelings, health, people,
-  religion, places, animals, industry, computer, food, sports, transportation, travel,
-  buildings, business, music
+- **pixabay** - https://pixabay.com/collections/ (63 collections, paginated
+  `?pagi=N`; fetched through the OS `curl.exe` - Cloudflare 403s .NET's TLS
+  fingerprint on the HTML pages)
 - **wallpaperhub** - https://www.wallpaperhub.app/collections/9280 · https://www.wallpaperhub.app/collections/7716 ·
   https://www.wallpaperhub.app/collections/7058 · https://www.wallpaperhub.app/collections/5472 ·
   https://www.wallpaperhub.app/collections/1274 · https://www.wallpaperhub.app/collections/6292 ·

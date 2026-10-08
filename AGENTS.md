@@ -125,8 +125,9 @@ extended). key facts the code depends on:
   `001`->people) -> modes General/Anime/People; legacy Latest/Random/Toplist
   still resolve with 111. the mode switch is lowercased (slideshow passes
   lowercase modes).
-- **pixabay**: 20 documented category values (docs `category str` row) =
-  `PixabayCategories`; every mode maps lowercased-or-default `backgrounds`.
+- **pixabay**: categories = the site's curated Collections index, live-loaded
+  (see the dated section below) - the old 20-API-category list, the API calls,
+  and the API key requirement are GONE.
 - **wallpaperhub**: 17 collections (id+title) = `WallpaperHubCollections`; a
   mode that matches a collection title routes to `/collections/<id>` and parses
   `pageProps.collectionWallpapers` (identical `{entity:...}` wrappers as
@@ -184,7 +185,8 @@ extended). key facts the code depends on:
     coalesce to `<Type> hresult=0x<code>` so the bar can never go blank.
   - loud contract: the bar lists EVERY platform with >= 1 failed card as
     `<platform> category thumbnails: <n>/<total> failed - <first reason>`; a
-    keyless install shows exactly 2 lines (Pexels + Pixabay API keys). the
+    keyless install shows exactly 1 line (the Pexels API key - pixabay needs no
+    key since the 2026-10-08 collections rework). the
     fill failure paths never touch the session cache, so the next Categories
     open retries them. verified menuless + vision on the local build
     (2026-10-07): the complaint cards `Aura Farming..Cyberpunk` all real,
@@ -340,6 +342,49 @@ cannot be loaded. Available decoders: ...` at ~35s into every fill. fix =
 `https://wallpapercave.com/dwp1x/<file>` (JPEG, 12/12 verified across 4
 albums); `FullPhotoUrl` stays `/wp/` (JPEG original). re-verified menuless:
 bar clean through the full 60s fill watch.
+
+## pixabay categories re-sourced to the real collections page (2026-10-08)
+
+user audit: pixabay's 20 "categories" were the API's filter values (docs
+`category str` row), not the site's own browsable categories. the real surface
+= `https://pixabay.com/collections/` ("Curated Collections" by Pixabay) -
+**63 collections** over 2 pages (`?pagi=1` = 40 + `?pagi=2` = 23; TRAP:
+`?pagi>=3` SILENTLY WRAPS to page 1 - the pager on page 2 even links to
+`?pagi=3` - so `GetPixabayCollectionsIndexAsync` stops at the first page with
+no NEW slugs, hard cap 10 + thrown error past it). `CategoriesPage`
+live-loads it (runs alongside the alpha + backiee loads) via
+`SetPixabayCollections`, same loud contract, error-bar visibility extended to
+the Local - Pixabay scope; the drill fetcher scrapes each collection's own
+page (`?pagi=N`, ~15 tiles; `data-pk` id, img `alt` as title, `__340.jpg`
+tile -> `_1280.jpg` full - SINGLE underscore, `__1280`/`__640`/bare = 403).
+
+- **the API is GONE from the pixabay path** (it cannot filter by collection):
+  pixabay needs NO API key anymore. the Settings key box was removed (saving
+  now clears any legacy stored key via the empty second slot), the keyless
+  bar-line count drops to exactly 1 (Pexels), `GetDescription` and the README
+  say so.
+- **transport = curl, like cara**: Cloudflare fingerprints the TLS client -
+  the SAME headers pass through curl.exe and 403 through SocketsHttpHandler
+  (http/1.1 `RequestVersionExact` included), so html fetches route through
+  `CurlClient.GetStringAsync` with `Sec-Fetch-Mode: navigate` +
+  `Sec-Fetch-Site: none` REQUIRED (plain curl = 403; the `... Aura/1.0` UA
+  passes with them). the CDN (cdn.pixabay.com) and `/api/` pass .NET - only
+  the HTML pages route through curl.
+- **Cloudflare rate-limits rapid pixabay fetches** (~4+ back to back = 403
+  challenge, loud as curl exit 22 in the bar, retried next open - failures
+  are never cached): the thumb fill got its own `PixabayThumbGate = 1` (like
+  alpha's) and the full 61-card pixabay fill then ran 0 challenges.
+- counts: per-scope Pixabay = **63** (was 20), Global = **159 merged cards**
+  (was 113; collection names like Food/Fashion/Sports merge with other
+  platforms' cards, adding 46 net). public-grid drill titles stay the
+  PLATFORM name (`Pixabay`), not the collection name.
+- menuless canary: `Halloween` (pixabay-only; 15-item drill, alt-text
+  captions render). verified menuless 2026-10-08 (probe
+  `C:\tmp\aura-pixabaycollectioncheck.ps1`): 159 cards, 14/14 sampled
+  collection names, 0 old API-category names, Halloween + alpha `Vehicle`
+  drills OK, bar clean through the whole fill + a 90s watch, no flip. vision
+  (zengate, `C:\tmp\zengate-vision.ps1`): real Halloween artwork tiles, no
+  broken/placeholder tiles.
 
 ## focus-free verification: menuless protocol (2026-10-07)
 

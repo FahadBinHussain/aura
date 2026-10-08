@@ -56,7 +56,11 @@ namespace Aura.Views.Backiee
         // AlphaCoders only: its service keeps the scrape cache in STATIC fields that are
         // not thread-safe, so its fills run strictly one at a time (the grid page's proven
         // mode) - concurrent fills raced the shared list and returned empty cards.
+        // alpha's static scrape cache needs 1-wide; pixabay's Cloudflare rate-limits rapid
+        // fetches (a 4-wide fill tripped challenge 403s on 3/61 cards, live 2026-10-08) -
+        // its collection pages get their own 1-wide gate for natural pacing.
         private static readonly SemaphoreSlim AlphaCodersThumbGate = new(1);
+        private static readonly SemaphoreSlim PixabayThumbGate = new(1);
 
         // one category as it exists on a single platform (what a drill-down needs)
         public sealed class CategorySourceRef
@@ -149,6 +153,27 @@ namespace Aura.Views.Backiee
             catch (Exception ex)
             {
                 errors.Add($"Couldn't load alphacoders categories: {ex.Message}");
+            }
+
+            // pixabay: its curated Collections index is the source (live load, same
+            // loud contract - the API category list is gone; the index wraps
+            // ?pagi>=3 back to page 1, the loader stops on the first page with no
+            // new slugs)
+            try
+            {
+                var pixabayCollections = await new PublicWallpaperService().GetPixabayCollectionsIndexAsync();
+                if (pixabayCollections.Count == 0)
+                {
+                    errors.Add("pixabay returned no collections - the /collections/ markup may have changed.");
+                }
+                else
+                {
+                    PublicWallpaperService.SetPixabayCollections(pixabayCollections);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Couldn't load pixabay collections: {ex.Message}");
             }
 
             try
@@ -254,7 +279,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders")
+                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay")
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -280,7 +305,9 @@ namespace Aura.Views.Backiee
 
             // pick the gate: AlphaCoders must run alone (static scrape cache), everything
             // else got fresh service instances and shares the bounded 4-wide gate
-            var gate = source.Platform == "AlphaCoders" ? AlphaCodersThumbGate : CategoryThumbGate;
+            var gate = source.Platform == "AlphaCoders" ? AlphaCodersThumbGate
+                : source.Platform == "Pixabay" ? PixabayThumbGate
+                : CategoryThumbGate;
             await gate.WaitAsync();
             try
             {
@@ -405,7 +432,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders"))
+            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay"))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;

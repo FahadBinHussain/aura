@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -11,18 +12,22 @@ namespace Aura.Services
     // curl-only HTTP transport for hosts that block .NET's TLS fingerprint: cara.app and
     // images.cara.app return 403 to SocketsHttpHandler (SChannel ClientHello, http/1.1 and
     // http/2 both) while curl.exe from the same machine passes - verified live 2026-10-08.
+    // pixabay.com's HTML pages (collections index + collection pages) join that set - same
+    // day, same proof shape: identical headers pass through curl and 403 through .NET (its
+    // CDN and /api/ pass .NET, so only the HTML pages route here; pixabay additionally
+    // requires the two Sec-Fetch-* headers passed as extraHeaders - plain curl = 403).
     // this is NOT a fallback: these hosts only ever go through curl here, and a failure is
     // loud - curl exit != 0 (incl. --fail exit 22 on any 4xx/5xx) throws with stderr attached,
     // which surfaces as the page's StatusInfoBar / the category-thumbnail bar line.
     internal static class CurlClient
     {
-        public static async Task<string> GetStringAsync(string url, CancellationToken cancellationToken = default)
+        public static async Task<string> GetStringAsync(string url, CancellationToken cancellationToken = default, IReadOnlyList<string> extraHeaders = null)
         {
-            var bytes = await GetByteArrayAsync(url, cancellationToken);
+            var bytes = await GetByteArrayAsync(url, cancellationToken, extraHeaders);
             return Encoding.UTF8.GetString(bytes);
         }
 
-        public static async Task<byte[]> GetByteArrayAsync(string url, CancellationToken cancellationToken = default)
+        public static async Task<byte[]> GetByteArrayAsync(string url, CancellationToken cancellationToken = default, IReadOnlyList<string> extraHeaders = null)
         {
             using var process = new Process();
             process.StartInfo = new ProcessStartInfo
@@ -43,6 +48,14 @@ namespace Aura.Services
             process.StartInfo.ArgumentList.Add("30");
             process.StartInfo.ArgumentList.Add("--user-agent");
             process.StartInfo.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0");
+            if (extraHeaders != null)
+            {
+                foreach (var header in extraHeaders)
+                {
+                    process.StartInfo.ArgumentList.Add("--header");
+                    process.StartInfo.ArgumentList.Add(header);
+                }
+            }
             process.StartInfo.ArgumentList.Add(url);
 
             if (!process.Start())
