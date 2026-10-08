@@ -194,9 +194,11 @@ extended). key facts the code depends on:
 
 ## 7 more keyless platforms ported, verified live (2026-10-08)
 
-the picker lists 28 platforms; 9 were implemented, now **16**: the new 7 =
+the picker listed 28 platforms; 9 were implemented, now **16**: the new 7 =
 DesktopNexus, Digital Blasphemy, HDwallpapers, Pixiv, Cara, Wallpaper Cave,
-Wallpaper Engine. Global categories = **149 merged cards** (was 112).
+Wallpaper Engine. the 2 dead domains (Kuvva, Vladstudio) were removed from
+the picker entirely on 2026-10-08, so it lists **26**. Global categories =
+**149 merged cards** (was 112).
 per-site reversal evidence + curl recipes live in
 `automata-private/<site>/AGENTS.md` (7 new folders). key facts:
 
@@ -231,11 +233,11 @@ per-site reversal evidence + curl recipes live in
   exception, clean bar. the parse harness missed it by mirroring patterns;
   the check that works is decoding the `@"..."` literal out of the C# SOURCE
   (`""` -> `"`) and asserting IsMatch against a captured body.
-- the other 12 listed platforms stay unimplemented ON PURPOSE: 8 are
+- the other 10 listed platforms stay unimplemented ON PURPOSE: 8 are
   WAF/anti-bot-walled (Dribbble, Newgrounds, Peakpx, CGSociety, Behance,
-  Artgram, ArtFol, CharacterDesignReferences), 2 domains are dead (Kuvva,
-  Vladstudio), 2 need credentials (Unsplash = API key with hosting-terms
-  caveat, DeviantArt = OAuth). the picker dialog text derives from
+  Artgram, ArtFol, CharacterDesignReferences) and 2 need credentials (Unsplash
+  = API key with hosting-terms caveat, DeviantArt = OAuth). the dead 2 were
+  dropped from the list (see above). the picker dialog text derives from
   SupportedPlatforms, so it always matches reality.
 - verification recipe (menuless, zero focus steal, ~9 min):
   `C:\tmp\aura-platformcheck.ps1` (probes stay in C:\tmp, never committed).
