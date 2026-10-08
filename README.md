@@ -43,7 +43,8 @@ is the code - mode tables + fetchers).
 
 - **backiee** - https://backiee.com/categories (19 slugs parse from there) ·
   drill `https://backiee.com/api/wallpaper/list.php?action=paging_list&category=<slug>`
-- **alphacoders** - https://alphacoders.com/resolution/4k-wallpapers ·
+- **alphacoders** - master list of category tags: https://alphacoders.com/tag/is-category ·
+  https://alphacoders.com/resolution/4k-wallpapers ·
   https://alphacoders.com/abstract-wallpapers · https://alphacoders.com/animal-wallpapers ·
   https://alphacoders.com/anime-wallpapers · https://alphacoders.com/anime-girl-wallpapers ·
   https://alphacoders.com/artistic-wallpapers · https://alphacoders.com/attack-on-titan-wallpapers ·
