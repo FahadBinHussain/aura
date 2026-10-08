@@ -151,27 +151,99 @@ namespace Aura.Services
             return html;
         }
 
-        // wallpaperhub's 17 collections (title is the browse key; id is the page path)
-        private static readonly (string Title, string Id)[] WallpaperHubCollections =
+        // wallpaperhub categories = the site's own Collections index
+        // (https://www.wallpaperhub.app/collections - single page today, 17
+        // collections; ?page=N is ignored and re-serves the same rows, so the
+        // loader stops at the first page with no NEW ids and real future
+        // pagination just works). live-loaded by the Categories page
+        // (GetWallpaperHubCollectionsIndexAsync + SetWallpaperHubCollections),
+        // same loud contract as backiee/alphacoders/pixabay - NO static list, a
+        // failed fetch = a loud error line. title is the browse key, id is the
+        // /collections/<id> page path (pageProps.collectionWallpapers - the drill
+        // fetcher is unchanged). the site passes .NET's TLS fingerprint (200 via
+        // SocketsHttpHandler) - unlike pixabay/cara no curl is needed here.
+        // (automata-private/wallpaperhub.app/AGENTS.md)
+        private static readonly object WallpaperHubCollectionsLock = new object();
+        private static readonly List<(string Title, string Id)> WallpaperHubCollectionList =
+            new List<(string Title, string Id)>();
+
+        public static IReadOnlyList<(string Title, string Id)> WallpaperHubCollections
         {
-            ("Windows 11", "9280"),
-            ("Surface Duo", "7716"),
-            ("Build 2020", "7058"),
-            ("October 2019 Event", "5472"),
-            ("Surface Collection", "1274"),
-            ("Windows Wallpapers", "6292"),
-            ("Office + Fluent Design", "2863"),
-            ("October 2018 Event", "1484"),
-            ("Ninja Cat Originals", "1386"),
-            ("Conference Collection", "1387"),
-            ("Xbox E3 2018 Collection", "1238"),
-            ("2019", "3692"),
-            ("idek", "4045"),
-            ("One World", "4636"),
-            ("Chat Backgrounds", "6401"),
-            ("Rainbows", "6638"),
-            ("Festive Wallpapers", "8318"),
-        };
+            get
+            {
+                lock (WallpaperHubCollectionsLock)
+                {
+                    return WallpaperHubCollectionList.ToArray();
+                }
+            }
+        }
+
+        public static void SetWallpaperHubCollections(IReadOnlyList<(string Title, string Id)> collections)
+        {
+            lock (WallpaperHubCollectionsLock)
+            {
+                WallpaperHubCollectionList.Clear();
+                WallpaperHubCollectionList.AddRange(collections);
+            }
+        }
+
+        // walk the collections index page by page: page 1 = the bare url, then
+        // ?page=N; stop at the first page that yields no NEW ids (today the site
+        // ignores ?page=N and page 2 comes back identical - one wasted fetch).
+        public async Task<List<(string Title, string Id)>> GetWallpaperHubCollectionsIndexAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var result = new List<(string Title, string Id)>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int page = 1; page <= 10; page++)
+            {
+                var url = page == 1
+                    ? "https://www.wallpaperhub.app/collections"
+                    : $"https://www.wallpaperhub.app/collections?page={page}";
+                var html = await _httpClient.GetStringAsync(url, cancellationToken);
+                var rows = ParseWallpaperHubCollectionRows(html);
+                int added = 0;
+                foreach (var row in rows)
+                {
+                    if (seen.Add(row.Id))
+                    {
+                        result.Add(row);
+                        added++;
+                    }
+                }
+
+                if (added == 0)
+                {
+                    return result;
+                }
+            }
+
+            throw new InvalidOperationException(
+                "wallpaperhub collections index did not end within 10 pages - refusing to ship a truncated category list.");
+        }
+
+        private static List<(string Title, string Id)> ParseWallpaperHubCollectionRows(string html)
+        {
+            var result = new List<(string Title, string Id)>();
+            var matches = Regex.Matches(
+                html,
+                "<h3>(?<name>[^<]+)</h3>(?s:.*?)href=\"/collections/(?<id>\\d+)\"",
+                RegexOptions.Singleline);
+
+            foreach (Match m in matches)
+            {
+                var name = WebUtility.HtmlDecode(m.Groups["name"].Value).Trim();
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+
+                result.Add((name, m.Groups["id"].Value));
+            }
+
+            return result;
+        }
 
         // desktopnexus: galleries page = the subdomain catalog; every subdomain browses /all/<page>
         // (automata-private/desktopnexus.com/AGENTS.md)

@@ -21,7 +21,7 @@ they get ported (17 as of 2026-10-08).
 | [Backiee](https://backiee.com) | 19 categories, tag search, latest feed |
 | [Alpha Coders](https://wall.alphacoders.com) | 24 categories, live from the site's category index |
 | [Pixabay](https://pixabay.com) | 63 curated collections (live) |
-| [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections |
+| [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections (live) |
 | [ArtStation](https://www.artstation.com) | wallpaper / landscape / nature / space / abstract queries |
 | [Pexels](https://www.pexels.com) | curated / nature / space queries (API key in Settings) |
 | [Wallhaven](https://wallhaven.cc) | General / Anime / People |
@@ -47,15 +47,9 @@ is the code - mode tables + fetchers).
 - **pixabay** - https://pixabay.com/collections/ (63 collections, paginated
   `?pagi=N`; fetched through the OS `curl.exe` - Cloudflare 403s .NET's TLS
   fingerprint on the HTML pages)
-- **wallpaperhub** - https://www.wallpaperhub.app/collections/9280 · https://www.wallpaperhub.app/collections/7716 ·
-  https://www.wallpaperhub.app/collections/7058 · https://www.wallpaperhub.app/collections/5472 ·
-  https://www.wallpaperhub.app/collections/1274 · https://www.wallpaperhub.app/collections/6292 ·
-  https://www.wallpaperhub.app/collections/2863 · https://www.wallpaperhub.app/collections/1484 ·
-  https://www.wallpaperhub.app/collections/1386 · https://www.wallpaperhub.app/collections/1387 ·
-  https://www.wallpaperhub.app/collections/1238 · https://www.wallpaperhub.app/collections/3692 ·
-  https://www.wallpaperhub.app/collections/4045 · https://www.wallpaperhub.app/collections/4636 ·
-  https://www.wallpaperhub.app/collections/6401 · https://www.wallpaperhub.app/collections/6638 ·
-  https://www.wallpaperhub.app/collections/8318 · https://www.wallpaperhub.app/wallpapers
+- **wallpaperhub** - https://www.wallpaperhub.app/collections (17 collections,
+  live index, one page - `?page=N` ignored; fetched through .NET, no curl
+  needed)
 - **artstation** - https://www.artstation.com/api/v2/search/projects.json?query=wallpaper&page=1&per_page=50&sorting=relevance ·
   https://www.artstation.com/api/v2/search/projects.json?query=landscape&page=1&per_page=50&sorting=relevance ·
   https://www.artstation.com/api/v2/search/projects.json?query=nature&page=1&per_page=50&sorting=relevance ·

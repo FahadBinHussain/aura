@@ -128,12 +128,13 @@ extended). key facts the code depends on:
 - **pixabay**: categories = the site's curated Collections index, live-loaded
   (see the dated section below) - the old 20-API-category list, the API calls,
   and the API key requirement are GONE.
-- **wallpaperhub**: 17 collections (id+title) = `WallpaperHubCollections`; a
-  mode that matches a collection title routes to `/collections/<id>` and parses
-  `pageProps.collectionWallpapers` (identical `{entity:...}` wrappers as
-  `initWallpapers`); anything else = `/wallpapers` (`initWallpapers`). both
-  SSR shapes serve everything at page 1. `?tags=` is SSR-ignored - never build
-  fetch URLs on it.
+- **wallpaperhub**: the 17 collections (id+title) = `WallpaperHubCollections`,
+  LIVE-LOADED from the site's own Collections index (see the dated section
+  below) - a mode that matches a collection title routes to `/collections/<id>`
+  and parses `pageProps.collectionWallpapers` (identical `{entity:...}`
+  wrappers as `initWallpapers`); anything else = `/wallpapers`
+  (`initWallpapers`). both SSR shapes serve everything at page 1. `?tags=` is
+  SSR-ignored - never build fetch URLs on it.
 - **alphacoders**: uniform `https://alphacoders.com/<slug>-wallpapers?page=N`
   (`4k` special -> `/resolution/4k-wallpapers`; plain `4k-wallpapers` = 404).
   the category list is LIVE-LOADED from the site's real category page
@@ -385,6 +386,37 @@ tile -> `_1280.jpg` full - SINGLE underscore, `__1280`/`__640`/bare = 403).
   drills OK, bar clean through the whole fill + a 90s watch, no flip. vision
   (zengate, `C:\tmp\zengate-vision.ps1`): real Halloween artwork tiles, no
   broken/placeholder tiles.
+
+## wallpaperhub categories live from the collections index (2026-10-08)
+
+user audit: the 17 wallpaperhub "categories" were a hand-reversed static table.
+fixed at the source: `PublicWallpaperService` now live-loads
+`https://www.wallpaperhub.app/collections` on every Categories open
+(`GetWallpaperHubCollectionsIndexAsync` + `SetWallpaperHubCollections`, runs
+alongside the backiee/alpha/pixabay loads, same loud contract, error-bar
+visibility extended to the Local - WallpaperHub scope).
+
+- index facts: **17 collections**, ONE page today - `?page=N` is IGNORED
+  (page 2 re-serves the same rows), so the loader walks pages until the first
+  one brings no NEW ids (hard cap 10, thrown error past it = the loud bar,
+  never a silently truncated list). card markup = `<h3>name</h3>` ...
+  `href="/collections/<id>"` (the row's View link); the parse matched 17/17
+  against the old static table (0 mismatches - titles/ids unchanged).
+- **no curl**: wallpaperhub accepts .NET's SocketsHttpHandler fingerprint
+  (IWR 200) - unlike pixabay/cara, the index AND the drill fetches stay on
+  the plain HttpClient.
+- the static `WallpaperHubCollections` array is GONE (replaced by a locked
+  live snapshot). `GetModes` reads the snapshot property; an empty list (load
+  failed) = no wallpaperhub cards + the loud error line, and the drill
+  fetcher's `FirstOrDefault` miss falls through to the `/wallpapers` route
+  exactly as before.
+- menuless canary: `Windows 11` (single-source card; collection has 6 items,
+  grid title = platform name `WallpaperHub`). verified 2026-10-08 (probe
+  `C:\tmp\aura-wallpaperhubindexcheck.ps1`): 159 cards, 17/17 live names on
+  the grid, `Windows 11` 6 items + alpha `Vehicle` 15 items, bar clean
+  through the whole fill + a 90s watch, no flip. vision (zengate): 4 real
+  Windows 11 tiles (bloom/logo/glow/sunrise), mode chips = live collection
+  titles, zero errors.
 
 ## focus-free verification: menuless protocol (2026-10-07)
 

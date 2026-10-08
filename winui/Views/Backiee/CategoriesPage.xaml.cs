@@ -176,6 +176,27 @@ namespace Aura.Views.Backiee
                 errors.Add($"Couldn't load pixabay collections: {ex.Message}");
             }
 
+            // wallpaperhub: its own Collections index is the source (live load,
+            // same loud contract - the 17-entry static table is gone; the loader
+            // stops on the first page with no new ids since ?page=N is ignored
+            // today)
+            try
+            {
+                var wallpaperHubCollections = await new PublicWallpaperService().GetWallpaperHubCollectionsIndexAsync();
+                if (wallpaperHubCollections.Count == 0)
+                {
+                    errors.Add("wallpaperhub returned no collections - the /collections markup may have changed.");
+                }
+                else
+                {
+                    PublicWallpaperService.SetWallpaperHubCollections(wallpaperHubCollections);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Couldn't load wallpaperhub collections: {ex.Message}");
+            }
+
             try
             {
                 var html = await BackieeNetworkClient.GetStringAsync(CategoriesUrl);
@@ -279,7 +300,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay")
+                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub")
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -432,7 +453,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay"))
+            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub"))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;
