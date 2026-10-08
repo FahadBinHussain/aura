@@ -64,11 +64,44 @@ namespace Aura.Services
             }
         }
 
-        // fetch the real category page and parse its <h3> rows: only row headers parse,
+        // fetch the real category page AND its ?page=N continuation (the index
+        // paginates: 20 rows on page 1, 4 more on page 2 = Dark/Technology/Religious/
+        // Humor, page >= 3 is empty) and parse the <h3> rows: only row headers parse,
         // so the -phone / pfp / gif cells in those rows never become category cards.
+        // end-of-index = the first page that yields 0 rows; the page cap only exists so
+        // a broken empty-page response can't loop forever, and hitting it throws LOUD
+        // (-> error bar) - never a silently truncated list. no partial results: the
+        // caller only SetCategories()s the complete list, any failed page = exception.
         public async Task<List<(string Key, string Name)>> GetCategoryIndexAsync()
         {
-            var html = await _httpClient.GetStringAsync(CategoryIndexUrl);
+            var result = new List<(string Key, string Name)>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            for (int page = 1; page <= 10; page++)
+            {
+                var url = page == 1 ? CategoryIndexUrl : $"{CategoryIndexUrl}?page={page}";
+                var html = await _httpClient.GetStringAsync(url);
+                var rows = ParseCategoryRows(html);
+                if (rows.Count == 0)
+                {
+                    return result;
+                }
+
+                foreach (var row in rows)
+                {
+                    if (seen.Add(row.Key))
+                    {
+                        result.Add(row);
+                    }
+                }
+            }
+
+            throw new InvalidOperationException(
+                "alphacoders category index did not end within 10 pages - refusing to ship a truncated category list.");
+        }
+
+        private static List<(string Key, string Name)> ParseCategoryRows(string html)
+        {
             var result = new List<(string Key, string Name)>();
             var matches = Regex.Matches(
                 html,

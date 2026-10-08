@@ -136,7 +136,8 @@ extended). key facts the code depends on:
 - **alphacoders**: uniform `https://alphacoders.com/<slug>-wallpapers?page=N`
   (`4k` special -> `/resolution/4k-wallpapers`; plain `4k-wallpapers` = 404).
   the category list is LIVE-LOADED from the site's real category page
-  `https://alphacoders.com/tag/is-category` (20 desktop rows; `GetCategoryIndexAsync`
+  `https://alphacoders.com/tag/is-category` (24 desktop rows over the index's 2
+  pages; `GetCategoryIndexAsync`
   + `SetCategories`, same loud contract as backiee - a failed fetch = a loud
   error line, never a silent empty list) - the merged grid AND
   `AlphaCodersGridPage` titles both read `AlphaCodersService.Categories`;
@@ -300,8 +301,12 @@ curated slug links, not the site's own category taxonomy. fixed at the source:
 `AlphaCodersService` holds NO static category list now -
 `CategoriesPage.LoadCategoriesAsync` fetches
 `https://alphacoders.com/tag/is-category` (runs alongside the backiee load)
-through `GetCategoryIndexAsync` + `SetCategories` and parses its **20 `<h3>`
-rows** (name = row text, first letter of each word up-cased - "video game" ->
+through `GetCategoryIndexAsync` + `SetCategories` and parses its **24 `<h3>`
+rows across 2 pages** - the index PAGINATES (`?page=1` = 20 rows + a
+`?page=2` link, `?page=2` = 4 more: Dark/Technology/Religious/Humor with no
+further link, `?page>=3` = 200 but 0 rows) and the loader walks pages until
+the first empty one (hard cap 10; blowing the cap = a thrown error -> the loud
+bar, never a silently truncated list) (name = row text, first letter of each word up-cased - "video game" ->
 "Video Game", the page's own "TV Show" casing survives; browse key = the h3
 slug -> `<slug>-wallpapers?page=N`, which is exactly the row's own "Desktop
 Wallpapers" cell href). the `-phone`/pfp/gif cells can never parse (h3-anchored
@@ -309,14 +314,15 @@ regex). fetch failure = a loud error bar line (same contract as backiee), and
 the error bar now also shows under the Local - AlphaCoders scope (visibility
 conditions extended to it).
 
-- counts: per-scope AlphaCoders = **20** (was 63), Global = **110 merged
-  cards** (was 150 - 40 cards were alpha-only legacy names; `Technology`
-  survives via hdwallpapers). the grid page's `4k`/`harvest`/`rain` quick
+- counts: per-scope AlphaCoders = **24** (was 63), Global = **113 merged
+  cards** (was 150 at the 63-era; 110 when only page 1 loaded - Dark,
+  Religious, Humor add cards, `Technology` merges into the hdwallpapers one).
+  the grid page's `4k`/`harvest`/`rain` quick
   buttons are page chips, not category rows - unaffected (`4k` still resolves
   to the resolution page).
 - menuless canary: `Batman` is gone (not a real category) - drill **`Vehicle`**
-  for the alpha single-source check. verified menuless twice: 110 cards,
-  20/20 real names on the grid, 0 legacy names, `Vehicle` title + 15 items,
+  for the alpha single-source check. verified menuless three times: 113 cards,
+  24/24 real names on the grid, 0 legacy names, `Vehicle` title + 15 items,
   bar clean, stable under a 60s watch.
 - one probe run landed on Home/picker after a back; never reproduced in 2
   full follow-up runs + the 60s watch - logged as observed-once, root cause

@@ -19,7 +19,7 @@ they get ported (17 as of 2026-10-08).
 | Site | What Aura browses |
 | --- | --- |
 | [Backiee](https://backiee.com) | 19 categories, tag search, latest feed |
-| [Alpha Coders](https://wall.alphacoders.com) | 20 categories, live from the site's category page |
+| [Alpha Coders](https://wall.alphacoders.com) | 24 categories, live from the site's category index |
 | [Pixabay](https://pixabay.com) | 20 categories (API key in Settings) |
 | [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections |
 | [ArtStation](https://www.artstation.com) | wallpaper / landscape / nature / space / abstract queries |
