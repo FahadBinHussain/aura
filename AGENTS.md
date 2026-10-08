@@ -192,6 +192,68 @@ extended). key facts the code depends on:
     hashes), never url strings. duplicate thumbs are honest source overlap,
     not a cache bug, unless hit ids differ.
 
+## 7 more keyless platforms ported, verified live (2026-10-08)
+
+the picker lists 28 platforms; 9 were implemented, now **16**: the new 7 =
+DesktopNexus, Digital Blasphemy, HDwallpapers, Pixiv, Cara, Wallpaper Cave,
+Wallpaper Engine. Global categories = **149 merged cards** (was 112).
+per-site reversal evidence + curl recipes live in
+`automata-private/<site>/AGENTS.md` (7 new folders). key facts:
+
+- **single source of truth** = `PublicWallpaperService.GetSupportedPlatformNames()`:
+  it drives the picker's not-implemented dialog (`ShowNotImplementedMessage`),
+  `CategoryPlatforms`, `BuildMerged`'s platform loop, and `NavigateToSource`'s
+  routing (default case = `IsSupportedPlatform` -> `PublicWallpaperGridPage`).
+  that last one was the 4th hardcoded list - a `case "Pixabay": ... case
+  "WallpaperHub":` switch arm - which made every new platform's card drill die
+  with `No drill-down page exists for X categories`. no hardcoded platform
+  lists remain.
+- honest caps: Digital Blasphemy full = 640x480 preview (membership originals),
+  Wallpaper Engine full = preview_url (file url needs auth), Cara thumb == full
+  (single full-size image), Wallpaper Cave titles = `<h1> #<n>` (no per-item
+  titles exist), DesktopNexus grid `/preview` + full `/original`, HDW full =
+  `/previews/<slug>-<id>.jpg` (dropping `thumb_` from the cdn url is 404).
+- content policy: pixiv `restrict=safe` pinned on every request + per-item
+  `xRestrict != 0` skipped; steam parts tagged Questionable/Mature/Adult/
+  NSFW/18+ dropped (2/30 on page 1); cara has no filter - no NSFW modes added.
+- pximg referer: `WallpaperItem.GetRefererFor` returns `https://www.pixiv.net/`
+  for i.pximg.net (alphacoders referer = 403 there) - proven live, pixiv tiles
+  render real art.
+- **cara needs curl, not .NET**: cara.app + images.cara.app return 403 to
+  SocketsHttpHandler's TLS fingerprint (http/1.1 AND http/2; curl + same UA =
+  200) -> `Services/CurlClient.cs` is cara's ONLY transport (html via
+  `GetStringAsync`, images via `WallpaperItem.IsCaraUrl`), single method not a
+  fallback, failure = curl exit code + stderr in the loud bar.
+  `BackieeNetworkClient`'s curl part now delegates to CurlClient (identical
+  invocation, unchanged behavior).
+- **steam split regex fails one-typo-silent**: a verbatim `Regex.Split`
+  literal one backslash short after the colon matches nothing -> 0 items, no
+  exception, clean bar. the parse harness missed it by mirroring patterns;
+  the check that works is decoding the `@"..."` literal out of the C# SOURCE
+  (`""` -> `"`) and asserting IsMatch against a captured body.
+- the other 12 listed platforms stay unimplemented ON PURPOSE: 8 are
+  WAF/anti-bot-walled (Dribbble, Newgrounds, Peakpx, CGSociety, Behance,
+  Artgram, ArtFol, CharacterDesignReferences), 2 domains are dead (Kuvva,
+  Vladstudio), 2 need credentials (Unsplash = API key with hosting-terms
+  caveat, DeviantArt = OAuth). the picker dialog text derives from
+  SupportedPlatforms, so it always matches reality.
+- verification recipe (menuless, zero focus steal, ~9 min):
+  `C:\tmp\aura-platformcheck.ps1` (probes stay in C:\tmp, never committed).
+  it: waits for a window handle that HOSTS UIA text and is still the main
+  window (the splash/transient window hands you a stale handle whose tree
+  reads empty forever), drills the picker for Pixiv via a 900x3600 resize
+  (the picker's ItemsRepeater realizes only the visible 16/28 otherwise),
+  then drills 6 single-source cards (source grep proved none of
+  Explore/Trending/Soulslike/All/Free/Latest is shared -> the chooser
+  MenuFlyout never opens), waits 180s of thumbnail fill reading BOTH
+  ErrorTextBlock and StatusInfoBar (an ERR line masks the IB fill lines if
+  you return early), deep-scrolls via ScrollItemPattern and restores to top,
+  captures via `automata-private\window-capture\Capture-WindowBackground.ps1`
+  (moved from `tools\` on 2026-10-08) for rule-15 vision checks. assert
+  items>=5 per drill, bar clean, cards>=100. the known open silent death
+  (exit=0) fired on 2 of 7 runs - paced re-runs pass; root cause still open
+  (see the menuless section below).
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked

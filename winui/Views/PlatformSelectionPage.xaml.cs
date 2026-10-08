@@ -153,10 +153,14 @@ namespace Aura.Views
 
         private async void ShowNotImplementedMessage()
         {
+            // derived from the services - the list can never go stale as platforms land
+            var available = new List<string> { "Alpha Coders", "ArtStation", "Backiee" };
+            available.AddRange(PublicWallpaperService.GetSupportedPlatformNames());
+
             ContentDialog dialog = new ContentDialog
             {
                 Title = "Platform Not Available",
-                Content = $"The {selectedPlatform} platform is not implemented yet. Available now: Backiee, Alpha Coders, ArtStation, Bing Wallpaper Archive, Pexels, Pixabay, Simple Desktops, Wallhaven, and WallpaperHub.",
+                Content = $"The {selectedPlatform} platform is not implemented yet. Available now: {string.Join(", ", available)}.",
                 CloseButtonText = "OK",
                 XamlRoot = this.XamlRoot
             };

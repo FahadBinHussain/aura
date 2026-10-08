@@ -25,13 +25,14 @@ namespace Aura.Views.Backiee
         private const string CategoriesUrl = "https://backiee.com/categories";
         private const string DefaultAccentHex = "#FF8C00";
 
-        // every platform the app implements - this array IS the scope menu.
+        // every platform the app implements - this array IS the scope menu. public sources derive
+        // from PublicWallpaperService so a newly ported platform can never be forgotten here (the
+        // scope menu, the merged cards and the not-implemented dialog all read that one list).
         // per-site reversal evidence: automata-private/<site>/AGENTS.md
         private static readonly string[] CategoryPlatforms =
-        {
-            "Backiee", "AlphaCoders", "ArtStation", "Bing Wallpaper Archive",
-            "Pexels", "Pixabay", "Simple Desktops", "Wallhaven", "WallpaperHub"
-        };
+            new[] { "Backiee", "AlphaCoders", "ArtStation" }
+                .Concat(PublicWallpaperService.GetSupportedPlatformNames())
+                .ToArray();
 
         // artstation: query entries - its subject-matter taxonomy is CSRF-blocked for
         // anonymous sessions (automata-private/www.artstation.com/AGENTS.md)
@@ -353,8 +354,10 @@ namespace Aura.Views.Backiee
             }
             // every other implemented platform contributes its GetModes() entries as categories
             // (pixabay docs list, pexels query modes, wallhaven bitmask, wallpaperhub collections,
-            //  bing/simpledesktops single honest entry - key = the mode the fetcher consumes)
-            foreach (var platform in new[] { "Bing Wallpaper Archive", "Pexels", "Pixabay", "Simple Desktops", "Wallhaven", "WallpaperHub" })
+            //  bing/simpledesktops single honest entry - key = the mode the fetcher consumes).
+            // the public list derives from PublicWallpaperService: adding a platform to its
+            // SupportedPlatforms set is ALL it takes to appear here.
+            foreach (var platform in PublicWallpaperService.GetSupportedPlatformNames())
             {
                 foreach (var mode in PublicWallpaperService.GetModes(platform))
                 {
@@ -481,16 +484,17 @@ namespace Aura.Views.Backiee
                     // source.Key = the search query the reversed GET endpoint accepts
                     Frame.Navigate(typeof(ArtStationGridPage), source.Key);
                     break;
-                case "Pixabay":
-                case "Pexels":
-                case "Bing Wallpaper Archive":
-                case "Simple Desktops":
-                case "Wallhaven":
-                case "WallpaperHub":
-                    Frame.Navigate(typeof(PublicWallpaperGridPage), new PublicGridNavigationParameter(source.Platform, source.Key));
-                    break;
                 default:
-                    ShowError($"No drill-down page exists for {source.Platform} categories.");
+                    // every PublicWallpaperService source shares one drill page; routing derives
+                    // from SupportedPlatforms so a newly ported platform needs no list edit here
+                    if (PublicWallpaperService.IsSupportedPlatform(source.Platform))
+                    {
+                        Frame.Navigate(typeof(PublicWallpaperGridPage), new PublicGridNavigationParameter(source.Platform, source.Key));
+                    }
+                    else
+                    {
+                        ShowError($"No drill-down page exists for {source.Platform} categories.");
+                    }
                     break;
             }
         }

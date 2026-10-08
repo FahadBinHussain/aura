@@ -19,6 +19,13 @@ namespace Aura.Services
         private const string WallpaperHub = "WallpaperHub";
         private const string Pexels = "Pexels";
         private const string Pixabay = "Pixabay";
+        private const string DesktopNexus = "DesktopNexus";
+        private const string DigitalBlasphemy = "Digital Blasphemy";
+        private const string Hdwallpapers = "HDwallpapers";
+        private const string Pixiv = "Pixiv";
+        private const string Cara = "Cara";
+        private const string WallpaperCave = "Wallpaper Cave";
+        private const string WallpaperEngine = "Wallpaper Engine";
 
         // pixabay's documented category values (https://pixabay.com/api/docs/, "category str" row)
         private static readonly string[] PixabayCategories =
@@ -51,6 +58,93 @@ namespace Aura.Services
             ("Festive Wallpapers", "8318"),
         };
 
+        // desktopnexus: galleries page = the subdomain catalog; every subdomain browses /all/<page>
+        // (automata-private/desktopnexus.com/AGENTS.md)
+        private static readonly (string Title, string Subdomain)[] DesktopNexusCategories =
+        {
+            ("All", "www"),
+            ("Abstract", "abstract"),
+            ("Aircraft", "aircraft"),
+            ("Animals", "animals"),
+            ("Anime", "anime"),
+            ("Architecture", "architecture"),
+            ("Boats", "boats"),
+            ("Cars", "cars"),
+            ("Entertainment", "entertainment"),
+            ("Motorcycles", "motorcycles"),
+            ("Nature", "nature"),
+            ("People", "people"),
+            ("Space", "space"),
+            ("Sports", "sports"),
+            ("Technology", "technology"),
+            ("Video Games", "videogames"),
+        };
+
+        // digital blasphemy: woo listing paths; the free tag ships everything on ONE page
+        // (automata-private/digitalblasphemy.com/AGENTS.md)
+        private static readonly (string Title, string Path)[] DigitalBlasphemyModes =
+        {
+            ("Wallpapers", "product-category/wallpapers"),
+            ("Free", "product-tag/free"),
+        };
+
+        // hdwallpapers: nav slug catalog (verified 2026-10-08; "Latest" = plain feed)
+        // (automata-private/www.hdwallpapers.net/AGENTS.md)
+        private static readonly (string Title, string Slug)[] HdwallpapersModes =
+        {
+            ("Latest", "latest-wallpapers"),
+            ("3D", "3d"),
+            ("Abstract", "abstract"),
+            ("Animals", "animals"),
+            ("Anime", "anime"),
+            ("Bikes", "bikes"),
+            ("Brands", "brands"),
+            ("Cars", "cars"),
+            ("Celebrations", "celebrations"),
+            ("Celebrities", "celebrities"),
+            ("City & Architecture", "city-and-architecture"),
+            ("Digital Art", "digital-art"),
+            ("Flowers", "flowers"),
+            ("Funny", "funny"),
+            ("Games", "games"),
+            ("Love", "love"),
+            ("Nature", "nature"),
+            ("People", "people"),
+            ("Quotes", "quotes"),
+            ("Space", "space"),
+            ("Sports", "sports"),
+            ("Technology", "technology"),
+            ("TV & Movies", "tv-and-movies"),
+            ("Typography", "typography"),
+            ("World", "world"),
+        };
+
+        // pixiv: ajax search tags, lowercased by the fetcher; restrict=safe is PINNED there
+        // (automata-private/www.pixiv.net/AGENTS.md)
+        private static readonly string[] PixivTags = { "Wallpaper", "Landscape", "Nature" };
+
+        // wallpaper cave: album page slugs; albums are single-shot (no server pagination anywhere)
+        // (automata-private/wallpapercave.com/AGENTS.md)
+        private static readonly (string Title, string Album)[] WallpaperCaveAlbums =
+        {
+            ("Wallpapers", "wallpapers"),
+            ("Cloud", "cloud-wallpapers"),
+            ("Desert", "desert-wallpapers"),
+            ("Fire", "fire-wallpapers"),
+            ("Ice", "ice-wallpapers"),
+            ("Lake", "lake-wallpapers"),
+            ("Ocean", "ocean-wallpapers"),
+            ("Sunshine", "sunshine-wallpapers"),
+            ("Soulslike", "soulslike-wallpapers"),
+        };
+
+        // wallpaper engine: verified requiredtags filters ("Wallpaper" returned the unfiltered
+        // list - excluded; Trending = no tag) (automata-private/steamcommunity.com/AGENTS.md)
+        private static readonly string[] WallpaperEngineModes =
+        {
+            "Trending", "Scene", "Anime", "3D", "Video", "Interactive", "Audio Responsive"
+        };
+
         private static readonly HashSet<string> SupportedPlatforms = new(StringComparer.OrdinalIgnoreCase)
         {
             Wallhaven,
@@ -58,7 +152,14 @@ namespace Aura.Services
             SimpleDesktops,
             WallpaperHub,
             Pexels,
-            Pixabay
+            Pixabay,
+            DesktopNexus,
+            DigitalBlasphemy,
+            Hdwallpapers,
+            Pixiv,
+            Cara,
+            WallpaperCave,
+            WallpaperEngine
         };
 
         private readonly HttpClient _httpClient;
@@ -98,6 +199,13 @@ namespace Aura.Services
                 // bing/simpledesktops have no taxonomy at all - one honest entry each (their AGENTS.md)
                 Bing => new[] { "Daily" },
                 SimpleDesktops => new[] { "Minimal" },
+                DesktopNexus => DesktopNexusCategories.Select(category => category.Title).ToArray(),
+                DigitalBlasphemy => DigitalBlasphemyModes.Select(category => category.Title).ToArray(),
+                Hdwallpapers => HdwallpapersModes.Select(category => category.Title).ToArray(),
+                Pixiv => PixivTags,
+                Cara => new[] { "Explore" },
+                WallpaperCave => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
+                WallpaperEngine => WallpaperEngineModes,
                 _ => Array.Empty<string>()
             };
         }
@@ -118,6 +226,13 @@ namespace Aura.Services
                 WallpaperHub => "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
                 Pexels => "Free stock photos via the official Pexels API. Add a Pexels API key in Settings.",
                 Pixabay => "Royalty-free images via the official Pixabay API. Add a Pixabay API key in Settings.",
+                DesktopNexus => "15 category galleries plus All from Desktop Nexus's public browse pages.",
+                DigitalBlasphemy => "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
+                Hdwallpapers => "Latest feed plus 25 category listings from HDwallpapers.net.",
+                Pixiv => "Safe-for-work illustrations from Pixiv's public search (restrict=safe, no key).",
+                Cara => "Explore feed from the Cara art community's server-rendered page.",
+                WallpaperCave => "Curated albums from Wallpaper Cave (single-shot album pages).",
+                WallpaperEngine => "Wallpaper Engine's Steam Workshop browse pages with public preview images.",
                 _ => "Browse wallpapers from this source."
             };
         }
@@ -138,6 +253,13 @@ namespace Aura.Services
                 WallpaperHub => await GetWallpaperHubWallpapersAsync(page, mode, cancellationToken),
                 Pexels => await GetPexelsWallpapersAsync(page, mode, cancellationToken),
                 Pixabay => await GetPixabayWallpapersAsync(page, mode, cancellationToken),
+                DesktopNexus => await GetDesktopNexusWallpapersAsync(page, mode, cancellationToken),
+                DigitalBlasphemy => await GetDigitalBlasphemyWallpapersAsync(page, mode, cancellationToken),
+                Hdwallpapers => await GetHdwallpapersWallpapersAsync(page, mode, cancellationToken),
+                Pixiv => await GetPixivWallpapersAsync(page, mode, cancellationToken),
+                Cara => await GetCaraWallpapersAsync(page, mode, cancellationToken),
+                WallpaperCave => await GetWallpaperCaveWallpapersAsync(page, mode, cancellationToken),
+                WallpaperEngine => await GetWallpaperEngineWallpapersAsync(page, mode, cancellationToken),
                 _ => throw new NotSupportedException($"{platformName} is not implemented yet.")
             };
         }
@@ -471,6 +593,433 @@ namespace Aura.Services
                     SourceUrl = sourceUrl,
                     Likes = GetString(hit, "likes", "0"),
                     Downloads = GetString(hit, "downloads", "0"),
+                    Resolution = resolution,
+                    QualityTag = GetQualityTag(resolution),
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // desktopnexus: subdomain browse pages - thumbnail (6.7KB) is too small for cards, so the
+        // grid uses /preview (34KB) and the full view /original (285KB), both verified by GET
+        // (automata-private/desktopnexus.com/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetDesktopNexusWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            // unknown/empty mode -> the all-feeds www listing (documented default)
+            var subdomain = DesktopNexusCategories
+                .FirstOrDefault(category => category.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Subdomain ?? "www";
+
+            var url = page <= 1
+                ? $"https://{subdomain}.desktopnexus.com/all/"
+                : $"https://{subdomain}.desktopnexus.com/all/{page}/";
+            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var matches = Regex.Matches(
+                html,
+                "<a href=\"(?<href>https://[a-z0-9]+\\.desktopnexus\\.com/wallpaper/\\d+)/\" alt=\"(?<title>[^\"]+)\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://assets\\.desktopnexus\\.com/[^\"]+)\"",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match match in matches)
+            {
+                var href = WebUtility.HtmlDecode(match.Groups["href"].Value) + "/";
+                var title = WebUtility.HtmlDecode(match.Groups["title"].Value);
+                var thumb = match.Groups["thumb"].Value;
+
+                if (string.IsNullOrWhiteSpace(title) || !seen.Add(href))
+                {
+                    continue;
+                }
+
+                var id = Regex.Match(href, "\\d+").Value;
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = id,
+                    Title = title,
+                    Description = "DesktopNexus wallpaper",
+                    ImageUrl = thumb.Replace("/thumbnail", "/preview"),
+                    FullPhotoUrl = thumb.Replace("/thumbnail", "/original"),
+                    SourceUrl = href,
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // digital blasphemy: woo product loop; full resolutions are membership-only, so both
+        // urls point at the keyless 640x480 CDN preview (documented cap)
+        // (automata-private/digitalblasphemy.com/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetDigitalBlasphemyWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            var path = DigitalBlasphemyModes
+                .FirstOrDefault(entry => entry.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Path ?? "product-category/wallpapers";
+
+            if (page > 1 && path == "product-tag/free")
+            {
+                // the free tag ships all 21 products on one page - there is no /page/N/
+                return new List<WallpaperItem>();
+            }
+
+            var url = page <= 1
+                ? $"https://digitalblasphemy.com/{path}/"
+                : $"https://digitalblasphemy.com/{path}/page/{page}/";
+            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var matches = Regex.Matches(
+                html,
+                "<a href=\"(?<href>https://digitalblasphemy\\.com/sec/[^/\"]+)/\"[^>]*>\\s*<img src=\"(?<thumb>https://cdn\\.digitalblasphemy\\.com/thumbnail/[^\"]+)\" alt=\"(?<alt>[^\"]*)\">\\s*<h2[^>]*>(?<title>.*?)</h2>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match match in matches)
+            {
+                var href = match.Groups["href"].Value + "/";
+                var thumb = match.Groups["thumb"].Value;
+                var title = WebUtility.HtmlDecode(Regex.Replace(match.Groups["title"].Value, "<[^>]+>", string.Empty)).Trim();
+                if (string.IsNullOrWhiteSpace(title))
+                {
+                    title = WebUtility.HtmlDecode(match.Groups["alt"].Value).Trim();
+                }
+
+                if (string.IsNullOrWhiteSpace(title) || !seen.Add(href))
+                {
+                    continue;
+                }
+
+                var resolutionMatch = Regex.Match(thumb, "_(?<res>\\d+x\\d+)\\.jpg$");
+                var resolution = resolutionMatch.Success ? resolutionMatch.Groups["res"].Value : string.Empty;
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = Regex.Match(href, "\\d+").Success ? Regex.Match(href, "\\d+").Value : href,
+                    Title = title,
+                    Description = "Digital Blasphemy wallpaper",
+                    ImageUrl = thumb,
+                    FullPhotoUrl = thumb,
+                    SourceUrl = href,
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    Resolution = resolution,
+                    QualityTag = GetQualityTag(resolution),
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // hdwallpapers: item template serves latest + every category; full-size = detail og:image
+        // (/previews/<slug>-<id>.jpg - dropping thumb_ from the cdn url is 404)
+        // (automata-private/www.hdwallpapers.net/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetHdwallpapersWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            var slug = HdwallpapersModes
+                .FirstOrDefault(entry => entry.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Slug ?? "latest-wallpapers";
+
+            var url = page <= 1
+                ? $"https://www.hdwallpapers.net/{slug}"
+                : $"https://www.hdwallpapers.net/{slug}/page-{page}";
+            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var matches = Regex.Matches(
+                html,
+                "href=\"(?<href>https://www\\.hdwallpapers\\.net/[^\"]+-wallpaper-\\d+\\.htm)\" title=\"(?<title>[^\"]+)\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://static\\d\\.hdwallpapers\\.net/[^\"]+)\"",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match match in matches)
+            {
+                var href = match.Groups["href"].Value;
+                var title = WebUtility.HtmlDecode(match.Groups["title"].Value);
+                var thumb = match.Groups["thumb"].Value;
+
+                if (string.IsNullOrWhiteSpace(title) || !seen.Add(href))
+                {
+                    continue;
+                }
+
+                var full = thumb;
+                var detail = Regex.Match(href, "/(?<cat>[^/]+)/(?<slug>[a-z0-9-]+)-wallpaper-(?<id>\\d+)\\.htm$");
+                if (detail.Success)
+                {
+                    full = $"https://www.hdwallpapers.net/previews/{detail.Groups["slug"].Value}-{detail.Groups["id"].Value}.jpg";
+                }
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = detail.Success ? detail.Groups["id"].Value : href,
+                    Title = title,
+                    Description = "HDwallpapers.net wallpaper",
+                    ImageUrl = thumb,
+                    FullPhotoUrl = full,
+                    SourceUrl = href,
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // pixiv: internal ajax search, anonymous-safe, restrict=safe PINNED on every request and
+        // xRestrict re-checked per item (adult content policy); i.pximg.net serves 403 unless the
+        // image load sends Referer pixiv.net - WallpaperItem.GetRefererFor handles that
+        // (automata-private/www.pixiv.net/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetPixivWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            var tag = string.IsNullOrWhiteSpace(mode) ? "wallpaper" : mode.ToLowerInvariant();
+            var url = $"https://www.pixiv.net/ajax/search/artworks/{Uri.EscapeDataString(tag)}?word={Uri.EscapeDataString(tag)}&restrict=safe&p={page}&order=date_d";
+
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.TryAddWithoutValidation("Referer", "https://www.pixiv.net/");
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            response.EnsureSuccessStatusCode();
+            var json = await response.Content.ReadAsStringAsync(cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("body", out var body) ||
+                !body.TryGetProperty("illustManga", out var search) ||
+                !search.TryGetProperty("data", out var data) ||
+                data.ValueKind != JsonValueKind.Array)
+            {
+                return wallpapers;
+            }
+
+            foreach (var item in data.EnumerateArray())
+            {
+                if (GetInt(item, "xRestrict") != 0)
+                {
+                    continue;
+                }
+
+                var id = GetString(item, "id");
+                var thumb = GetString(item, "url");
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(thumb))
+                {
+                    continue;
+                }
+
+                // full = strip the per-image /c/<w>x<h>_<q>_<flag> thumb prefix (the value varies
+                // per image, so regex it out instead of hardcoding one prefix)
+                var full = Regex.Replace(thumb, "/c/\\d+x\\d+_[^/]+(?=/img-master)", "");
+                var width = GetInt(item, "width");
+                var height = GetInt(item, "height");
+                var resolution = width > 0 && height > 0 ? $"{width}x{height}" : string.Empty;
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = id,
+                    Title = GetString(item, "title", "Pixiv illustration"),
+                    Description = $"Illustration by {GetString(item, "userName", "Pixiv artist")} on Pixiv.",
+                    ImageUrl = thumb,
+                    FullPhotoUrl = full,
+                    SourceUrl = $"https://www.pixiv.net/artworks/{id}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    Resolution = resolution,
+                    QualityTag = GetQualityTag(resolution),
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // cara: one SSR explore page (props.pageProps.imagePosts, no cursor key in the payload);
+        // posts ship a single full-size image so thumb == full
+        // (automata-private/cara.app/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetCaraWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            if (page > 1)
+            {
+                return new List<WallpaperItem>();
+            }
+
+            // cara.app (HTML and images.cara.app) returns 403 to .NET's SocketsHttpHandler
+            // TLS fingerprint while curl.exe passes - curl is cara's ONLY transport, not a
+            // fallback (Services/CurlClient.cs, verified live 2026-10-08)
+            var html = await CurlClient.GetStringAsync("https://cara.app/explore", cancellationToken);
+            var match = Regex.Match(html, "<script id=\"__NEXT_DATA__\" type=\"application/json\">(?<json>.*?)</script>", RegexOptions.Singleline);
+            var wallpapers = new List<WallpaperItem>();
+            if (!match.Success)
+            {
+                return wallpapers;
+            }
+
+            using var document = JsonDocument.Parse(match.Groups["json"].Value);
+            if (!TryGetNestedProperty(document.RootElement, out var posts, "props", "pageProps", "imagePosts") ||
+                posts.ValueKind != JsonValueKind.Array)
+            {
+                return wallpapers;
+            }
+
+            foreach (var post in posts.EnumerateArray())
+            {
+                var id = GetString(post, "id");
+                var cover = GetString(post, "coverImage");
+                if (string.IsNullOrWhiteSpace(cover) &&
+                    post.TryGetProperty("images", out var images) &&
+                    images.ValueKind == JsonValueKind.Array)
+                {
+                    foreach (var image in images.EnumerateArray())
+                    {
+                        cover = GetString(image, "src");
+                        if (!string.IsNullOrWhiteSpace(cover))
+                        {
+                            break;
+                        }
+                    }
+                }
+
+                if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(cover))
+                {
+                    continue;
+                }
+
+                var imageUrls = MakeAbsoluteUrl("https://images.cara.app", cover);
+                var author = GetString(post, "name", "Cara artist");
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = id,
+                    Title = GetString(post, "title", "Cara artwork"),
+                    Description = $"Artwork by {author} on Cara.",
+                    ImageUrl = imageUrls,
+                    FullPhotoUrl = imageUrls,
+                    SourceUrl = $"https://cara.app/post/{id}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // wallpaper cave: album pages are single-shot (no server pagination exists anywhere on the
+        // site); per-item titles do not exist on list pages, so cards get `<h1> #<n>` positional
+        // titles (automata-private/wallpapercave.com/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetWallpaperCaveWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            if (page > 1)
+            {
+                return new List<WallpaperItem>();
+            }
+
+            var album = WallpaperCaveAlbums
+                .FirstOrDefault(entry => entry.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Album ?? "wallpapers";
+            var html = await _httpClient.GetStringAsync($"https://wallpapercave.com/{album}", cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var heading = Regex.Match(html, "<h1[^>]*>(?<h1>[^<]+)</h1>", RegexOptions.Singleline);
+            var albumTitle = WebUtility.HtmlDecode(heading.Groups["h1"].Value).Trim();
+            if (string.IsNullOrWhiteSpace(albumTitle))
+            {
+                albumTitle = "Wallpapers";
+            }
+
+            var matches = Regex.Matches(
+                html,
+                "<a href=\"/w/(?<id>wp\\d+)\"[^>]*>\\s*<picture>.*?<img src=\"(?<img>/wp/wp\\d+\\.jpg)\"[^>]*class=\"wimg\"",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            var index = 0;
+            foreach (Match match in matches)
+            {
+                var id = match.Groups["id"].Value;
+                var file = match.Groups["img"].Value; // /wp/wp2471696.jpg
+                if (!seen.Add(id))
+                {
+                    continue;
+                }
+
+                index++;
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = id,
+                    Title = $"{albumTitle} #{index}",
+                    Description = "Wallpaper Cave wallpaper",
+                    ImageUrl = $"https://wallpapercave.com/mwp/{file.Substring(4)}", // mobile srcset = the small thumb
+                    FullPhotoUrl = $"https://wallpapercave.com{file}",               // 1980px original
+                    SourceUrl = $"https://wallpapercave.com/w/{id}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        // wallpaper engine: SSR React-Query payload with ESCAPED quotes - split per item on the
+        // publishedfileid marker (id/preview_url counts match, 30/30 per page); WE's own maturity
+        // tags ride in the same tags array and are dropped per item (adult content policy)
+        // (automata-private/steamcommunity.com/AGENTS.md)
+        private async Task<List<WallpaperItem>> GetWallpaperEngineWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
+        {
+            // verified filters only; Trending/unknown = no tag (the "Wallpaper" tag returned the
+            // unfiltered list, so it is deliberately not shipped)
+            var tag = !string.IsNullOrWhiteSpace(mode) &&
+                      !mode.Equals("Trending", StringComparison.OrdinalIgnoreCase) &&
+                      WallpaperEngineModes.Contains(mode, StringComparer.OrdinalIgnoreCase)
+                ? mode
+                : string.Empty;
+
+            var url = $"https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p={page}" +
+                      (tag.Length > 0 ? $"&requiredtags%5B0%5D={Uri.EscapeDataString(tag)}" : string.Empty);
+            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            var parts = Regex.Split(html, @"publishedfileid\\\"":\\""");
+            foreach (var part in parts.Skip(1))
+            {
+                var idMatch = Regex.Match(part, @"^\d+");
+                var urlMatch = Regex.Match(part, @"preview_url\\\"":\\""(?<url>[^\\""]+)");
+                if (!idMatch.Success || !urlMatch.Success || !seen.Add(idMatch.Value))
+                {
+                    continue;
+                }
+
+                if (part.Contains("tag\\\":\\\"Questionable") ||
+                    part.Contains("tag\\\":\\\"Mature") ||
+                    part.Contains("tag\\\":\\\"Adult") ||
+                    part.Contains("tag\\\":\\\"NSFW") ||
+                    part.Contains("tag\\\":\\\"18+"))
+                {
+                    continue;
+                }
+
+                var titleMatch = Regex.Match(part, @"title\\\"":\\""(?<title>[^\\""]+)");
+                var resolutionMatch = Regex.Match(part, @"tag\\\"":\\""(?<res>\d{3,4} x \d{3,4})\\""" );
+                var resolution = resolutionMatch.Success ? resolutionMatch.Groups["res"].Value.Replace(" ", string.Empty) : string.Empty;
+                var preview = urlMatch.Groups["url"].Value;
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = idMatch.Value,
+                    Title = titleMatch.Success ? WebUtility.HtmlDecode(titleMatch.Groups["title"].Value) : "Wallpaper Engine wallpaper",
+                    Description = "Wallpaper Engine workshop wallpaper",
+                    ImageUrl = preview,
+                    FullPhotoUrl = preview, // workshop file downloads need an authenticated call - previews are the public surface
+                    SourceUrl = $"https://steamcommunity.com/sharedfiles/filedetails/?id={idMatch.Value}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
                     Resolution = resolution,
                     QualityTag = GetQualityTag(resolution),
                     IsAI = false

@@ -66,6 +66,16 @@ namespace Aura.Models
             }
         }
 
+        // per-CDN referer: i.pximg.net returns 403 to anything that is not Referer pixiv.net
+        // (verified 200 pixiv.net / 403 wall.alphacoders.com - automata-private/www.pixiv.net);
+        // every other host keeps the alphacoders-compatible default
+        private static string GetRefererFor(string url)
+        {
+            return url.Contains("i.pximg.net", StringComparison.OrdinalIgnoreCase)
+                ? "https://www.pixiv.net/"
+                : "https://wall.alphacoders.com/";
+        }
+
         // Async method to load the actual image when needed with WebP support
         public async Task<BitmapImage> LoadImageAsync()
         {
@@ -76,14 +86,17 @@ namespace Aura.Models
                 httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                 httpClient.DefaultRequestHeaders.Add("Accept", "image/webp,image/apng,image/*,*/*;q=0.8");
                 httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
-                httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
+                httpClient.DefaultRequestHeaders.Add("Referer", GetRefererFor(ImageUrl));
 
 
-                // Download the image data. Backiee currently needs a curl fallback on some
-                // Windows/.NET TLS stacks, while AlphaCoders continues through HttpClient.
-                var imageBytes = IsBackieeUrl(ImageUrl)
-                    ? await BackieeNetworkClient.GetByteArrayAsync(ImageUrl)
-                    : await httpClient.GetByteArrayAsync(ImageUrl);
+                // Download the image data, host-routed: curl is cara's ONLY transport
+                // (TLS-fingerprint 403), backiee keeps its proven client, everything
+                // else continues through HttpClient
+                var imageBytes = IsCaraUrl(ImageUrl)
+                    ? await CurlClient.GetByteArrayAsync(ImageUrl)
+                    : IsBackieeUrl(ImageUrl)
+                        ? await BackieeNetworkClient.GetByteArrayAsync(ImageUrl)
+                        : await httpClient.GetByteArrayAsync(ImageUrl);
 
                 // Convert WebP to PNG using ImageSharp
                 using (var inputStream = new MemoryStream(imageBytes))
@@ -132,13 +145,16 @@ namespace Aura.Models
                     httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
                     httpClient.DefaultRequestHeaders.Add("Accept", "image/webp,image/apng,image/*,*/*;q=0.8");
                     httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
-                    httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
+                    httpClient.DefaultRequestHeaders.Add("Referer", GetRefererFor(FullPhotoUrl));
 
-                    // Download the image data. Backiee currently needs a curl fallback on some
-                    // Windows/.NET TLS stacks, while AlphaCoders continues through HttpClient.
-                    var imageBytes = IsBackieeUrl(FullPhotoUrl)
-                        ? await BackieeNetworkClient.GetByteArrayAsync(FullPhotoUrl)
-                        : await httpClient.GetByteArrayAsync(FullPhotoUrl);
+                    // Download the image data, host-routed: curl is cara's ONLY transport
+                    // (TLS-fingerprint 403), backiee keeps its proven client, everything
+                    // else continues through HttpClient
+                    var imageBytes = IsCaraUrl(FullPhotoUrl)
+                        ? await CurlClient.GetByteArrayAsync(FullPhotoUrl)
+                        : IsBackieeUrl(FullPhotoUrl)
+                            ? await BackieeNetworkClient.GetByteArrayAsync(FullPhotoUrl)
+                            : await httpClient.GetByteArrayAsync(FullPhotoUrl);
 
                     // Convert WebP to PNG using ImageSharp
                     using (var inputStream = new MemoryStream(imageBytes))
@@ -192,6 +208,15 @@ namespace Aura.Models
         {
             return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
                    uri.Host.EndsWith("backiee.com", StringComparison.OrdinalIgnoreCase);
+        }
+
+        // cara.app / images.cara.app: .NET's TLS fingerprint gets 403 (bot management),
+        // curl.exe passes - those URLs only ever go through CurlClient (no fallback)
+        private static bool IsCaraUrl(string url)
+        {
+            return Uri.TryCreate(url, UriKind.Absolute, out var uri) &&
+                   (uri.Host.Equals("cara.app", StringComparison.OrdinalIgnoreCase) ||
+                    uri.Host.EndsWith(".cara.app", StringComparison.OrdinalIgnoreCase));
         }
     }
 
