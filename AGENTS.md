@@ -498,6 +498,40 @@ collection page mixes shapes:
   (viewport realized) title `Pixabay` bar clean, vision = real nature stills
   (beach-spit frame = the probed video), full watch bar clean.
 
+## categories page lag: off-thread image conversion + parallel opens (2026-10-09)
+
+user report: the Global categories page was "lagging super hard" (stutter
+while the ~200 card thumbs streamed in, dead time on every open). two causes,
+both fixed:
+
+- **`WallpaperItem.LoadImageAsync` / `LoadFullImageAsync` ran their CPU on the
+  UI thread**: every `await` in them resumes on the WinUI SynchronizationContext,
+  and ImageSharp's `Image.LoadAsync` + `SaveAsPngAsync` over MemoryStreams
+  complete synchronously - so each fill did a FULL-resolution decode + FULL-
+  size PNG re-encode inline on the dispatcher (tens to hundreds of ms x ~200
+  fills per open; a detail page = one big stutter). both now wrap decode +
+  encode in `Task.Run` (pool thread); `LoadImageAsync` also resizes to <=500
+  wide BEFORE encoding (`DecodePixelWidth = 500` discarded the full-res PNG
+  anyway - the encode is thumb-sized now; sources <=500 wide are untouched, so
+  the DecodePixelWidth upscale path behaves exactly as before). `BitmapImage`
+  is a DependencyObject: created back on the UI thread after the pool hop. the
+  full path ALSO left the old `GetOutputStreamAt`/`AsStreamForWrite`/
+  `FlushAsync` WIC form (the 0x88982F50-prone one from the thumb fix above) for
+  the proven `WriteAsync` + `Seek(0)` + `SetSourceAsync` pattern.
+- **the open awaited the 5 index loads sequentially** (alpha -> pixabay ->
+  wallpaperhub -> artstation -> backiee + 19 eager thumbs) before the first
+  card could render = every open paid the SUM of all round trips, growing with
+  every platform added. now `Task.WhenAll` over 5 local funcs inside
+  `LoadCategoriesAsync`, each returning ITS OWN `List<string>` of errors (one
+  shared list appended from parallel tasks would race), merged after WhenAll;
+  a `finally` keeps the progress bar + `_isLoading` reset even if WhenAll ever
+  faulted (a stuck `_isLoading` would dead-end the page silently).
+- verified menuless (re-run of `C:\tmp\aura-artstationchannelcheck.ps1`): 221
+  cards, 64/64 channels, all 3 drills OK, bar clean through the whole fill +
+  an 18x5s watch whose cadence never slipped (UIA reads = the UI-thread canary
+  - the old build starved them during fills), focus restored. one run died
+  with the KNOWN open exit=0 signature mid-drill; the paced re-run passed.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked
@@ -542,7 +576,10 @@ collection page mixes shapes:
   | 1 = external force kill | 0xC0000354 = STATUS_DEBUGGER_INACTIVE = a
   debugger killed it (probe ARTIFACT, discard the run) | any other negative
   = NTSTATUS crash** - and the registry last-write check (only a close
-  writes park coords). status: paused, nothing running; resume = the cdb
+  writes park coords). status: one more real exit=0 death observed
+  2026-10-09 (artstation probe drill phase, right before the Book
+  Illustration drill; the paced re-run passed - same signature, root cause
+  still open); otherwise nothing parked; resume = the cdb
   loop-ender catcher, recipe in automata `windows-ui-automation`.
 
 ## xamlcompiler quirk: invalid property = SILENT exit 1 (2026-10-06)

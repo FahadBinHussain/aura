@@ -122,113 +122,31 @@ namespace Aura.Views.Backiee
             ErrorTextBlock.Visibility = Visibility.Collapsed;
             LoadingProgressBar.Visibility = Visibility.Visible;
 
+            // the five index loads are independent round trips - run them TOGETHER.
+            // awaited one after another, every Categories open paid the SUM of all
+            // five plus the 19 backiee thumb downloads before the first card could
+            // render, and the sum grew with every platform added (reported: the
+            // Global page "lagging super hard"). each load returns its OWN error
+            // strings; they merge after WhenAll - one shared List<string> appended
+            // from parallel tasks would race. every continuation still resumes on
+            // the UI thread (no ConfigureAwait(false) here), so the shared
+            // snapshots and collections are only ever touched there.
             var errors = new List<string>();
-
-            // alphacoders: its REAL category page is the single source (live load with
-            // the same loud contract as backiee - the service holds no static list,
-            // a failed fetch leaves the platform empty AND explained in the error bar)
             try
             {
-                var alphaCategories = await new AlphaCodersService().GetCategoryIndexAsync();
-                if (alphaCategories.Count == 0)
+                var loads = new[]
                 {
-                    errors.Add("alphacoders returned no categories - the /tag/is-category markup may have changed.");
-                }
-                else
-                {
-                    AlphaCodersService.SetCategories(alphaCategories);
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Couldn't load alphacoders categories: {ex.Message}");
-            }
+                    LoadAlphaIndexAsync(),
+                    LoadPixabayCollectionsAsync(),
+                    LoadWallpaperHubCollectionsAsync(),
+                    LoadArtStationChannelsAsync(),
+                    LoadBackieeCategoriesAsync(),
+                };
 
-            // pixabay: its curated Collections index is the source (live load, same
-            // loud contract - the API category list is gone; the index wraps
-            // ?pagi>=3 back to page 1, the loader stops on the first page with no
-            // new slugs)
-            try
-            {
-                var pixabayCollections = await new PublicWallpaperService().GetPixabayCollectionsIndexAsync();
-                if (pixabayCollections.Count == 0)
+                foreach (var loadErrors in await Task.WhenAll(loads))
                 {
-                    errors.Add("pixabay returned no collections - the /collections/ markup may have changed.");
+                    errors.AddRange(loadErrors);
                 }
-                else
-                {
-                    PublicWallpaperService.SetPixabayCollections(pixabayCollections);
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Couldn't load pixabay collections: {ex.Message}");
-            }
-
-            // wallpaperhub: its own Collections index is the source (live load,
-            // same loud contract - the 17-entry static table is gone; the loader
-            // stops on the first page with no new ids since ?page=N is ignored
-            // today)
-            try
-            {
-                var wallpaperHubCollections = await new PublicWallpaperService().GetWallpaperHubCollectionsIndexAsync();
-                if (wallpaperHubCollections.Count == 0)
-                {
-                    errors.Add("wallpaperhub returned no collections - the /collections markup may have changed.");
-                }
-                else
-                {
-                    PublicWallpaperService.SetWallpaperHubCollections(wallpaperHubCollections);
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Couldn't load wallpaperhub collections: {ex.Message}");
-            }
-
-            // artstation: its own Channels directory is the category source (live
-            // load, same loud contract - the 5 query entries are gone; every
-            // published channel the site's picker lists becomes a card,
-            // key = channel:<id>)
-            try
-            {
-                var artChannels = await new ArtStationService().GetChannelsIndexAsync();
-                if (artChannels.Count == 0)
-                {
-                    errors.Add("artstation returned no channels - the channels.json markup may have changed.");
-                }
-                else
-                {
-                    ArtStationService.SetChannels(artChannels);
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Couldn't load artstation channels: {ex.Message}");
-            }
-
-            try
-            {
-                var html = await BackieeNetworkClient.GetStringAsync(CategoriesUrl);
-                var parsed = BackieeHtmlParser.ParseCategories(html);
-
-                if (parsed.Count == 0)
-                {
-                    errors.Add("backiee returned no categories - the /categories markup may have changed.");
-                }
-                else
-                {
-                    _backieeCategories.AddRange(parsed);
-                    int failures = await LoadThumbnailsAsync(parsed);
-                    if (failures == parsed.Count)
-                    {
-                        errors.Add("Every category thumbnail failed to load - backiee is likely blocking image requests.");
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                errors.Add($"Couldn't load backiee categories: {ex.Message}");
             }
             finally
             {
@@ -240,6 +158,146 @@ namespace Aura.Views.Backiee
             BuildMerged();
             ApplyScope();
             _ = FillThumbnailsAsync(); // fire-and-forget: placeholder cards fill in as thumbs arrive
+
+            // alphacoders: its REAL category page is the single source (live load with
+            // the same loud contract as backiee - the service holds no static list,
+            // a failed fetch leaves the platform empty AND explained in the error bar)
+            async Task<List<string>> LoadAlphaIndexAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var alphaCategories = await new AlphaCodersService().GetCategoryIndexAsync();
+                    if (alphaCategories.Count == 0)
+                    {
+                        loadErrors.Add("alphacoders returned no categories - the /tag/is-category markup may have changed.");
+                    }
+                    else
+                    {
+                        AlphaCodersService.SetCategories(alphaCategories);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load alphacoders categories: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
+
+            // pixabay: its curated Collections index is the source (live load, same
+            // loud contract - the API category list is gone; the index wraps
+            // ?pagi>=3 back to page 1, the loader stops on the first page with no
+            // new slugs)
+            async Task<List<string>> LoadPixabayCollectionsAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var pixabayCollections = await new PublicWallpaperService().GetPixabayCollectionsIndexAsync();
+                    if (pixabayCollections.Count == 0)
+                    {
+                        loadErrors.Add("pixabay returned no collections - the /collections/ markup may have changed.");
+                    }
+                    else
+                    {
+                        PublicWallpaperService.SetPixabayCollections(pixabayCollections);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load pixabay collections: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
+
+            // wallpaperhub: its own Collections index is the source (live load,
+            // same loud contract - the 17-entry static table is gone; the loader
+            // stops on the first page with no new ids since ?page=N is ignored
+            // today)
+            async Task<List<string>> LoadWallpaperHubCollectionsAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var wallpaperHubCollections = await new PublicWallpaperService().GetWallpaperHubCollectionsIndexAsync();
+                    if (wallpaperHubCollections.Count == 0)
+                    {
+                        loadErrors.Add("wallpaperhub returned no collections - the /collections markup may have changed.");
+                    }
+                    else
+                    {
+                        PublicWallpaperService.SetWallpaperHubCollections(wallpaperHubCollections);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load wallpaperhub collections: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
+
+            // artstation: its own Channels directory is the category source (live
+            // load, same loud contract - the 5 query entries are gone; every
+            // published channel the site's picker lists becomes a card,
+            // key = channel:<id>)
+            async Task<List<string>> LoadArtStationChannelsAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var artChannels = await new ArtStationService().GetChannelsIndexAsync();
+                    if (artChannels.Count == 0)
+                    {
+                        loadErrors.Add("artstation returned no channels - the channels.json markup may have changed.");
+                    }
+                    else
+                    {
+                        ArtStationService.SetChannels(artChannels);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load artstation channels: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
+
+            // backiee: the category page + its 19 eager thumbnails (real art on the
+            // cards from the first paint - this is the one block that must finish
+            // before BuildMerged, exactly as before)
+            async Task<List<string>> LoadBackieeCategoriesAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var html = await BackieeNetworkClient.GetStringAsync(CategoriesUrl);
+                    var parsed = BackieeHtmlParser.ParseCategories(html);
+
+                    if (parsed.Count == 0)
+                    {
+                        loadErrors.Add("backiee returned no categories - the /categories markup may have changed.");
+                    }
+                    else
+                    {
+                        _backieeCategories.AddRange(parsed);
+                        int failures = await LoadThumbnailsAsync(parsed);
+                        if (failures == parsed.Count)
+                        {
+                            loadErrors.Add("Every category thumbnail failed to load - backiee is likely blocking image requests.");
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load backiee categories: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
         }
 
         private async Task<int> LoadThumbnailsAsync(List<BackieeCategory> categories)

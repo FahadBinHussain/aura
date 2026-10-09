@@ -8,6 +8,7 @@ using System.IO; // For MemoryStream
 using Windows.Storage.Streams; // For InMemoryRandomAccessStream
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Formats.Png;
+using SixLabors.ImageSharp.Processing;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
 using Aura.Services;
@@ -98,38 +99,49 @@ namespace Aura.Models
                         ? await BackieeNetworkClient.GetByteArrayAsync(ImageUrl)
                         : await httpClient.GetByteArrayAsync(ImageUrl);
 
-                // Convert WebP to PNG using ImageSharp
-                using (var inputStream = new MemoryStream(imageBytes))
+                // decode + re-encode OFF the UI thread: every await above resumes on
+                // the app dispatcher (WinUI SynchronizationContext), and ImageSharp's
+                // decode + PNG encode are CPU work - run inline there they froze the
+                // UI once per thumbnail, and the Categories page streams ~200 fills
+                // per open (reported: "lagging super hard"). resize BEFORE encoding
+                // too: DecodePixelWidth=500 throws the full-res PNG away anyway, so
+                // the encode is thumb-sized now. sources <= 500 wide are left alone -
+                // DecodePixelWidth's upscale path then behaves exactly as before.
+                var pngBytes = await Task.Run(async () =>
                 {
-
-                    // Load the image using ImageSharp (supports WebP)
+                    using (var inputStream = new MemoryStream(imageBytes))
                     using (var image = await Image.LoadAsync(inputStream))
                     {
+                        if (image.Width > 500)
+                        {
+                            image.Mutate(x => x.Resize(500, 0));
+                        }
+
                         using (var outputStream = new MemoryStream())
                         {
-                            // Convert to PNG
                             await image.SaveAsPngAsync(outputStream);
-                            outputStream.Position = 0;
-
-
-                            // bytes -> stream the SAME way BackieeCategory does (proven on
-                            // 19/19 backiee thumbs): direct WriteAsync into the WinRT stream.
-                            // the old GetOutputStreamAt/AsStreamForWrite/Flush path threw
-                            // WIC 0x88982F50 with NO message on 3 of 93 thumbnail loads.
-                            var bitmap = new BitmapImage();
-                            bitmap.DecodePixelWidth = 500;
-
-                            using (var stream = new InMemoryRandomAccessStream())
-                            {
-                                await stream.WriteAsync(outputStream.ToArray().AsBuffer());
-                                stream.Seek(0);
-                                await bitmap.SetSourceAsync(stream);
-                            }
-
-                            return bitmap;
+                            return outputStream.ToArray();
                         }
                     }
+                });
+
+                // bytes -> stream the SAME way BackieeCategory does (proven on
+                // 19/19 backiee thumbs): direct WriteAsync into the WinRT stream.
+                // the old GetOutputStreamAt/AsStreamForWrite/Flush path threw
+                // WIC 0x88982F50 with NO message on 3 of 93 thumbnail loads.
+                // BitmapImage is a DependencyObject - created back on the UI
+                // thread, while all the CPU work above ran on the pool.
+                var bitmap = new BitmapImage();
+                bitmap.DecodePixelWidth = 500;
+
+                using (var stream = new InMemoryRandomAccessStream())
+                {
+                    await stream.WriteAsync(pngBytes.AsBuffer());
+                    stream.Seek(0);
+                    await bitmap.SetSourceAsync(stream);
                 }
+
+                return bitmap;
             }
         }
 
@@ -156,34 +168,37 @@ namespace Aura.Models
                             ? await BackieeNetworkClient.GetByteArrayAsync(FullPhotoUrl)
                             : await httpClient.GetByteArrayAsync(FullPhotoUrl);
 
-                    // Convert WebP to PNG using ImageSharp
-                    using (var inputStream = new MemoryStream(imageBytes))
+                    // decode + re-encode OFF the UI thread - same dispatcher freeze as
+                    // the thumbnail path (a detail page opened as one big stutter while
+                    // the full-size PNG re-encode ran inline). no resize here: the full
+                    // image IS the point.
+                    var pngBytes = await Task.Run(async () =>
                     {
-                        // Load the image using ImageSharp (supports WebP)
+                        using (var inputStream = new MemoryStream(imageBytes))
                         using (var image = await Image.LoadAsync(inputStream))
                         {
                             using (var outputStream = new MemoryStream())
                             {
-                                // Convert to PNG
                                 await image.SaveAsPngAsync(outputStream);
-                                outputStream.Position = 0;
-
-                                // Create BitmapImage from PNG data
-                                var bitmap = new BitmapImage();
-
-                                // Convert to IRandomAccessStream
-                                var randomAccessStream = new InMemoryRandomAccessStream();
-                                var raOutputStream = randomAccessStream.GetOutputStreamAt(0);
-                                await outputStream.CopyToAsync(raOutputStream.AsStreamForWrite());
-                                await raOutputStream.FlushAsync();
-
-                                // Set bitmap source
-                                await bitmap.SetSourceAsync(randomAccessStream);
-
-                                return bitmap;
+                                return outputStream.ToArray();
                             }
                         }
+                    });
+
+                    // same proven stream path as LoadImageAsync (the old
+                    // GetOutputStreamAt/AsStreamForWrite/FlushAsync form threw WIC
+                    // 0x88982F50 with NO message on 3 of 93 thumbnail loads - it is
+                    // the same WIC API here); BitmapImage stays on the UI thread.
+                    var bitmap = new BitmapImage();
+
+                    using (var stream = new InMemoryRandomAccessStream())
+                    {
+                        await stream.WriteAsync(pngBytes.AsBuffer());
+                        stream.Seek(0);
+                        await bitmap.SetSourceAsync(stream);
                     }
+
+                    return bitmap;
                 }
             }
             catch (Exception ex)
