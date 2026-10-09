@@ -34,7 +34,7 @@
                         <Viewbox Stretch="Uniform">
                             <Grid Width="1920" Height="1080">
                                 <Image x:Name="DesktopSlideshowImage"
-                                       Source="ms-appx:///Assets/placeholder.png"
+                                       Source="ms-appx:///Assets/placeholder-wallpaper-1000.png"
                                        Stretch="UniformToFill" />
                             </Grid>
                         </Viewbox>
@@ -103,6 +103,12 @@
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Loud failure line: never a silently dead slideshow -->
+                    <InfoBar x:Name="DesktopSlideshowInfoBar"
+                             IsOpen="False"
+                             IsClosable="False"
+                             Severity="Warning"/>
                 </StackPanel>
 
                 <!-- Right Column: Lock Screen Slideshow -->
@@ -118,7 +124,7 @@
                         <Viewbox Stretch="Uniform">
                             <Grid Width="1920" Height="1080">
                                 <Image x:Name="LockScreenSlideshowImage"
-                                       Source="ms-appx:///Assets/placeholder.png"
+                                       Source="ms-appx:///Assets/placeholder-wallpaper-1000.png"
                                        Stretch="UniformToFill" />
                             </Grid>
                         </Viewbox>
@@ -187,6 +193,12 @@
                                        Visibility="Collapsed"/>
                         </StackPanel>
                     </Border>
+
+                    <!-- Loud failure line: never a silently dead slideshow -->
+                    <InfoBar x:Name="LockScreenSlideshowInfoBar"
+                             IsOpen="False"
+                             IsClosable="False"
+                             Severity="Warning"/>
                 </StackPanel>
             </Grid>
         </StackPanel>

@@ -1033,22 +1033,28 @@ namespace Aura
                 string lockInterval = settings.TryGetValue("LockScreenSlideshowInterval", out var li) ? li.GetString() ?? "12 hours" : "12 hours";
 
                 var dispatcherQueue = App.MainDispatcherQueue ?? DispatcherQueue;
+                var service = SlideshowService.Instance;
 
-                if (desktopEnabled && desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(desktopCategory))
+                // skip if the Slideshow page already started/restored these -
+                // two parallel starts would race on the same wallpaper lists
+                if (desktopEnabled && desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(desktopCategory)
+                    && !service.DesktopRunning && !service.DesktopStarting)
                 {
                     var interval = SlideshowService.ParseInterval(desktopInterval);
-                    await SlideshowService.Instance.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue);
+                    await service.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue);
                 }
 
-                if (lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory))
+                if (lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory)
+                    && !service.LockScreenRunning && !service.LockScreenStarting)
                 {
                     var interval = SlideshowService.ParseInterval(lockInterval);
-                    await SlideshowService.Instance.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue);
+                    await service.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue);
                 }
             }
-            catch (Exception)
+            catch (Exception ex)
             {
-                // Silently ignore if settings can't be read
+                // unreadable settings at startup - LOUD on the Slideshow page, never silent
+                SlideshowService.Instance.ReportRestoreError($"Slideshow restore failed: {ex.Message}");
             }
         }
 

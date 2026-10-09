@@ -38,24 +38,49 @@ namespace Aura.Views.Backiee
         public SlideshowPage()
         {
             this.InitializeComponent();
-            
-            // Subscribe to slideshow wallpaper change events
-            SlideshowService.Instance.DesktopWallpaperChanged += OnDesktopWallpaperChanged;
-            SlideshowService.Instance.LockScreenWallpaperChanged += OnLockScreenWallpaperChanged;
-            
+
             // Delay loading settings until page is fully loaded
             this.Loaded += SlideshowPage_Loaded;
             this.Unloaded += SlideshowPage_Unloaded;
-            
+
             // Start countdown timer
             StartCountdownTimer();
         }
-        
+
+        private void SubscribeServiceEvents()
+        {
+            // -= first: Loaded can fire again on the same instance and a singleton
+            // event must never accumulate dead-page handlers
+            SlideshowService.Instance.DesktopWallpaperChanged -= OnDesktopWallpaperChanged;
+            SlideshowService.Instance.LockScreenWallpaperChanged -= OnLockScreenWallpaperChanged;
+            SlideshowService.Instance.ErrorsChanged -= OnSlideshowErrorsChanged;
+            SlideshowService.Instance.DesktopWallpaperChanged += OnDesktopWallpaperChanged;
+            SlideshowService.Instance.LockScreenWallpaperChanged += OnLockScreenWallpaperChanged;
+            SlideshowService.Instance.ErrorsChanged += OnSlideshowErrorsChanged;
+        }
+
+        private void UnsubscribeServiceEvents()
+        {
+            SlideshowService.Instance.DesktopWallpaperChanged -= OnDesktopWallpaperChanged;
+            SlideshowService.Instance.LockScreenWallpaperChanged -= OnLockScreenWallpaperChanged;
+            SlideshowService.Instance.ErrorsChanged -= OnSlideshowErrorsChanged;
+        }
+
+        private void OnSlideshowErrorsChanged(object? sender, EventArgs e)
+        {
+            DispatcherQueue.TryEnqueue(() =>
+            {
+                UpdateStatusUI();
+                UpdateCountdowns();
+            });
+        }
+
         private void SlideshowPage_Unloaded(object sender, RoutedEventArgs e)
         {
             // Stop countdown timer when page is unloaded
             _countdownTimer?.Stop();
             _countdownTimer = null;
+            UnsubscribeServiceEvents();
         }
         
         private void StartCountdownTimer()
@@ -69,60 +94,49 @@ namespace Aura.Views.Backiee
         
         private void UpdateCountdowns()
         {
-            // Update desktop countdown
-            if (_desktopSlideshowEnabled && SlideshowService.Instance.DesktopNextChangeTime > DateTime.MinValue)
+            var service = SlideshowService.Instance;
+
+            // Desktop countdown: while enabled it NEVER silently hides - the user
+            // must always see WHEN the wallpaper is expected to change, or WHY
+            // it is not running (the InfoBar below carries the reason).
+            if (_desktopSlideshowEnabled)
             {
-                var timeRemaining = SlideshowService.Instance.DesktopNextChangeTime - DateTime.Now;
-                
-                // Only show "Changing wallpaper..." for up to 30 seconds after scheduled time
-                // After that, hide the countdown (wallpaper change might have failed or completed)
-                if (timeRemaining.TotalSeconds > 0)
-                {
-                    DesktopCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
-                    DesktopCountdownText.Visibility = Visibility.Visible;
-                }
-                else if (timeRemaining.TotalSeconds >= -30)
-                {
-                    DesktopCountdownText.Text = "Changing wallpaper...";
-                    DesktopCountdownText.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    // Hide after 30 seconds to avoid getting stuck
-                    DesktopCountdownText.Visibility = Visibility.Collapsed;
-                }
+                DesktopCountdownText.Visibility = Visibility.Visible;
+                DesktopCountdownText.Text = CountdownText(
+                    service.DesktopStarting, service.DesktopRunning, service.DesktopNextChangeTime);
             }
             else
             {
                 DesktopCountdownText.Visibility = Visibility.Collapsed;
             }
-            
-            // Update lock screen countdown
-            if (_lockScreenSlideshowEnabled && SlideshowService.Instance.LockScreenNextChangeTime > DateTime.MinValue)
+
+            // Lock screen countdown - same states, symmetric
+            if (_lockScreenSlideshowEnabled)
             {
-                var timeRemaining = SlideshowService.Instance.LockScreenNextChangeTime - DateTime.Now;
-                
-                // Only show "Changing wallpaper..." for up to 30 seconds after scheduled time
-                if (timeRemaining.TotalSeconds > 0)
-                {
-                    LockScreenCountdownText.Text = $"Next wallpaper in: {FormatTimeSpan(timeRemaining)}";
-                    LockScreenCountdownText.Visibility = Visibility.Visible;
-                }
-                else if (timeRemaining.TotalSeconds >= -30)
-                {
-                    LockScreenCountdownText.Text = "Changing wallpaper...";
-                    LockScreenCountdownText.Visibility = Visibility.Visible;
-                }
-                else
-                {
-                    // Hide after 30 seconds to avoid getting stuck
-                    LockScreenCountdownText.Visibility = Visibility.Collapsed;
-                }
+                LockScreenCountdownText.Visibility = Visibility.Visible;
+                LockScreenCountdownText.Text = CountdownText(
+                    service.LockScreenStarting, service.LockScreenRunning, service.LockScreenNextChangeTime);
             }
             else
             {
                 LockScreenCountdownText.Visibility = Visibility.Collapsed;
             }
+        }
+
+        private string CountdownText(bool starting, bool running, DateTime nextChangeTime)
+        {
+            if (starting)
+                return "Starting slideshow...";
+
+            if (!running || nextChangeTime <= DateTime.MinValue)
+                return "Slideshow is not running";
+
+            var timeRemaining = nextChangeTime - DateTime.Now;
+            if (timeRemaining.TotalSeconds > 0)
+                return $"Next wallpaper at {nextChangeTime:HH:mm:ss} (in {FormatTimeSpan(timeRemaining)})";
+            if (timeRemaining.TotalSeconds >= -60)
+                return "Changing wallpaper...";
+            return $"Overdue - expected at {nextChangeTime:HH:mm:ss}";
         }
         
         private string FormatTimeSpan(TimeSpan timeSpan)
@@ -147,6 +161,8 @@ namespace Aura.Views.Backiee
         
         private async void SlideshowPage_Loaded(object sender, RoutedEventArgs e)
         {
+            SubscribeServiceEvents();
+            if (_countdownTimer == null) StartCountdownTimer();
             LoadSettings();
             await LoadCurrentWallpapers();
         }
@@ -350,6 +366,8 @@ namespace Aura.Views.Backiee
             }
             catch (Exception ex)
             {
+                // corrupt/unreadable settings file - LOUD, never a fake "No slideshow set"
+                SlideshowService.Instance.ReportRestoreError($"Slideshow settings could not be read: {ex.Message}");
             }
             
             UpdateStatusUI();
@@ -357,7 +375,8 @@ namespace Aura.Views.Backiee
         
         private async Task UpdateStatusUIAsync()
         {
-            
+            var service = SlideshowService.Instance;
+
             // Update desktop slideshow status
             if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
             {
@@ -379,12 +398,29 @@ namespace Aura.Views.Backiee
             {
                 LockScreenStatusText.Text = "No slideshow set";
             }
-            
+
+            // Loud failure lines: a slideshow that cannot run says so here
+            ApplyErrorBar(DesktopSlideshowInfoBar, service.DesktopError, service.DesktopRunning);
+            ApplyErrorBar(LockScreenSlideshowInfoBar, service.LockScreenError, service.LockScreenRunning);
+
             // Wait a moment for the service to update next change times
             await Task.Delay(100);
             
             // Force immediate countdown update
             UpdateCountdowns();
+        }
+
+        private static void ApplyErrorBar(InfoBar bar, string? error, bool running)
+        {
+            if (string.IsNullOrWhiteSpace(error))
+            {
+                bar.IsOpen = false;
+                return;
+            }
+            bar.Title = running ? "Slideshow warning" : "Slideshow not running";
+            bar.Message = error;
+            bar.Severity = running ? InfoBarSeverity.Warning : InfoBarSeverity.Error;
+            bar.IsOpen = true;
         }
         
         private void UpdateStatusUI()
@@ -429,22 +465,29 @@ namespace Aura.Views.Backiee
         {
             try
             {
-                // Restore desktop slideshow if it was enabled
-                if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
+                var service = SlideshowService.Instance;
+
+                // Restore desktop slideshow if it was enabled - never restart one
+                // that is already running or mid-start (each page visit used to
+                // restart it, resetting the countdown and spamming history)
+                if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory)
+                    && !service.DesktopRunning && !service.DesktopStarting)
                 {
                     var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                    await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await service.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
                 
-                // Restore lock screen slideshow if it was enabled
-                if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
+                // Restore lock screen slideshow if it was enabled - same guard
+                if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory)
+                    && !service.LockScreenRunning && !service.LockScreenStarting)
                 {
                     var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                    await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await service.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
                 }
             }
             catch (Exception ex)
             {
+                SlideshowService.Instance.ReportRestoreError($"Slideshow restore failed: {ex.Message}");
             }
         }
 

@@ -70,6 +70,62 @@ namespace Aura.Services
         public TimeSpan DesktopInterval => _desktopInterval;
         public TimeSpan LockScreenInterval => _lockScreenInterval;
 
+        // Loud failure state: a slideshow that cannot run says so here (InfoBar on
+        // the Slideshow page + app.log), never a silent dead timer.
+        public bool DesktopStarting { get; private set; }
+        public bool LockScreenStarting { get; private set; }
+        public bool DesktopRunning => _desktopTimer != null;
+        public bool LockScreenRunning => _lockScreenTimer != null;
+        private string? _desktopLoadError;
+        private string? _desktopApplyError;
+        private string? _lockScreenLoadError;
+        private string? _lockScreenApplyError;
+        public string? DesktopError => JoinErrors(_desktopLoadError, _desktopApplyError);
+        public string? LockScreenError => JoinErrors(_lockScreenLoadError, _lockScreenApplyError);
+        public event EventHandler? ErrorsChanged;
+
+        private static string? JoinErrors(params string?[] parts)
+            => string.Join(" ", parts.Where(p => !string.IsNullOrWhiteSpace(p)));
+
+        private void RaiseErrorsChanged() => ErrorsChanged?.Invoke(this, EventArgs.Empty);
+
+        private void SetDesktopLoadError(string? error)
+        {
+            _desktopLoadError = error;
+            if (error != null) LogInfo(error);
+            RaiseErrorsChanged();
+        }
+
+        private void SetDesktopApplyError(string? error)
+        {
+            _desktopApplyError = error;
+            if (error != null) LogInfo(error);
+            RaiseErrorsChanged();
+        }
+
+        private void SetLockScreenLoadError(string? error)
+        {
+            _lockScreenLoadError = error;
+            if (error != null) LogInfo(error);
+            RaiseErrorsChanged();
+        }
+
+        private void SetLockScreenApplyError(string? error)
+        {
+            _lockScreenApplyError = error;
+            if (error != null) LogInfo(error);
+            RaiseErrorsChanged();
+        }
+
+        // startup restore path (settings file unreadable) - affects both surfaces
+        public void ReportRestoreError(string message)
+        {
+            _desktopLoadError = message;
+            _lockScreenLoadError = message;
+            LogInfo(message);
+            RaiseErrorsChanged();
+        }
+
         // Windows API for setting desktop wallpaper
         [DllImport("user32.dll", CharSet = CharSet.Auto)]
         private static extern int SystemParametersInfo(int uAction, int uParam, string lpvParam, int fuWinIni);
@@ -98,9 +154,9 @@ namespace Aura.Services
 
         public async Task StartDesktopSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
         {
+            DesktopStarting = true;
             try
             {
-
                 // Store parameters for batch loading
                 _desktopPlatforms = platforms;
                 _desktopCategory = category;
@@ -113,23 +169,32 @@ namespace Aura.Services
                 // Load progress if exists
                 LoadProgress();
 
-                // Fetch wallpapers from multiple platforms
-                await LoadWallpapersForDesktop(platforms, category);
+                // Fetch wallpapers from every platform - one broken platform must
+                // never kill the batch (ArtStation used to hit a NotSupportedException
+                // in PublicWallpaperService and silently took all 8 platforms down)
+                var failures = await LoadWallpapersForDesktop(platforms, category);
 
                 if (_desktopWallpapers.Count == 0)
                 {
+                    SetDesktopLoadError(failures.Count > 0
+                        ? $"Desktop slideshow not started: 0 wallpapers loaded - {string.Join("; ", failures)}"
+                        : "Desktop slideshow not started: 0 wallpapers loaded (every platform returned nothing)");
                     return;
                 }
+                SetDesktopLoadError(failures.Count > 0
+                    ? $"Desktop slideshow running, skipped: {string.Join("; ", failures)}"
+                    : null);
 
+                // persisted index can outlast a shorter fresh batch
+                if (_desktopCurrentIndex >= _desktopWallpapers.Count) _desktopCurrentIndex = 0;
 
                 // Set first wallpaper immediately (or current index if resuming)
                 await SetDesktopWallpaper(_desktopWallpapers[_desktopCurrentIndex]);
                 SaveProgress();
-                
-                
+
                 // Set next change time AFTER wallpaper is set
                 _desktopNextChangeTime = DateTime.Now.Add(interval);
-                LogInfo($"[NEW CODE] Desktop next change time set to: {_desktopNextChangeTime}");
+                LogInfo($"Desktop next change time set to: {_desktopNextChangeTime}");
 
                 // Use one-shot timer so the countdown restarts AFTER work completes
                 // This ensures: set wallpaper → countdown → download → set → countdown → ...
@@ -145,90 +210,111 @@ namespace Aura.Services
                         await NextDesktopWallpaper();
                         // Countdown starts only after wallpaper is successfully set
                         _desktopNextChangeTime = DateTime.Now.Add(interval);
-                        LogInfo($"[NEW CODE] Desktop next change time set to: {_desktopNextChangeTime}");
-                        // Restart timer for next cycle
-                        if (_desktopTimer != null)
-                        {
-                            _desktopTimer.Start();
-                        }
+                        LogInfo($"Desktop next change time set to: {_desktopNextChangeTime}");
                     }
                     catch (Exception ex)
                     {
+                        SetDesktopApplyError($"Desktop slideshow cycle failed: {ex.Message}");
                     }
                     finally
                     {
                         _isChangingDesktop = false;
+                        // always restart - a one-shot timer that dies here = silent slideshow death
+                        _desktopTimer?.Start();
                     }
                 };
                 _desktopTimer.Start();
-
             }
             catch (Exception ex)
             {
+                SetDesktopLoadError($"Desktop slideshow failed to start: {ex.Message}");
+            }
+            finally
+            {
+                DesktopStarting = false;
+                RaiseErrorsChanged();
             }
         }
 
         public async Task StartLockScreenSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
         {
-
-            // Store parameters for batch loading
-            _lockScreenPlatforms = platforms;
-            _lockScreenCategory = category;
-            _lockScreenDispatcherQueue = dispatcherQueue;
-            _lockScreenInterval = interval;
-
-            // Stop existing timer if any
-            StopLockScreenSlideshow();
-
-            // Load progress if exists
-            LoadProgress();
-
-            // Fetch wallpapers from multiple platforms
-            await LoadWallpapersForLockScreen(platforms, category);
-
-            if (_lockScreenWallpapers.Count == 0)
+            LockScreenStarting = true;
+            try
             {
-                return;
-            }
+                // Store parameters for batch loading
+                _lockScreenPlatforms = platforms;
+                _lockScreenCategory = category;
+                _lockScreenDispatcherQueue = dispatcherQueue;
+                _lockScreenInterval = interval;
 
-            // Set first wallpaper immediately (or current index if resuming)
-            await SetLockScreenWallpaper(_lockScreenWallpapers[_lockScreenCurrentIndex]);
-            SaveProgress();
-            
-            // Set next change time AFTER wallpaper is set
-            _lockScreenNextChangeTime = DateTime.Now.Add(interval);
-            LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
+                // Stop existing timer if any
+                StopLockScreenSlideshow();
 
-            // Use one-shot timer so the countdown restarts AFTER work completes
-            _lockScreenTimer = dispatcherQueue.CreateTimer();
-            _lockScreenTimer.Interval = interval;
-            _lockScreenTimer.IsRepeating = false;
-            _lockScreenTimer.Tick += async (sender, e) =>
-            {
-                if (_isChangingLockScreen) return;
-                _isChangingLockScreen = true;
-                try
+                // Load progress if exists
+                LoadProgress();
+
+                // Fetch wallpapers from every platform - isolated per platform
+                var failures = await LoadWallpapersForLockScreen(platforms, category);
+
+                if (_lockScreenWallpapers.Count == 0)
                 {
-                    await NextLockScreenWallpaper();
-                    // Countdown starts only after wallpaper is successfully set
-                    _lockScreenNextChangeTime = DateTime.Now.Add(interval);
-                    LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
-                    // Restart timer for next cycle
-                    if (_lockScreenTimer != null)
+                    SetLockScreenLoadError(failures.Count > 0
+                        ? $"Lock screen slideshow not started: 0 wallpapers loaded - {string.Join("; ", failures)}"
+                        : "Lock screen slideshow not started: 0 wallpapers loaded (every platform returned nothing)");
+                    return;
+                }
+                SetLockScreenLoadError(failures.Count > 0
+                    ? $"Lock screen slideshow running, skipped: {string.Join("; ", failures)}"
+                    : null);
+
+                // persisted index can outlast a shorter fresh batch
+                if (_lockScreenCurrentIndex >= _lockScreenWallpapers.Count) _lockScreenCurrentIndex = 0;
+
+                // Set first wallpaper immediately (or current index if resuming)
+                await SetLockScreenWallpaper(_lockScreenWallpapers[_lockScreenCurrentIndex]);
+                SaveProgress();
+
+                // Set next change time AFTER wallpaper is set
+                _lockScreenNextChangeTime = DateTime.Now.Add(interval);
+                LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
+
+                // Use one-shot timer so the countdown restarts AFTER work completes
+                _lockScreenTimer = dispatcherQueue.CreateTimer();
+                _lockScreenTimer.Interval = interval;
+                _lockScreenTimer.IsRepeating = false;
+                _lockScreenTimer.Tick += async (sender, e) =>
+                {
+                    if (_isChangingLockScreen) return;
+                    _isChangingLockScreen = true;
+                    try
                     {
-                        _lockScreenTimer.Start();
+                        await NextLockScreenWallpaper();
+                        // Countdown starts only after wallpaper is successfully set
+                        _lockScreenNextChangeTime = DateTime.Now.Add(interval);
+                        LogInfo($"Lock screen next change time set to: {_lockScreenNextChangeTime}");
                     }
-                }
-                catch (Exception ex)
-                {
-                }
-                finally
-                {
-                    _isChangingLockScreen = false;
-                }
-            };
-            _lockScreenTimer.Start();
-
+                    catch (Exception ex)
+                    {
+                        SetLockScreenApplyError($"Lock screen slideshow cycle failed: {ex.Message}");
+                    }
+                    finally
+                    {
+                        _isChangingLockScreen = false;
+                        // always restart - a one-shot timer that dies here = silent slideshow death
+                        _lockScreenTimer?.Start();
+                    }
+                };
+                _lockScreenTimer.Start();
+            }
+            catch (Exception ex)
+            {
+                SetLockScreenLoadError($"Lock screen slideshow failed to start: {ex.Message}");
+            }
+            finally
+            {
+                LockScreenStarting = false;
+                RaiseErrorsChanged();
+            }
         }
 
         public void StopDesktopSlideshow()
@@ -239,6 +325,10 @@ namespace Aura.Services
                 _desktopTimer = null;
             }
             _isChangingDesktop = false;
+            // user disabled it (or a restart began) - no stale error must linger
+            SetDesktopLoadError(null);
+            SetDesktopApplyError(null);
+            RaiseErrorsChanged();
         }
 
         public void StopLockScreenSlideshow()
@@ -249,6 +339,9 @@ namespace Aura.Services
                 _lockScreenTimer = null;
             }
             _isChangingLockScreen = false;
+            SetLockScreenLoadError(null);
+            SetLockScreenApplyError(null);
+            RaiseErrorsChanged();
         }
 
         public async Task NextDesktopWallpaper()
@@ -266,8 +359,12 @@ namespace Aura.Services
                         // Load next batch
                         _desktopCurrentBatch++;
                         _desktopCurrentIndex = 0;
-                        await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory);
+                        var failures = await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory);
                         SaveProgress(); // Save progress after loading new batch
+                        if (failures.Count > 0)
+                        {
+                            SetDesktopLoadError($"Desktop slideshow running, skipped: {string.Join("; ", failures)}");
+                        }
                     }
                     
                     if (_desktopWallpapers.Count > 0 && _desktopCurrentIndex < _desktopWallpapers.Count)
@@ -277,14 +374,17 @@ namespace Aura.Services
                     }
                     else
                     {
+                        SetDesktopApplyError("Desktop slideshow: the next batch came back with no wallpapers - tap Next again or re-set the slideshow");
                     }
                 }
                 else
                 {
+                    SetDesktopApplyError("Desktop slideshow: no wallpapers loaded - re-set the slideshow from its Edit button");
                 }
             }
             catch (Exception ex)
             {
+                SetDesktopApplyError($"Desktop next wallpaper failed: {ex.Message}");
             }
         }
 
@@ -303,8 +403,12 @@ namespace Aura.Services
                         // Load next batch
                         _lockScreenCurrentBatch++;
                         _lockScreenCurrentIndex = 0;
-                        await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory);
+                        var failures = await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory);
                         SaveProgress(); // Save progress after loading new batch
+                        if (failures.Count > 0)
+                        {
+                            SetLockScreenLoadError($"Lock screen slideshow running, skipped: {string.Join("; ", failures)}");
+                        }
                     }
                     
                     if (_lockScreenWallpapers.Count > 0 && _lockScreenCurrentIndex < _lockScreenWallpapers.Count)
@@ -314,60 +418,76 @@ namespace Aura.Services
                     }
                     else
                     {
+                        SetLockScreenApplyError("Lock screen slideshow: the next batch came back with no wallpapers - tap Next again or re-set the slideshow");
                     }
                 }
                 else
                 {
+                    SetLockScreenApplyError("Lock screen slideshow: no wallpapers loaded - re-set the slideshow from its Edit button");
                 }
             }
             catch (Exception ex)
             {
+                SetLockScreenApplyError($"Lock screen next wallpaper failed: {ex.Message}");
             }
         }
 
-        private async Task LoadWallpapersForDesktop(List<string> platforms, string category)
+        private async Task<List<string>> LoadWallpapersForDesktop(List<string> platforms, string category)
         {
+            var failures = new List<string>();
             try
             {
                 _desktopWallpapers.Clear();
 
                 // Load wallpapers from all selected platforms
                 var allWallpapers = new List<WallpaperItem>();
+                string mode = NormalizePublicMode(category);
 
                 foreach (var platform in platforms)
                 {
-                    if (platform == "AlphaCoders")
+                    // isolate every platform: one broken fetch (ArtStation's old
+                    // NotSupportedException, a pexels key error, a bad page) must
+                    // never take the whole batch down silently
+                    try
                     {
-                        // Get wallpapers from AlphaCoders service
-                        string categoryKey = category switch
+                        if (platform == "AlphaCoders")
                         {
-                            "4K Wallpapers" => "4k",
-                            "Harvest Wallpapers" => "harvest",
-                            "Rain Wallpapers" => "rain",
-                            _ => "4k"
-                        };
+                            // Get wallpapers from AlphaCoders service
+                            string categoryKey = category switch
+                            {
+                                "4K Wallpapers" => "4k",
+                                "Harvest Wallpapers" => "harvest",
+                                "Rain Wallpapers" => "rain",
+                                _ => "4k"
+                            };
 
-                        // Use scraper directly to avoid cache issues
-                        var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
-                        
-                        // Tag wallpapers with their platform
-                        foreach (var wallpaper in wallpapers)
-                        {
-                            wallpaper.Platform = "AlphaCoders";
-                            allWallpapers.Add(wallpaper);
+                            // Use scraper directly to avoid cache issues
+                            var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
+
+                            // Tag wallpapers with their platform
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = "AlphaCoders";
+                                allWallpapers.Add(wallpaper);
+                            }
                         }
-                    }
-                    else if (platform == "Backiee")
-                    {
-                        // Use batch number as page number (0-indexed so subtract 1)
-                        int pageNumber = _desktopCurrentBatch - 1;
-                        string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-                        
-                        string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                        if (!string.IsNullOrWhiteSpace(jsonContent))
+                        else if (platform == "Backiee")
                         {
+                            // Use batch number as page number (0-indexed so subtract 1)
+                            int pageNumber = _desktopCurrentBatch - 1;
+                            string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+
+                            string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                            if (string.IsNullOrWhiteSpace(jsonContent))
+                            {
+                                throw new InvalidOperationException("empty response from the backiee list API");
+                            }
                             using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                             {
+                                if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                                {
+                                    throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
+                                }
                                 foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                                 {
                                     var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
@@ -379,23 +499,41 @@ namespace Aura.Services
                                 }
                             }
                         }
-                    }
-                    else if (platform == "ArtStation" || PublicWallpaperService.IsSupportedPlatform(platform))
-                    {
-                        // Use PublicWallpaperService for ArtStation and other public platforms
-                        var publicService = new PublicWallpaperService();
-                        
-                        // Get mode based on platform
-                        string mode = category == "All" || string.IsNullOrEmpty(category) ? "latest" : category.ToLower();
-                        
-                        var wallpapers = await publicService.GetWallpapersAsync(platform, _desktopCurrentBatch, mode);
-                        
-                        // Tag wallpapers with their platform
-                        foreach (var wallpaper in wallpapers)
+                        else if (platform == "ArtStation")
                         {
-                            wallpaper.Platform = platform;
-                            allWallpapers.Add(wallpaper);
+                            // its own service - PublicWallpaperService has NO ArtStation
+                            // arm and throws NotSupportedException for it
+                            var artStationService = new ArtStationService();
+                            var sorting = mode == "latest" ? "latest" : "trending";
+                            var wallpapers = await artStationService.GetProjectsAsync(sorting, _desktopCurrentBatch);
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = "ArtStation";
+                                allWallpapers.Add(wallpaper);
+                            }
                         }
+                        else if (PublicWallpaperService.IsSupportedPlatform(platform))
+                        {
+                            // Use PublicWallpaperService for the other public platforms
+                            var publicService = new PublicWallpaperService();
+                            var wallpapers = await publicService.GetWallpapersAsync(platform, _desktopCurrentBatch, mode);
+
+                            // Tag wallpapers with their platform
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = platform;
+                                allWallpapers.Add(wallpaper);
+                            }
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("not an implemented platform");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{platform}: {ex.Message}");
+                        LogInfo($"platform load failed - {platform}: {ex.Message}");
                     }
                 }
 
@@ -403,56 +541,71 @@ namespace Aura.Services
                 var shuffled = allWallpapers.OrderBy(x => _random.Next()).ToList();
                 _desktopWallpapers.AddRange(shuffled);
 
-                LogInfo($"Loaded {_desktopWallpapers.Count} wallpapers from {platforms.Count} platform(s)");
+                LogInfo($"Loaded {_desktopWallpapers.Count} wallpapers from {platforms.Count} platform(s)" +
+                        (failures.Count > 0 ? $" ({failures.Count} failed)" : ""));
             }
             catch (Exception ex)
             {
+                failures.Add($"wallpaper load: {ex.Message}");
+                LogInfo($"wallpaper load failed: {ex.Message}");
             }
+            return failures;
         }
 
-        private async Task LoadWallpapersForLockScreen(List<string> platforms, string category)
+        private async Task<List<string>> LoadWallpapersForLockScreen(List<string> platforms, string category)
         {
+            var failures = new List<string>();
             try
             {
                 _lockScreenWallpapers.Clear();
 
                 // Load wallpapers from all selected platforms
                 var allWallpapers = new List<WallpaperItem>();
+                string mode = NormalizePublicMode(category);
 
                 foreach (var platform in platforms)
                 {
-                    if (platform == "AlphaCoders")
+                    // isolated per platform, same as the desktop loader
+                    try
                     {
-                        // Get wallpapers from AlphaCoders service
-                        string categoryKey = category switch
+                        if (platform == "AlphaCoders")
                         {
-                            "4K Wallpapers" => "4k",
-                            "Harvest Wallpapers" => "harvest",
-                            "Rain Wallpapers" => "rain",
-                            _ => "4k"
-                        };
+                            // Get wallpapers from AlphaCoders service
+                            string categoryKey = category switch
+                            {
+                                "4K Wallpapers" => "4k",
+                                "Harvest Wallpapers" => "harvest",
+                                "Rain Wallpapers" => "rain",
+                                _ => "4k"
+                            };
 
-                        // Use scraper directly to avoid cache issues
-                        var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
-                        
-                        // Tag wallpapers with their platform
-                        foreach (var wallpaper in wallpapers)
-                        {
-                            wallpaper.Platform = "AlphaCoders";
-                            allWallpapers.Add(wallpaper);
+                            // Use scraper directly to avoid cache issues
+                            var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
+
+                            // Tag wallpapers with their platform
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = "AlphaCoders";
+                                allWallpapers.Add(wallpaper);
+                            }
                         }
-                    }
-                    else if (platform == "Backiee")
-                    {
-                        // Use batch number as page number (0-indexed so subtract 1)
-                        int pageNumber = _lockScreenCurrentBatch - 1;
-                        string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-                        
-                        string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                        if (!string.IsNullOrWhiteSpace(jsonContent))
+                        else if (platform == "Backiee")
                         {
+                            // Use batch number as page number (0-indexed so subtract 1)
+                            int pageNumber = _lockScreenCurrentBatch - 1;
+                            string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+
+                            string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                            if (string.IsNullOrWhiteSpace(jsonContent))
+                            {
+                                throw new InvalidOperationException("empty response from the backiee list API");
+                            }
                             using (JsonDocument doc = JsonDocument.Parse(jsonContent))
                             {
+                                if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                                {
+                                    throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
+                                }
                                 foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
                                 {
                                     var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
@@ -464,23 +617,41 @@ namespace Aura.Services
                                 }
                             }
                         }
-                    }
-                    else if (platform == "ArtStation" || PublicWallpaperService.IsSupportedPlatform(platform))
-                    {
-                        // Use PublicWallpaperService for ArtStation and other public platforms
-                        var publicService = new PublicWallpaperService();
-                        
-                        // Get mode based on platform
-                        string mode = category == "All" || string.IsNullOrEmpty(category) ? "latest" : category.ToLower();
-                        
-                        var wallpapers = await publicService.GetWallpapersAsync(platform, _lockScreenCurrentBatch, mode);
-                        
-                        // Tag wallpapers with their platform
-                        foreach (var wallpaper in wallpapers)
+                        else if (platform == "ArtStation")
                         {
-                            wallpaper.Platform = platform;
-                            allWallpapers.Add(wallpaper);
+                            // its own service - PublicWallpaperService has NO ArtStation
+                            // arm and throws NotSupportedException for it
+                            var artStationService = new ArtStationService();
+                            var sorting = mode == "latest" ? "latest" : "trending";
+                            var wallpapers = await artStationService.GetProjectsAsync(sorting, _lockScreenCurrentBatch);
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = "ArtStation";
+                                allWallpapers.Add(wallpaper);
+                            }
                         }
+                        else if (PublicWallpaperService.IsSupportedPlatform(platform))
+                        {
+                            // Use PublicWallpaperService for the other public platforms
+                            var publicService = new PublicWallpaperService();
+                            var wallpapers = await publicService.GetWallpapersAsync(platform, _lockScreenCurrentBatch, mode);
+
+                            // Tag wallpapers with their platform
+                            foreach (var wallpaper in wallpapers)
+                            {
+                                wallpaper.Platform = platform;
+                                allWallpapers.Add(wallpaper);
+                            }
+                        }
+                        else
+                        {
+                            throw new NotSupportedException("not an implemented platform");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        failures.Add($"{platform}: {ex.Message}");
+                        LogInfo($"platform load failed - {platform}: {ex.Message}");
                     }
                 }
 
@@ -488,11 +659,15 @@ namespace Aura.Services
                 var shuffled = allWallpapers.OrderBy(x => _random.Next()).ToList();
                 _lockScreenWallpapers.AddRange(shuffled);
 
-                LogInfo($"Loaded {_lockScreenWallpapers.Count} wallpapers from {platforms.Count} platform(s)");
+                LogInfo($"Loaded {_lockScreenWallpapers.Count} wallpapers from {platforms.Count} platform(s)" +
+                        (failures.Count > 0 ? $" ({failures.Count} failed)" : ""));
             }
             catch (Exception ex)
             {
+                failures.Add($"wallpaper load: {ex.Message}");
+                LogInfo($"wallpaper load failed: {ex.Message}");
             }
+            return failures;
         }
 
         private async Task SetDesktopWallpaper(WallpaperItem wallpaper)
@@ -521,6 +696,7 @@ namespace Aura.Services
                 string imageUrl = wallpaper.FullPhotoUrl;
                 if (string.IsNullOrEmpty(imageUrl))
                 {
+                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no image URL");
                     return;
                 }
 
@@ -551,7 +727,10 @@ namespace Aura.Services
                         if (File.Exists(fullLocalPath))
                             imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
                         else
+                        {
+                            SetDesktopApplyError($"Could not apply '{wallpaper.Title}': local file missing ({fullLocalPath})");
                             return;
+                        }
                     }
                     else
                     {
@@ -603,13 +782,16 @@ namespace Aura.Services
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
                     DesktopWallpaperChanged?.Invoke(this, imageUrl);
+                    SetDesktopApplyError(null);
                 }
                 else
                 {
+                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': Windows refused the wallpaper change (WinRT and SystemParametersInfo both failed)");
                 }
             }
             catch (Exception ex)
             {
+                SetDesktopApplyError($"Could not apply '{wallpaper.Title}': {ex.Message}");
             }
         }
 
@@ -619,6 +801,7 @@ namespace Aura.Services
             {
                 if (string.IsNullOrEmpty(wallpaper.ImageUrl))
                 {
+                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no image URL");
                     return;
                 }
 
@@ -634,6 +817,7 @@ namespace Aura.Services
 
                 if (string.IsNullOrEmpty(bigThumbUrl))
                 {
+                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no full-size image URL from AlphaCoders");
                     return;
                 }
 
@@ -673,6 +857,7 @@ namespace Aura.Services
                     }
                     catch (Exception ex)
                     {
+                        SetDesktopApplyError($"Could not apply '{wallpaper.Title}': download failed - {ex.Message}");
                         return;
                     }
 
@@ -721,13 +906,16 @@ namespace Aura.Services
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
                     DesktopWallpaperChanged?.Invoke(this, originalUrl);
+                    SetDesktopApplyError(null);
                 }
                 else
                 {
+                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': Windows refused the wallpaper change (WinRT and SystemParametersInfo both failed)");
                 }
             }
             catch (Exception ex)
             {
+                SetDesktopApplyError($"Could not apply '{wallpaper.Title}': {ex.Message}");
             }
         }
 
@@ -757,6 +945,7 @@ namespace Aura.Services
                 string imageUrl = wallpaper.FullPhotoUrl;
                 if (string.IsNullOrEmpty(imageUrl))
                 {
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no image URL");
                     return;
                 }
 
@@ -785,7 +974,10 @@ namespace Aura.Services
                         if (File.Exists(fullLocalPath))
                             imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
                         else
+                        {
+                            SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: local file missing ({fullLocalPath})");
                             return;
+                        }
                     }
                     else
                     {
@@ -888,13 +1080,16 @@ namespace Aura.Services
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
                     LockScreenWallpaperChanged?.Invoke(this, imageUrl);
+                    SetLockScreenApplyError(null);
                 }
                 else
                 {
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: registry write failed (needs admin for the machine-wide key, and the per-user key also failed)");
                 }
             }
             catch (Exception ex)
             {
+                SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: {ex.Message}");
             }
         }
 
@@ -904,6 +1099,7 @@ namespace Aura.Services
             {
                 if (string.IsNullOrEmpty(wallpaper.ImageUrl))
                 {
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no image URL");
                     return;
                 }
 
@@ -919,6 +1115,7 @@ namespace Aura.Services
 
                 if (string.IsNullOrEmpty(bigThumbUrl))
                 {
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no full-size image URL from AlphaCoders");
                     return;
                 }
 
@@ -957,6 +1154,7 @@ namespace Aura.Services
                     }
                     catch (Exception ex)
                     {
+                        SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: download failed - {ex.Message}");
                         return;
                     }
 
@@ -992,14 +1190,35 @@ namespace Aura.Services
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;
                     LockScreenWallpaperChanged?.Invoke(this, originalUrl);
+                    SetLockScreenApplyError(null);
                 }
                 else
                 {
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: Windows refused the change (WinRT TrySetLockScreenImageAsync failed)");
                 }
             }
             catch (Exception ex)
             {
+                SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: {ex.Message}");
             }
+        }
+
+        // The dialog's category names are backiee/alpha-specific ("Latest
+        // Wallpapers", "4K Wallpapers", ...) or "All" - public platforms get
+        // their own honest "latest" mode instead of a foreign category string
+        // (which used to fall into wallhaven's toplist default and pexels'
+        // literal search query).
+        private static string NormalizePublicMode(string category)
+        {
+            if (string.IsNullOrWhiteSpace(category) || category == "All")
+                return "latest";
+
+            var backieeAlphaCategories = new[]
+            {
+                "Latest Wallpapers", "8K UltraHD", "AI Generated",
+                "4K Wallpapers", "Harvest Wallpapers", "Rain Wallpapers"
+            };
+            return backieeAlphaCategories.Contains(category) ? "latest" : category.ToLowerInvariant();
         }
 
         public static TimeSpan ParseInterval(string interval)

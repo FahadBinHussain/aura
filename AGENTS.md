@@ -740,6 +740,70 @@ navigation snapshot at AddEntry time:
   foreground - if fg is the user's app, ABORT loudly, never activate.
   probes: `C:\tmp\aura-selectfix*.ps1` (4 = screen-grab attempt).
 
+## slideshow died silently on load + next-change status (2026-10-09)
+
+user report: desktop slideshow set to `1 Minutes` never changed the wallpaper,
+and the page had no "when is it expected to change" status. the log stopped
+right after `Toggle enabled: True` - nothing else ever logged. root causes +
+fixes:
+
+- **one broken platform silently killed the whole batch**: both loaders ran
+  every platform inside ONE try/catch with an EMPTY catch, and the platform
+  loop included `platform == "ArtStation" || PublicWallpaperService
+  .IsSupportedPlatform(platform)` - but `GetWallpapersAsync` has NO ArtStation
+  arm (`_ => throw new NotSupportedException`) - so ArtStation (3rd in the
+  user's list of 8) threw, the catch swallowed it, the local list was
+  discarded, `_desktopWallpapers.Count == 0` and `StartDesktopSlideshow`
+  returned BEFORE creating the timer: no timer, no next-change time, no
+  countdown, no log line, forever. now each platform loads in its OWN
+  try/catch (failures collected as `<platform>: <reason>`, logged), and
+  ArtStation routes to `ArtStationService.GetProjectsAsync(sorting, batch)`
+  (`https://www.artstation.com/projects.json?sorting=latest|trending` -
+  curl-proven; plain .NET passes per the artstation section) instead of the
+  public service. backiee's parse also throws LOUD on a non-array response
+  shape (challenge/error page) instead of an unhandled `EnumerateArray`.
+- **loud contract (rule: fail loudly, never a dead timer)**: the empty-batch
+  return now sets `DesktopLoadError`/`LockScreenLoadError` (exact per-platform
+  reasons) and raises a new `ErrorsChanged` event; the page renders it in two
+  new per-column InfoBars (`DesktopSlideshowInfoBar` / `LockScreenSlideshowInfoBar`
+  - Error + "Slideshow not running" when stopped, Warning + "Slideshow
+  warning" when running with skipped platforms). apply failures (no image URL,
+  download refused, Windows refused the change) set `*ApplyError` with the
+  wallpaper title + reason and clear on the next successful set; the one-shot
+  tick timers restart in `finally` (the old code only restarted on success,
+  so one thrown cycle = permanent silent death) and log cycle failures;
+  settings/restore read failures report via `ReportRestoreError` instead of
+  empty catches.
+- **public mode mapping**: the dialog's categories are backiee/alpha names -
+  `NormalizePublicMode` maps `Latest Wallpapers`/`4K Wallpapers`/`8K UltraHD`/
+  `AI Generated`/`Harvest Wallpapers`/`Rain Wallpapers`/`All` -> `latest` for
+  the public platforms (the old `category.ToLower()` fed wallhaven's toplist
+  default and pexels' literal search query with `latest wallpapers`).
+- **status (the user's ask)**: countdown text never silently hides while
+  enabled - `Starting slideshow...` / `Next wallpaper at HH:mm:ss (in 56s)` /
+  `Changing wallpaper...` (<60s overdue) / `Overdue - expected at HH:mm:ss` /
+  `Slideshow is not running`. the old code collapsed it when next-change time
+  was MinValue (never started) and hid it >30s past due - exactly the reported
+  blank state.
+- **blank preview card**: `SlideshowPage.xaml` referenced
+  `ms-appx:///Assets/placeholder.png` which DOES NOT EXIST (the real asset is
+  `placeholder-wallpaper-1000.png`, used everywhere else) - both Image
+  Sources fixed; the card now shows the live wallpaper.
+- **restart guard**: page `RestoreSlideshows` + `MainWindow`
+  .RestoreSlideshowsOnStartupAsync skip when `DesktopRunning ||
+  DesktopStarting` (every Slideshow-page visit used to restart the running
+  slideshow - resetting the countdown and re-adding a history row), and the
+  page's singleton-event subscriptions moved to Loaded/Unloaded with `-=`
+  first (dead-page handlers used to accumulate on `SlideshowService.Instance`).
+- verified menuless with the user's exact config (probe
+  `C:\tmp\aura-slideshowstatus.ps1`): `Loaded 224 wallpapers from 8
+  platform(s)`, 0 platform failures, status line exact
+  `8 platforms - Latest Wallpapers (Refresh: 1 Minutes)`, countdown
+  `Next wallpaper at 15:28:58 (in 56s)` (vision: verbatim blue line, real
+  preview photo, zero error banners), history gained `Desktop/Slideshow`
+  rows at 15:25:39 / 15:26:56 / 15:27:58 / 15:28:59 = exactly 60s apart,
+  2+ `next change time` log lines, info bar closed throughout.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked
