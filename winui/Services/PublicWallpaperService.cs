@@ -764,13 +764,37 @@ namespace Aura.Services
             var html = await GetPixabayHtmlAsync(url, cancellationToken);
             var wallpapers = new List<WallpaperItem>();
 
-            var matches = Regex.Matches(
-                html,
-                "<div id=\"item-\\d+\" data-pk=\"(?<id>\\d+)\" class=\"item\">\\s*<a href=\"(?<href>/(?:photos|illustrations)/[^\\\"]+)\">\\s*<img[^>]+src=\"(?<img>https://cdn\\.pixabay\\.com/photo/[^\\\"]+__340\\.jpg)\"[^>]+alt=\"(?<alt>[^\\\"]*)\"",
-                RegexOptions.Singleline);
+            // one tile = <div id="item-N" data-pk="N" class="item[ video-item]"> <a href=poster-page>
+            // then its poster img. Shapes proven across photo/illustration/vector/video pages:
+            // only the first ~15 tiles render eagerly (src=), the rest are
+            // src="/static/img/blank.gif" + data-lazy=; posters come as __340.jpg, __340.png
+            // (full = _1280 + SAME extension - _1280.jpg on a png asset = 403) or video
+            // _tiny.jpg (1280x720 ladder: small/medium/large all 200, large = 3840x2160,
+            // "big" = 404); tile links span /photos /illustrations /vectors /videos and are
+            // kept generic so a future media type degrades to skipping that tile, not a
+            // broken SourceUrl. matching only eager jpg photo tiles served 15/49 per page
+            // and 0 items on the single video collection ("Nature videos" = permanent
+            // error-bar line until this pass existed).
+            var tilePatterns = new[]
+            {
+                "<div id=\"item-\\d+\" data-pk=\"(?<id>\\d+)\" class=\"item[^\\\"]*\">\\s*<a href=\"(?<href>/[^\\\"]+)\">[\\s\\S]{0,600}?<img[^>]+src=\"(?<img>https://cdn\\.pixabay\\.com/(?:photo|video)/[^\\\"]+?(?:__340|_tiny)\\.(?:jpg|png))\"[^>]+alt=\"(?<alt>[^\\\"]*)\"",
+                "<div id=\"item-\\d+\" data-pk=\"(?<id>\\d+)\" class=\"item[^\\\"]*\">\\s*<a href=\"(?<href>/[^\\\"]+)\">[\\s\\S]{0,600}?<img[^>]+data-lazy=\"(?<img>https://cdn\\.pixabay\\.com/(?:photo|video)/[^\\\"]+?(?:__340|_tiny)\\.(?:jpg|png))\"[^>]+alt=\"(?<alt>[^\\\"]*)\"",
+            };
+
+            var tiles = new List<Match>();
+            foreach (var tilePattern in tilePatterns)
+            {
+                foreach (Match tile in Regex.Matches(html, tilePattern, RegexOptions.Singleline))
+                {
+                    tiles.Add(tile);
+                }
+            }
+
+            // a page carries both shapes - restore document order across the passes
+            tiles.Sort((left, right) => left.Index.CompareTo(right.Index));
 
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (Match match in matches)
+            foreach (Match match in tiles)
             {
                 var id = match.Groups["id"].Value;
                 if (!seen.Add(id))
@@ -785,8 +809,12 @@ namespace Aura.Services
                     Title = WebUtility.HtmlDecode(match.Groups["alt"].Value).Trim(),
                     Description = "Pixabay collection item",
                     ImageUrl = preview,
-                    // __340 preview -> _1280 original (single underscore; __1280 = 403)
-                    FullPhotoUrl = preview.Replace("__340", "_1280"),
+                    // photo: __340 preview -> _1280 original (single underscore; __1280 = 403,
+                    // extension preserved - _1280.jpg on a png asset = 403).
+                    // video: tiny poster -> large 4K still
+                    FullPhotoUrl = preview.Contains("/video/")
+                        ? preview.Replace("_tiny.", "_large.")
+                        : preview.Replace("__340", "_1280"),
                     SourceUrl = $"https://pixabay.com{WebUtility.HtmlDecode(match.Groups["href"].Value)}",
                     Likes = string.Empty,
                     Downloads = string.Empty,

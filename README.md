@@ -22,7 +22,7 @@ they get ported (17 as of 2026-10-08).
 | [Alpha Coders](https://wall.alphacoders.com) | 24 categories, live from the site's category index |
 | [Pixabay](https://pixabay.com) | 63 curated collections (live) |
 | [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections (live) |
-| [ArtStation](https://www.artstation.com) | wallpaper / landscape / nature / space / abstract queries |
+| [ArtStation](https://www.artstation.com) | 64 channels, live from the site's channels directory |
 | [Pexels](https://www.pexels.com) | curated / nature / space queries (API key in Settings) |
 | [Wallhaven](https://wallhaven.cc) | General / Anime / People |
 | [Bing Wallpaper Archive](https://www.bing.com) | daily homepage wallpapers |
@@ -46,15 +46,16 @@ is the code - mode tables + fetchers).
 - **alphacoders** - https://alphacoders.com/tag/is-category
 - **pixabay** - https://pixabay.com/collections/ (63 collections, paginated
   `?pagi=N`; fetched through the OS `curl.exe` - Cloudflare 403s .NET's TLS
-  fingerprint on the HTML pages)
+  fingerprint on the HTML pages) · drill `https://pixabay.com/collections/<slug>/?pagi=N`
+  (tile parse covers eager + `data-lazy` imgs, photo/illustration/vector/video
+  posters)
 - **wallpaperhub** - https://www.wallpaperhub.app/collections (17 collections,
   live index, one page - `?page=N` ignored; fetched through .NET, no curl
   needed)
-- **artstation** - https://www.artstation.com/api/v2/search/projects.json?query=wallpaper&page=1&per_page=50&sorting=relevance ·
-  https://www.artstation.com/api/v2/search/projects.json?query=landscape&page=1&per_page=50&sorting=relevance ·
-  https://www.artstation.com/api/v2/search/projects.json?query=nature&page=1&per_page=50&sorting=relevance ·
-  https://www.artstation.com/api/v2/search/projects.json?query=space&page=1&per_page=50&sorting=relevance ·
-  https://www.artstation.com/api/v2/search/projects.json?query=abstract&page=1&per_page=50&sorting=relevance
+- **artstation** - https://www.artstation.com/api/v2/community/channels/channels.json
+  (64 published channels: 61 global + 1 hashtag + 2 sponsored, all drillable) ·
+  drill `https://www.artstation.com/api/v2/community/channels/projects.json?channel_id=<id>&page=1&sorting=trending&per_page=45`
+  (`sorting` is restricted to `trending|latest|popular` - anything else = 400)
 - **pexels** - `https://api.pexels.com/v1/curated?page=1&per_page=30` ·
   `https://api.pexels.com/v1/search?query=nature&orientation=landscape&page=1&per_page=30` ·
   `https://api.pexels.com/v1/search?query=space&orientation=landscape&page=1&per_page=30`

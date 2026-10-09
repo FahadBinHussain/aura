@@ -56,14 +56,80 @@ namespace Aura.Services
             return wallpapers;
         }
 
-        public async Task<List<WallpaperItem>> SearchProjectsAsync(
-            string query,
+        // ---- channels: the site's own category surface (live index) ----
+        // CategoriesPage live-loads this on every open (same loud contract as
+        // backiee/alpha/pixabay/wallpaperhub): a failed fetch = zero ArtStation
+        // cards + a bar line, never a stale static list.
+        private static readonly object ChannelsLock = new object();
+        private static IReadOnlyList<(int Id, string Name)> _channels = Array.Empty<(int, string)>();
+
+        public static IReadOnlyList<(int Id, string Name)> Channels
+        {
+            get
+            {
+                lock (ChannelsLock)
+                {
+                    return _channels;
+                }
+            }
+        }
+
+        public static void SetChannels(IReadOnlyList<(int Id, string Name)> channels)
+        {
+            lock (ChannelsLock)
+            {
+                _channels = channels;
+            }
+        }
+
+        public async Task<List<(int Id, string Name)>> GetChannelsIndexAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var url = $"{BaseUrl}/api/v2/community/channels/channels.json";
+            var json = await _httpClient.GetStringAsync(url, cancellationToken);
+            var channels = new List<(int Id, string Name)>();
+
+            using var document = JsonDocument.Parse(json);
+            if (!document.RootElement.TryGetProperty("data", out var dataElement) ||
+                dataElement.ValueKind != JsonValueKind.Array)
+            {
+                return channels;
+            }
+
+            foreach (var channelElement in dataElement.EnumerateArray())
+            {
+                // only what the site itself publishes into its own channel picker
+                if (!string.Equals(GetString(channelElement, "state"), "published", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                if (!channelElement.TryGetProperty("id", out var idElement) ||
+                    !idElement.TryGetInt32(out var id))
+                {
+                    continue;
+                }
+
+                var name = GetString(channelElement, "name").Trim();
+                if (name.Length == 0)
+                {
+                    continue;
+                }
+
+                channels.Add((id, name));
+            }
+
+            return channels;
+        }
+
+        public async Task<List<WallpaperItem>> GetChannelProjectsAsync(
+            int channelId,
             int page,
             CancellationToken cancellationToken = default)
         {
-            // GET-only search: the subject-matter taxonomy filters are POST + CSRF-protected
-            // (anonymous sessions never get a token) - see automata-private/www.artstation.com/AGENTS.md
-            var url = $"{BaseUrl}/api/v2/search/projects.json?query={Uri.EscapeDataString(query)}&page={page}&per_page=50&sorting=relevance";
+            // sorting=trending + per_page=45 = the site's own channel-page call
+            // (sorting is restricted to trending|latest|popular - anything else = 400)
+            var url = $"{BaseUrl}/api/v2/community/channels/projects.json?channel_id={channelId}&page={page}&sorting=trending&per_page=45";
             var json = await _httpClient.GetStringAsync(url, cancellationToken);
             var wallpapers = new List<WallpaperItem>();
 
@@ -76,7 +142,8 @@ namespace Aura.Services
 
             foreach (var projectElement in dataElement.EnumerateArray())
             {
-                if (GetBool(projectElement, "is_adult_content"))
+                // channel cards carry only hide_as_adult (no is_adult_content field)
+                if (GetBool(projectElement, "hide_as_adult"))
                 {
                     continue;
                 }

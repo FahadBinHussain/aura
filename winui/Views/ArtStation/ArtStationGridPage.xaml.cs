@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using Aura.Models;
 using Aura.Services;
@@ -18,7 +19,7 @@ namespace Aura.Views.ArtStation
         private bool _isLoading;
         private bool _hasMoreProjects = true;
         private string _currentSorting = "trending";
-        private string _currentQuery; // non-null = category/query mode (categories page deep-link)
+        private int _currentChannelId; // non-zero = channel/category mode (live channels index)
 
         public ArtStationGridPage()
         {
@@ -30,10 +31,21 @@ namespace Aura.Views.ArtStation
         {
             base.OnNavigatedTo(e);
 
-            if (e.Parameter is string query && !string.IsNullOrWhiteSpace(query))
+            if (e.Parameter is string key && !string.IsNullOrWhiteSpace(key))
             {
-                _currentQuery = query;
-                PageTitleTextBlock.Text = $"ArtStation {char.ToUpperInvariant(query[0])}{query.Substring(1)}";
+                // categories page hands us channel:<id> (the live channels index)
+                if (!key.StartsWith("channel:", StringComparison.Ordinal) ||
+                    !int.TryParse(key.Substring("channel:".Length), out var channelId))
+                {
+                    throw new InvalidOperationException($"ArtStation grid parameter must be channel:<id>, got '{key}'");
+                }
+
+                _currentChannelId = channelId;
+                var channelName = ArtStationService.Channels
+                    .FirstOrDefault(channel => channel.Id == channelId).Name;
+                PageTitleTextBlock.Text = string.IsNullOrWhiteSpace(channelName)
+                    ? $"ArtStation #{channelId}"
+                    : $"ArtStation {channelName}";
             }
 
             if (_projects.Count == 0)
@@ -50,13 +62,13 @@ namespace Aura.Views.ArtStation
             }
 
             var sorting = button.Tag?.ToString() ?? "trending";
-            if (sorting == _currentSorting && _currentQuery == null && _projects.Count > 0)
+            if (sorting == _currentSorting && _currentChannelId == 0 && _projects.Count > 0)
             {
                 return;
             }
 
             _currentSorting = sorting;
-            _currentQuery = null; // sorting buttons leave category/query mode
+            _currentChannelId = 0; // sorting buttons leave channel/category mode
             _currentPage = 1;
             _hasMoreProjects = true;
             _projects.Clear();
@@ -79,9 +91,9 @@ namespace Aura.Views.ArtStation
                 LoadingProgressBar.Visibility = Visibility.Visible;
                 StatusInfoBar.IsOpen = false;
 
-                var newProjects = _currentQuery == null
+                var newProjects = _currentChannelId == 0
                     ? await _artStationService.GetProjectsAsync(_currentSorting, _currentPage)
-                    : await _artStationService.SearchProjectsAsync(_currentQuery, _currentPage);
+                    : await _artStationService.GetChannelProjectsAsync(_currentChannelId, _currentPage);
                 if (newProjects.Count == 0)
                 {
                     _hasMoreProjects = false;
@@ -213,9 +225,9 @@ namespace Aura.Views.ArtStation
             ResetSortingButton(TrendingButton);
             ResetSortingButton(LatestButton);
 
-            if (_currentQuery != null)
+            if (_currentChannelId != 0)
             {
-                // neither sort chip applies while a category query drives the grid
+                // neither sort chip applies while a channel drives the grid
                 return;
             }
 

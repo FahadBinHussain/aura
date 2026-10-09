@@ -34,17 +34,6 @@ namespace Aura.Views.Backiee
                 .Concat(PublicWallpaperService.GetSupportedPlatformNames())
                 .ToArray();
 
-        // artstation: query entries - its subject-matter taxonomy is CSRF-blocked for
-        // anonymous sessions (automata-private/www.artstation.com/AGENTS.md)
-        private static readonly (string Key, string Name)[] ArtStationCategories =
-        {
-            ("wallpaper", "Wallpaper"),
-            ("landscape", "Landscape"),
-            ("nature", "Nature"),
-            ("space", "Space"),
-            ("abstract", "Abstract"),
-        };
-
         private static readonly BitmapImage PlaceholderImage =
             new BitmapImage(new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png"));
 
@@ -197,6 +186,27 @@ namespace Aura.Views.Backiee
                 errors.Add($"Couldn't load wallpaperhub collections: {ex.Message}");
             }
 
+            // artstation: its own Channels directory is the category source (live
+            // load, same loud contract - the 5 query entries are gone; every
+            // published channel the site's picker lists becomes a card,
+            // key = channel:<id>)
+            try
+            {
+                var artChannels = await new ArtStationService().GetChannelsIndexAsync();
+                if (artChannels.Count == 0)
+                {
+                    errors.Add("artstation returned no channels - the channels.json markup may have changed.");
+                }
+                else
+                {
+                    ArtStationService.SetChannels(artChannels);
+                }
+            }
+            catch (Exception ex)
+            {
+                errors.Add($"Couldn't load artstation channels: {ex.Message}");
+            }
+
             try
             {
                 var html = await BackieeNetworkClient.GetStringAsync(CategoriesUrl);
@@ -300,7 +310,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub")
+                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation")
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -369,7 +379,13 @@ namespace Aura.Views.Backiee
                         .GetWallpapersByCategoryAsync(source.Key, 1, 1)).FirstOrDefault();
                     break;
                 case "ArtStation":
-                    first = (await new ArtStationService().SearchProjectsAsync(source.Key, 1)).FirstOrDefault();
+                    // keys come from the live channels index: channel:<id>
+                    if (!source.Key.StartsWith("channel:", StringComparison.Ordinal) ||
+                        !int.TryParse(source.Key.Substring("channel:".Length), out var artChannelId))
+                    {
+                        throw new FormatException($"ArtStation category key must be channel:<id>, got '{source.Key}'");
+                    }
+                    first = (await new ArtStationService().GetChannelProjectsAsync(artChannelId, 1)).FirstOrDefault();
                     break;
                 default:
                     // every public platform's GetModes() entry IS the mode its fetcher consumes
@@ -417,9 +433,9 @@ namespace Aura.Views.Backiee
             {
                 Add("AlphaCoders", key, name, DefaultAccentHex);
             }
-            foreach (var (key, name) in ArtStationCategories)
+            foreach (var (id, name) in ArtStationService.Channels)
             {
-                Add("ArtStation", key, name, DefaultAccentHex);
+                Add("ArtStation", $"channel:{id}", name, DefaultAccentHex);
             }
             // every other implemented platform contributes its GetModes() entries as categories
             // (pixabay docs list, pexels query modes, wallhaven bitmask, wallpaperhub collections,
@@ -453,7 +469,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub"))
+            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation"))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;

@@ -148,11 +148,16 @@ extended). key facts the code depends on:
   dated section below).
 - **artstation**: the subject-matter taxonomy is POST + CSRF (anonymous =
   `Invalid CSRF Token`; GET filter params silently ignored - all baselines stay
-  47230) => honest **query entries** (wallpaper/landscape/nature/space/abstract)
-  through GET `api/v2/search/projects.json?query=` (`SearchProjectsAsync`,
-  cards map `smaller_square_cover_url`/`url`, `is_adult_content` filtered).
-  `ArtStationGridPage` takes the query as its navigation parameter; sorting
-  buttons exit query mode (and neither chip is highlighted while in it).
+  47230), but the site's own **Channels directory** is anonymous-open - that is
+  the category source now (see the dated section below). live index
+  `api/v2/community/channels/channels.json` (`GetChannelsIndexAsync` +
+  `SetChannels`, 64 published channels) + drill
+  `community/channels/projects.json?channel_id=&sorting=trending&per_page=45`
+  (`GetChannelProjectsAsync`, same card shape as the search endpoint minus
+  `is_adult_content` - the adult flag there is `hide_as_adult`).
+  `ArtStationGridPage` takes `channel:<id>` as its navigation parameter;
+  sorting buttons exit channel mode (and neither chip is highlighted while
+  in it).
 - **bing + simple desktops**: proven zero taxonomy => one honest entry each
   (`Daily` / `Minimal`) so no scope ever renders an empty grid; their fetchers
   ignore the mode.
@@ -168,7 +173,7 @@ extended). key facts the code depends on:
   right after `ApplyScope`) gives every non-backiee card ONE representative
   wallpaper = page 1's first item of its own drill-down fetch (alpha
   `GetWallpapersByCategoryAsync(key,1,1)` / `ArtStationService
-  SearchProjectsAsync` / `PublicWallpaperService.GetWallpapersAsync`) through
+  GetChannelProjectsAsync` / `PublicWallpaperService.GetWallpapersAsync`) through
   `WallpaperItem.LoadImageAsync`, session-cached in a static
   `ConcurrentDictionary`. three traps found live:
   - **`AlphaCodersService`'s scrape cache is STATIC** (list + lastPage +
@@ -418,6 +423,81 @@ visibility extended to the Local - WallpaperHub scope).
   Windows 11 tiles (bloom/logo/glow/sunrise), mode chips = live collection
   titles, zero errors.
 
+## artstation categories live from the channels directory (2026-10-09)
+
+user audit: the channel picker on artstation's search sidebar (Abstract,
+Anatomy, Animals & Wildlife, ... "All channels") IS the site's category
+taxonomy - reversed and ported as artstation's categories, replacing the 5
+honest query entries.
+
+- endpoints (all anonymous, plain HttpClient - no curl): list
+  `GET api/v2/community/channels/channels.json` = `{total_count, data[]}`
+  (64 published channels: 61 global + 1 hashtag + 2 sponsored; fields id,
+  name, uri, state, type) and drill
+  `GET api/v2/community/channels/projects.json?channel_id=<id>&page=N&sorting=trending&per_page=45`
+  (card shape = search/projects.json minus `is_adult_content` - adult items
+  carry only `hide_as_adult`, filtered; `total_count` caps at 10000; trending
+  page2 can overlap page1 by ~2/45). `sorting` is RESTRICTED to
+  trending|latest|popular - anything else = 400 with the valid list in the
+  error body. all 64 ids verified 200-with-items in one pass.
+- discovery: the list endpoint was found in the Angular search bundle - the
+  `/search` document 403s without full `Sec-Fetch-Mode: navigate` headers,
+  and the JS bundles need `Referer` + `Sec-Fetch-Dest: script`. GET filter
+  params on `search/projects.json` stay silently ignored (baseline
+  unchanged), and `/api/v2/search/channels` 500s on every shape tried - the
+  community/channels pair above is the real surface.
+- code: `ArtStationService` holds a locked live snapshot (`ChannelsLock` /
+  `SetChannels` / `GetChannelsIndexAsync`) like alpha/pixabay/wallpaperhub;
+  `SearchProjectsAsync` and the static 5-entry `ArtStationCategories` table
+  are GONE. keys = `channel:<id>`; the thumb fill and `ArtStationGridPage`'s
+  OnNavigatedTo parse it STRICT (a non-`channel:<id>` key throws - loud,
+  never a silent browse-mode grid). grid title = `ArtStation <channel name>`
+  (snapshot lookup; `#<id>` label if the snapshot ever lacks it). the 5th
+  live-load block runs with the others and `"ArtStation"` joined both
+  error-visibility conditions.
+- counts: per-scope ArtStation = **64** (was 5), Global = **221 merged cards**
+  (was 159; 2 channel names merged into existing cards - Abstract among
+  them). the old query names survive on their non-artstation owners (pixiv:
+  Wallpaper/Landscape/Nature, pexels: Space, backiee+alpha+pixabay:
+  Abstract), so none of those cards disappeared.
+- menuless canary: **`Book Illustration`** (artstation-only channel,
+  chooser-free) -> title `ArtStation Book Illustration`, 44 items, bar clean.
+  verified 2026-10-09 with probe `C:\tmp\aura-artstationchannelcheck.ps1`:
+  221 cards, 64/64 channel names on the grid, Book Illustration + alpha
+  `Vehicle` + the pixabay `Nature videos` regression all OK, bar clean
+  through the whole fill + an 18x5s watch, no flip, focus restored. vision
+  (zengate): real book-illustration/fantasy artwork tiles (horned creature,
+  Witcher covers), zero errors.
+
+## pixabay tile parse: lazy imgs + video collections (2026-10-09)
+
+found by the artstation probe's long bar watch: a persistent
+`Pixabay category thumbnails: 1/61 failed - no items returned for "Nature
+videos"` line - earlier probes sampled the bar before the 1-wide pixabay fill
+reached that card, so it looked clean. root cause: the shipped tile regex
+matched ONE shape - eager `src=` photo/illustration jpg tiles - while every
+collection page mixes shapes:
+
+- only the first ~15 tiles render eagerly; the rest are
+  `src="/static/img/blank.gif" data-lazy="..."` (halloween page: 15 eager +
+  33 lazy of 49 main-grid tiles - every drill silently served ~15/page).
+- posters: `__340.jpg`, `__340.png` (full = `_1280` + SAME extension -
+  `_1280.jpg` on a png asset = 403), video `_tiny.jpg`; tile links span
+  `/photos` `/illustrations` `/vectors` `/videos`.
+- "Nature videos" is the ONE video collection of 63 - `class="item
+  video-item"` tiles whose poster still ships a full ladder: `tiny` 1280x720
+  -> small 1920 -> medium 2560 -> `large` 3840x2160 (all 200; `big` = 404).
+  it parsed 0 items = the permanent loud error line.
+- fix = two-pass regex (eager `src=` + lazy `data-lazy=`), generic tile href
+  (a future media type degrades to skipping that tile, not a broken
+  SourceUrl), jpg|png, video included; both passes merged and sorted by
+  document index, deduped by `data-pk` id. `FullPhotoUrl`: video
+  `_tiny.` -> `_large.`, photo `__340` -> `_1280` (extension preserved).
+- verified: parse == tile-div count on 3 captured pages (50/49/50, was
+  15/0/0 with the shipped pattern), probe drill `Nature videos` = 20 items
+  (viewport realized) title `Pixabay` bar clean, vision = real nature stills
+  (beach-spit frame = the probed video), full watch bar clean.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked
@@ -427,8 +507,9 @@ visibility extended to the Local - WallpaperHub scope).
   the popup is never created at all. so the only acceptable interactive
   check while the user is at the machine is MENULESS: Global card count +
   direct-navigate drills (every single-source merged card skips the chooser:
-  `Celebration` `Batman` `General` `Windows 11` `Wallpaper` `Backgrounds`
-  `Curated` `Daily` `Minimal`) - zero scope menu, zero chooser, zero popup.
+  `Celebration` `Vehicle` `General` `Windows 11` `Book Illustration`
+  `Backgrounds` `Curated` `Daily` `Minimal`) - zero scope menu, zero chooser,
+  zero popup.
 - one menuless pass takes ~90s and verified everything on the CI build
   (2026-10-07): Global = **112** cards, scope `Global`, no error; drill
   titles `Celebration wallpapers` / `Batman` / `Wallhaven` / `WallpaperHub` /
