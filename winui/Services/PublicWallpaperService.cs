@@ -151,6 +151,148 @@ namespace Aura.Services
             return html;
         }
 
+        // pexels categories = the site's own Wallpapers discover index
+        // (https://www.pexels.com/discover/wallpapers/ - the __NEXT_DATA__
+        // props.pageProps.topics[] array: 9 topics of search-term pills, each
+        // term = a /search/<term>/ link. user audit 2026-10-09: use every
+        // section EXCEPT "Phone & mobile" (slug "phone" skipped - a size class,
+        // not a wallpaper style) => 78 terms over 8 topics. the term is BOTH the
+        // card name (the pill's own lowercase text) and the API search query
+        // (the site's link carries no orientation param, so the drill dropped
+        // orientation=landscape to match it - "vertical wallpaper" resolves to
+        // portrait). the pill's own 420x420 photo (imageUrl + ?h=420&w=420&
+        // fit=crop&dpr=1) is the card thumb: fills every card with ZERO API
+        // calls (the free tier caps 200 req/hour - 78 search fills per open
+        // would eat 40% of the quota before any browsing). the API stays only
+        // for the drills (per_page=30 search). transport: www.pexels.com 403s
+        // .NET's TLS fingerprint AND bare/minimal-header curl - the FULL browser
+        // header set through CurlClient passes (verified side by side
+        // 2026-10-09), so html fetches route there like pixabay/cara. one pill
+        // ("live wallpaper") links to /search/videos/ on the site, but its
+        // photo surface serves 100s of results - the photo query is what this
+        // image app ships. the old Curated/Nature/Space query entries are GONE
+        // (Nature/Space live on as other platforms' cards; Curated had no other
+        // owner and disappeared). (automata-private/www.pexels.com/AGENTS.md)
+        private static readonly object PexelsDiscoverLock = new object();
+        private static readonly List<(string Term, string ImageUrl)> PexelsDiscoverList =
+            new List<(string Term, string ImageUrl)>();
+
+        public static IReadOnlyList<(string Term, string ImageUrl)> PexelsDiscoverTerms
+        {
+            get
+            {
+                lock (PexelsDiscoverLock)
+                {
+                    return PexelsDiscoverList.ToArray();
+                }
+            }
+        }
+
+        public static void SetPexelsDiscoverTerms(IReadOnlyList<(string Term, string ImageUrl)> terms)
+        {
+            lock (PexelsDiscoverLock)
+            {
+                PexelsDiscoverList.Clear();
+                PexelsDiscoverList.AddRange(terms);
+            }
+        }
+
+        // the discover page's representative photo for a term - the card thumb
+        // source. missing term = loud throw (index fetch failed), never a
+        // placeholder that lies about the card having art.
+        public static string GetPexelsTermImageUrl(string term)
+        {
+            foreach (var entry in PexelsDiscoverTerms)
+            {
+                if (entry.Term.Equals(term ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                {
+                    return entry.ImageUrl + "?h=420&w=420&fit=crop&dpr=1";
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"No pexels discover term named '{term}' is loaded - the discover/wallpapers index fetch failed, so this card cannot honestly pick a thumbnail.");
+        }
+
+        public async Task<List<(string Term, string ImageUrl)>> GetPexelsDiscoverIndexAsync(
+            CancellationToken cancellationToken = default)
+        {
+            var html = await GetPexelsHtmlAsync("https://www.pexels.com/discover/wallpapers/", cancellationToken);
+
+            // the taxonomy lives in Next.js' __NEXT_DATA__ payload; the script tag
+            // carries id + type + crossorigin attrs, so match on the id alone. the
+            // JSON escapes '<' itself, so a non-greedy </script> stop is safe.
+            var match = Regex.Match(
+                html,
+                @"<script id=""__NEXT_DATA__""[^>]*>(?<json>[\s\S]*?)</script>");
+            if (!match.Success)
+            {
+                throw new InvalidOperationException(
+                    "pexels discover page had no __NEXT_DATA__ payload - the markup changed, refusing to guess a category list.");
+            }
+
+            var terms = new List<(string Term, string ImageUrl)>();
+            using (var document = JsonDocument.Parse(match.Groups["json"].Value))
+            {
+                var topics = document.RootElement
+                    .GetProperty("props")
+                    .GetProperty("pageProps")
+                    .GetProperty("topics");
+
+                foreach (var topic in topics.EnumerateArray())
+                {
+                    var slug = topic.GetProperty("slug").GetString();
+                    if (string.Equals(slug, "phone", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue; // "Phone & mobile" excluded by user decision 2026-10-09
+                    }
+
+                    foreach (var term in topic.GetProperty("terms").EnumerateArray())
+                    {
+                        var name = term.GetProperty("term").GetString();
+                        var image = term.GetProperty("imageUrl").GetString();
+                        if (string.IsNullOrWhiteSpace(name) || string.IsNullOrWhiteSpace(image))
+                        {
+                            throw new InvalidOperationException(
+                                "pexels discover term is missing its name or imageUrl - the payload shape changed, refusing to ship a broken card.");
+                        }
+
+                        terms.Add((name.Trim(), image));
+                    }
+                }
+            }
+
+            if (terms.Count == 0)
+            {
+                throw new InvalidOperationException(
+                    "pexels discover payload had topics but no terms - the payload shape changed.");
+            }
+
+            return terms;
+        }
+
+        // pexels' Cloudflare edge needs the full browser header set: minimal curl
+        // (UA alone, or the pixabay Sec-Fetch pair) and .NET's HttpClient both
+        // 403 (verified side by side 2026-10-09) - only curl + Accept,
+        // Accept-Language, the three Sec-Fetch-* headers and
+        // Upgrade-Insecure-Requests pass, through CurlClient like pixabay/cara.
+        // curl's --fail turns any 4xx/5xx into a thrown error -> the loud bar;
+        // a 200 challenge body is caught by the __NEXT_DATA__ absence check above.
+        private async Task<string> GetPexelsHtmlAsync(string url, CancellationToken cancellationToken)
+        {
+            return await CurlClient.GetStringAsync(url, cancellationToken, PexelsBrowserHeaders);
+        }
+
+        private static readonly string[] PexelsBrowserHeaders =
+        {
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+            "Accept-Language: en-US,en;q=0.9",
+            "Sec-Fetch-Mode: navigate",
+            "Sec-Fetch-Site: none",
+            "Sec-Fetch-Dest: document",
+            "Upgrade-Insecure-Requests: 1"
+        };
+
         // wallpaperhub categories = the site's own Collections index
         // (https://www.wallpaperhub.app/collections - single page today, 17
         // collections; ?page=N is ignored and re-serves the same rows, so the
@@ -387,8 +529,8 @@ namespace Aura.Services
             {
                 // wallhaven categories = the API's 3-bit mask (general/anime/people), see automata wallhaven.cc/AGENTS.md
                 Wallhaven => new[] { "General", "Anime", "People" },
-                // pexels' API has no taxonomy - query modes are all it offers (automata www.pexels.com/AGENTS.md)
-                Pexels => new[] { "Curated", "Nature", "Space" },
+                // pexels categories = the site's own discover/wallpapers terms, live-loaded (see the pexels block above)
+                Pexels => PexelsDiscoverTerms.Select(term => term.Term).ToArray(),
                 Pixabay => PixabayCollections.Select(collection => collection.Name).ToArray(),
                 WallpaperHub => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
                 // bing/simpledesktops have no taxonomy at all - one honest entry each (their AGENTS.md)
@@ -420,7 +562,7 @@ namespace Aura.Services
                 Bing => "Recent daily Bing homepage wallpapers from Microsoft's public archive endpoint.",
                 SimpleDesktops => "Minimal, distraction-free wallpapers from Simple Desktops.",
                 WallpaperHub => "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
-                Pexels => "Free stock photos via the official Pexels API. Add a Pexels API key in Settings.",
+                Pexels => "The site's own discover/wallpapers search terms, live-loaded. Add a Pexels API key in Settings.",
                 Pixabay => "Pixabay's curated collections, live from pixabay.com/collections (no key needed).",
                 DesktopNexus => "15 category galleries plus All from Desktop Nexus's public browse pages.",
                 DigitalBlasphemy => "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
@@ -698,9 +840,11 @@ namespace Aura.Services
                 throw new InvalidOperationException("Pexels support needs a Pexels API key. Add it in Settings > API Keys, then try again.");
             }
 
-            var requestUrl = string.Equals(mode, "Curated", StringComparison.OrdinalIgnoreCase)
-                ? $"https://api.pexels.com/v1/curated?page={page}&per_page=30"
-                : $"https://api.pexels.com/v1/search?query={Uri.EscapeDataString(string.IsNullOrWhiteSpace(mode) ? "wallpaper" : mode)}&orientation=landscape&page={page}&per_page=30";
+            // every mode is a discover term now (the Curated endpoint entry is gone with the
+            // old 3-mode table), and the site's pill links carry NO orientation param - the
+            // search mirrors the site exactly, so "vertical wallpaper" resolves portrait.
+            var requestUrl =
+                $"https://api.pexels.com/v1/search?query={Uri.EscapeDataString(string.IsNullOrWhiteSpace(mode) ? "wallpaper" : mode)}&page={page}&per_page=30";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
             request.Headers.TryAddWithoutValidation("Authorization", apiKey);

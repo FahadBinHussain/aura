@@ -122,9 +122,9 @@ namespace Aura.Views.Backiee
             ErrorTextBlock.Visibility = Visibility.Collapsed;
             LoadingProgressBar.Visibility = Visibility.Visible;
 
-            // the five index loads are independent round trips - run them TOGETHER.
+            // the six index loads are independent round trips - run them TOGETHER.
             // awaited one after another, every Categories open paid the SUM of all
-            // five plus the 19 backiee thumb downloads before the first card could
+            // six plus the 19 backiee thumb downloads before the first card could
             // render, and the sum grew with every platform added (reported: the
             // Global page "lagging super hard"). each load returns its OWN error
             // strings; they merge after WhenAll - one shared List<string> appended
@@ -140,6 +140,7 @@ namespace Aura.Views.Backiee
                     LoadPixabayCollectionsAsync(),
                     LoadWallpaperHubCollectionsAsync(),
                     LoadArtStationChannelsAsync(),
+                    LoadPexelsDiscoverAsync(),
                     LoadBackieeCategoriesAsync(),
                 };
 
@@ -266,6 +267,33 @@ namespace Aura.Views.Backiee
                 return loadErrors;
             }
 
+            // pexels: the site's own discover/wallpapers index is the category
+            // source (live load, same loud contract - the 3 query entries are
+            // gone; phone section stays out per user decision, chip photos fill
+            // the cards with zero API calls)
+            async Task<List<string>> LoadPexelsDiscoverAsync()
+            {
+                var loadErrors = new List<string>();
+                try
+                {
+                    var pexelsTerms = await new PublicWallpaperService().GetPexelsDiscoverIndexAsync();
+                    if (pexelsTerms.Count == 0)
+                    {
+                        loadErrors.Add("pexels returned no discover terms - the discover/wallpapers markup may have changed.");
+                    }
+                    else
+                    {
+                        PublicWallpaperService.SetPexelsDiscoverTerms(pexelsTerms);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    loadErrors.Add($"Couldn't load pexels categories: {ex.Message}");
+                }
+
+                return loadErrors;
+            }
+
             // backiee: the category page + its 19 eager thumbnails (real art on the
             // cards from the first paint - this is the one block that must finish
             // before BuildMerged, exactly as before)
@@ -368,7 +396,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation")
+                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation" || _scopePlatform == "Pexels")
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -444,6 +472,14 @@ namespace Aura.Views.Backiee
                         throw new FormatException($"ArtStation category key must be channel:<id>, got '{source.Key}'");
                     }
                     first = (await new ArtStationService().GetChannelProjectsAsync(artChannelId, 1)).FirstOrDefault();
+                    break;
+                case "Pexels":
+                    // the discover pill's own photo (the site's representative image
+                    // for the term) - ZERO API calls: the free tier caps 200
+                    // requests/hour and 78 search fills per open would eat 40% of it
+                    // before the user browses anything. the drill still searches.
+                    var pillImage = PublicWallpaperService.GetPexelsTermImageUrl(source.Key);
+                    first = new WallpaperItem { ImageUrl = pillImage, FullPhotoUrl = pillImage };
                     break;
                 default:
                     // every public platform's GetModes() entry IS the mode its fetcher consumes
@@ -527,7 +563,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation"))
+            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation" || _scopePlatform == "Pexels"))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;

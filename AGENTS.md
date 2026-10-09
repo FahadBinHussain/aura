@@ -161,8 +161,11 @@ extended). key facts the code depends on:
 - **bing + simple desktops**: proven zero taxonomy => one honest entry each
   (`Daily` / `Minimal`) so no scope ever renders an empty grid; their fetchers
   ignore the mode.
-- **pexels**: API has no categories at all (Curated/Nature/Space stay), the
-  website is Cloudflare-walled (403 / "Just a moment") - documented, not retried.
+- **pexels**: categories = the site's own Wallpapers discover index, live
+  loaded (see the dated pexels section below - the old read "API has no
+  categories at all (Curated/Nature/Space stay), the website is
+  Cloudflare-walled" is SUPERSEDED: the site passes with curl + the full
+  browser header set).
 - chips overflow fix: up to 17-20 mode chips per platform -> `ModeButtonsPanel`
   now sits in a horizontal `ScrollViewer` (Auto horizontal bar, Disabled
   vertical, ZoomMode Disabled).
@@ -192,7 +195,10 @@ extended). key facts the code depends on:
   - loud contract: the bar lists EVERY platform with >= 1 failed card as
     `<platform> category thumbnails: <n>/<total> failed - <first reason>`; a
     keyless install shows exactly 1 line (the Pexels API key - pixabay needs no
-    key since the 2026-10-08 collections rework). the
+    key since the 2026-10-08 collections rework; since the 2026-10-09 pexels
+    discover re-source even pexels FILLS need no key - the chip photos come
+    from the CDN - so a keyless install shows no fill line at all: the loud
+    key error surfaces on the first pexels DRILL instead). the
     fill failure paths never touch the session cache, so the next Categories
     open retries them. verified menuless + vision on the local build
     (2026-10-07): the complaint cards `Aura Farming..Cyberpunk` all real,
@@ -332,9 +338,11 @@ conditions extended to it).
   for the alpha single-source check. verified menuless three times: 113 cards,
   24/24 real names on the grid, 0 legacy names, `Vehicle` title + 15 items,
   bar clean, stable under a 60s watch.
-- one probe run landed on Home/picker after a back; never reproduced in 2
-  full follow-up runs + the 60s watch - logged as observed-once, root cause
-  unknown.
+- the back-lands-on-Home anomaly observed TWICE now: the 2026-10-08 alpha run
+  and the 2026-10-09 pexels run 3 (both at the LAST back of a drill sequence:
+  scope reads `ABSENT`, `Select Your Wallpaper Source` present, cards=-1;
+  re-navigating to Categories works) - not reproduced between them, root
+  cause unknown.
 
 ## wallpaper cave thumbs hit an AVIF wall (2026-10-08)
 
@@ -531,6 +539,88 @@ both fixed:
   an 18x5s watch whose cadence never slipped (UIA reads = the UI-thread canary
   - the old build starved them during fills), focus restored. one run died
   with the KNOWN open exit=0 signature mid-drill; the paced re-run passed.
+- **UI-thread peg on the full grid is PRE-EXISTING, measured A/B 2026-10-09**
+  (during the pexels port, to rule the port out): with ZERO probe walkers on
+  an idle Categories page, one thread burns ~1 core - and it is the UI thread
+  (per-thread UserProcessorTime delta + GetWindowThreadProcessId). HEAD
+  `6b88dee` at **221 cards**: CPU 5.58s/6s, GridCount-style walk 9541 ms,
+  FindText 3132 ms. pexels build at **296 cards**: 5.36s/6s, 18098 ms,
+  7239 ms. Home (small tree) = 0.2s/10s + 13 ms walks. so the peg predates
+  the pexels port and scales with realized card count - it is NOT a pexels
+  regression; what the UI thread actually burns CPU on is NOT yet root-caused
+  (a managed stack dump is the next step; the probe deaths below correlate
+  with walking this pegged thread). measurement gotcha: `dotnet build
+  winui\` (the folder) resolves `Aura.sln` whose default platform is ARM64
+  and lands in `bin\ARM64\Debug\win-arm64\` - which does NOT run on this x64
+  box; build `winui\Aura.csproj` directly for the flat `bin\Debug\Aura.exe`
+  the probes launch.
+
+## pexels categories live from the discover index (2026-10-09)
+
+user audit: pexels' categories = the SECTIONS on its own Wallpapers
+discover page (`https://www.pexels.com/discover/wallpapers/`), minus the
+"Phone & mobile" section (a size class, not a style - user decision). the
+old read "the API has no categories, the website is CF-walled" is REVERSED
++ ported: the wall was a bare-curl artifact, and the taxonomy lives in the
+page's Next.js payload, not the API.
+
+- structure: `__NEXT_DATA__` script payload (match on the id alone - the
+  other attrs vary) -> `props.pageProps.topics[]` = **9 topics x ~10
+  `terms[]`** = 88 terms (`resolution phone desktop dark colors aesthetic
+  nature seasonal subjects`; `dark` has 8, the rest 10). the `phone` topic
+  is skipped per user decision -> **78 terms over 8 topics** (10/10/8/10/
+  10/10/10/10). every term = `{term, mediaId, imageUrl, totalResults}` and
+  the term is BOTH the card name (the pill's lowercase text) and the API
+  search query. the pill href is `/search/<term>/` with NO orientation
+  param, so the drill dropped `orientation=landscape` to match (`vertical
+  wallpaper` resolves portrait). one pill (`live wallpaper`) links to
+  `/search/videos/` on the site but its PHOTO surface serves hundreds of
+  results - the photo query is what this image app ships (automata
+  `www.pexels.com/AGENTS.md` has the curl recipe).
+- transport: `www.pexels.com` 403s .NET's TLS fingerprint AND bare/minimal
+  curl (UA alone, pixabay's Sec-Fetch pair) - only curl + the FULL browser
+  header set passes (6 headers, side-by-side proof 2026-10-09) -> pexels
+  html routes through `CurlClient` like pixabay/cara, header set lives in
+  `PexelsBrowserHeaders`. a challenge shell fails the `__NEXT_DATA__`
+  presence check -> thrown error -> loud bar, never a silently empty list.
+- code: `PublicWallpaperService` holds a locked live snapshot
+  (`PexelsDiscoverLock` / `SetPexelsDiscoverTerms` / `PexelsDiscoverTerms`
+  property / `GetPexelsDiscoverIndexAsync`, same pattern as alpha/pixabay/
+  wallpaperhub/artstation); `GetModes(Pexels)` reads it; the 6th
+  `Task.WhenAll` load block in `LoadCategoriesAsync` feeds it and
+  `"Pexels"` joined both error-visibility conditions. **card thumbs = the
+  pill's own `images.pexels.com` photo** (`imageUrl + ?h=420&w=420&fit=
+  crop&dpr=1`; pill ImageUrls carry NO query string today, so the append is
+  safe) - ZERO API calls: the free tier caps 200 req/hour and 78 search
+  fills per open would eat 40% before any browsing. thumb case lives in
+  `LoadRepresentativeThumbnailAsync` (a `WallpaperItem` over the CDN url ->
+  the shared `LoadImageAsync`, which already does webp under the app's
+  image Accept); `GetPexelsTermImageUrl` miss = loud throw, never a fake
+  placeholder. the drill still searches (`/v1/search?query=<term>`, key
+  required; `/v1/curated` and the orientation param are GONE from the code).
+- counts: per-scope Pexels = **78** (was 3), Global = **296 merged cards**
+  (was 221 = 221 - 1 Curated + 78 - 2 merges: pixabay already owns
+  collections named `black wallpaper` and `aesthetic wallpaper`, so those
+  two pexels terms merged into them instead of adding cards). Curated had
+  no other owner and disappeared with the port; Nature/Space survive on
+  backiee/pixiv/desktopnexus/hdwallpapers. `GetDescription` says
+  discover-loaded + mentions the key for drills.
+- keyless contract: fills need NO key (CDN pill photos) - a keyless
+  install's fill bar is CLEAN and the loud key error surfaces on the first
+  pexels DRILL instead (see the thumbnail-fix section above).
+- menuless canary: **`dark academia wallpaper`** (pexels-only term,
+  chooser-free) -> grid title `Pexels`, description = the discover line,
+  mode chips = the live terms, search returns 30 (viewport-realized 20).
+- verified menuless + vision 2026-10-09 with probe
+  `C:\tmp\aura-pexelsdiscovercheck.ps1`: 296 cards, 78/78 term names on the
+  grid, Nature/Space present, Curated gone, 5 cross-platform spot checks,
+  all 3 drills (dark academia wallpaper / alpha Vehicle / pixabay Nature
+  videos) OK, bar clean through the fill. vision (zengate, 3 shots):
+  Categories top = real art everywhere, drill = 4 real pexels photos +
+  title `Pexels`, scrolled pill zone = 9 pexels cards all real artwork, no
+  placeholders, no errors. runs 1+2 died with the known exit=0 (see the
+  death section); run 3 passed end to end after pacing + an adaptive
+  settle that waits for UIA walk latency instead of a fixed sleep.
 
 ## focus-free verification: menuless protocol (2026-10-07)
 
@@ -542,7 +632,7 @@ both fixed:
   check while the user is at the machine is MENULESS: Global card count +
   direct-navigate drills (every single-source merged card skips the chooser:
   `Celebration` `Vehicle` `General` `Windows 11` `Book Illustration`
-  `Backgrounds` `Curated` `Daily` `Minimal`) - zero scope menu, zero chooser,
+  `Backgrounds` `Daily` `Minimal` `dark academia wallpaper`) - zero scope menu, zero chooser,
   zero popup.
 - one menuless pass takes ~90s and verified everything on the CI build
   (2026-10-07): Global = **112** cards, scope `Global`, no error; drill
@@ -576,11 +666,13 @@ both fixed:
   | 1 = external force kill | 0xC0000354 = STATUS_DEBUGGER_INACTIVE = a
   debugger killed it (probe ARTIFACT, discard the run) | any other negative
   = NTSTATUS crash** - and the registry last-write check (only a close
-  writes park coords). status: one more real exit=0 death observed
-  2026-10-09 (artstation probe drill phase, right before the Book
-  Illustration drill; the paced re-run passed - same signature, root cause
-  still open); otherwise nothing parked; resume = the cdb
-  loop-ender catcher, recipe in automata `windows-ui-automation`.
+  writes park coords). status: THREE real exit=0 deaths on 2026-10-09 (artstation probe
+  drill phase right before the Book Illustration drill + the pexels probe's
+  runs 1 and 2, both mid-drill-sequence during the pre-existing UI-thread
+  peg above; every paced re-run passed - pexels run 3 went green end to
+  end). same signature, root cause still open; otherwise nothing parked;
+  resume = the cdb loop-ender catcher, recipe in automata
+  `windows-ui-automation`.
 
 ## xamlcompiler quirk: invalid property = SILENT exit 1 (2026-10-06)
 

@@ -23,7 +23,7 @@ they get ported (17 as of 2026-10-08).
 | [Pixabay](https://pixabay.com) | 63 curated collections (live) |
 | [WallpaperHub](https://www.wallpaperhub.app) | 17 curated collections (live) |
 | [ArtStation](https://www.artstation.com) | 64 channels, live from the site's channels directory |
-| [Pexels](https://www.pexels.com) | curated / nature / space queries (API key in Settings) |
+| [Pexels](https://www.pexels.com) | 78 discover search terms, live from the site's Wallpapers index (API key in Settings) |
 | [Wallhaven](https://wallhaven.cc) | General / Anime / People |
 | [Bing Wallpaper Archive](https://www.bing.com) | daily homepage wallpapers |
 | [Simple Desktops](https://simpledesktops.com) | minimal desktop sets |
@@ -38,7 +38,7 @@ they get ported (17 as of 2026-10-08).
 
 ### Category links
 
-The URLs behind each site's category/mode entries (2026-10-08; source of truth
+The URLs behind each site's category/mode entries (2026-10-09; source of truth
 is the code - mode tables + fetchers).
 
 - **backiee** - https://backiee.com/categories (19 slugs parse from there) ·
@@ -56,9 +56,15 @@ is the code - mode tables + fetchers).
   (64 published channels: 61 global + 1 hashtag + 2 sponsored, all drillable) ·
   drill `https://www.artstation.com/api/v2/community/channels/projects.json?channel_id=<id>&page=1&sorting=trending&per_page=45`
   (`sorting` is restricted to `trending|latest|popular` - anything else = 400)
-- **pexels** - `https://api.pexels.com/v1/curated?page=1&per_page=30` ·
-  `https://api.pexels.com/v1/search?query=nature&orientation=landscape&page=1&per_page=30` ·
-  `https://api.pexels.com/v1/search?query=space&orientation=landscape&page=1&per_page=30`
+- **pexels** - https://www.pexels.com/discover/wallpapers/ (the `__NEXT_DATA__`
+  `topics[]` array = 9 sections of search-term pills; the "Phone & mobile"
+  section stays out per user decision => 78 terms over 8 sections; fetched
+  through the OS `curl.exe` - Cloudflare 403s .NET's TLS fingerprint AND
+  minimal-header curl, only the full browser header set passes) · drill
+  `https://api.pexels.com/v1/search?query=<term>&page=1&per_page=30` (the
+  term IS the query; no orientation param - the site's pill links carry none,
+  so `vertical wallpaper` resolves portrait. card thumbs = the pill's own
+  `images.pexels.com` photo, zero API calls)
 - **wallhaven** - https://wallhaven.cc/api/v1/search?categories=100&purity=100&sorting=toplist&order=desc&page=1 ·
   https://wallhaven.cc/api/v1/search?categories=010&purity=100&sorting=toplist&order=desc&page=1 ·
   https://wallhaven.cc/api/v1/search?categories=001&purity=100&sorting=toplist&order=desc&page=1
