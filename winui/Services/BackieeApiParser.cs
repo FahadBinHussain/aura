@@ -36,7 +36,7 @@ namespace Aura.Services
                 Description = GetString(wallpaperElement, "Description", title),
                 ImageUrl = imageUrl,
                 FullPhotoUrl = fullPhotoUrl,
-                SourceUrl = GetString(wallpaperElement, "WallpaperUrl", $"https://backiee.com/wallpaper/{id}"),
+                SourceUrl = GetString(wallpaperElement, "WallpaperUrl", BuildWallpaperUrl(id, GetString(wallpaperElement, "ThemeCat"))),
                 Resolution = GetString(wallpaperElement, "Resolution"),
                 QualityTag = GetString(wallpaperElement, "UltraHDType"),
                 IsAI = GetBoolFlag(wallpaperElement, "AIGenerated"),
@@ -50,6 +50,18 @@ namespace Aura.Services
             }
 
             return wallpaper;
+        }
+
+        // backiee has NO id-only permalink (/wallpaper/<id> = 404, proven live
+        // 2026-10-09): every real URL is /wallpaper/<slug>/<id> and the server
+        // 301s ANY slug to the canonical one (/wallpaper/zzzznope/376636 ->
+        // /wallpaper/anime/376636), so an id resolves with ThemeCat when we
+        // have it and a neutral segment otherwise - the browser lands on the
+        // canonical page either way. never build the slugless form.
+        public static string BuildWallpaperUrl(string id, string themeCat = "")
+        {
+            var slug = string.IsNullOrWhiteSpace(themeCat) ? "detail" : themeCat;
+            return $"https://backiee.com/wallpaper/{slug}/{id}";
         }
 
         public static string GetString(JsonElement element, string propertyName, string fallback = "")

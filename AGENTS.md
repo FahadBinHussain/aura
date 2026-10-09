@@ -695,6 +695,51 @@ navigation snapshot at AddEntry time:
   2560x1600 image; final History = 4 rows, thumbnails render, no bars.
   history file: `%APPDATA%\Aura\wallpaper_history.json`.
 
+## backiee view-on-web 404 + selectable detail titles (2026-10-09)
+
+- **backiee has NO id-only permalink**: `/wallpaper/<id>` = 404, and the
+  older AGENTS claim that it 301s is WRONG - it 404s with no redirect (all
+  of `/wallpapers/<id>`, `/wallpaper-detail/<id>`, `/detail/<id>`,
+  `/wallpaper/<id>/` 404 too). but ANY slug in `/wallpaper/<slug>/<id>`
+  resolves: `zzzznope/376636` -> 301 -> canonical `/wallpaper/anime/376636`
+  (200). canonical slug = server-side (title slug or theme cat, not
+  derivable client-side).
+- the detail APIs (`detail_page_v2` root = WallpaperColors/Tags/Comments/
+  Publisher + related lists; v1 `detail_page` root = TagList/ColorList/
+  Publisher/YouMayList/SelectionList/CommentList) carry **no URL for the
+  current wallpaper anywhere** - no string in the 108KB response even
+  contains the id. the `else` branches in both detail pages' publishers
+  therefore ALWAYS fired and clobbered every good canonical SourceUrl with
+  the slugless 404 -> View on Web broke for every backiee detail opened
+  (that was the user's 404 screenshot). fix: else branches deleted on
+  `Views\Backiee` + `Views\AlphaCoders` `WallpaperDetailPage.xaml.cs` (alpha
+  page's "DetailApiBaseUrl" is also backiee's detail_page_v2 - copy-paste);
+  API value still used when present.
+- remaining empty-SourceUrl fallbacks go through
+  `BackieeApiParser.BuildWallpaperUrl(id, themeCat)` =
+  `https://backiee.com/wallpaper/{themeCat|detail}/{id}` - the any-slug 301
+  resolves to canonical in the browser. call sites: parser fallback (was
+  line 39), both OnNavigatedTo defaults. sweep confirmed no slugless
+  construction left (grep `backiee.com/wallpaper` = helper + comments only).
+- curl-proven: `detail/376636` -> 301 canonical, `anime/376636` -> 200.
+- **selectable titles**: `IsTextSelectionEnabled="True"` on the LIVE
+  `TitleTextBlock` of all 4 detail pages (Backiee line 35, AlphaCoders line
+  35 - the line-20 twins are commented out; PublicSources line 45,
+  ArtStation line 14). XamlCompiler ACCEPTED the property (build green) -
+  valid WinUI 3 TextBlock prop, contrary to the silent-exit-1 quirk which
+  applies to properties that don't exist.
+- menuless proof recipe (no synthetic input, no focus steal): UIA
+  TextPattern on the title = present; `DocumentRange.Select()` then
+  `GetSelection()` reads back the full exact title = selection live.
+  UIA `SetFocus()` on a WinUI TextBlock throws "Target element cannot
+  receive focus" (automation peer says not focusable), and with the window
+  ACTIVE but the TextBlock unfocused the highlight renders NOWHERE in
+  PrintWindow captures - so a visual-highlight proof menuless is NOT
+  possible; the highlight appears on real pointer drag (focus goes to the
+  TextBlock then). screenshot proof of selection needs the window already
+  foreground - if fg is the user's app, ABORT loudly, never activate.
+  probes: `C:\tmp\aura-selectfix*.ps1` (4 = screen-grab attempt).
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked

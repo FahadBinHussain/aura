@@ -37,6 +37,7 @@
                            FontSize="24"
                            FontWeight="Bold"
                            TextWrapping="Wrap"
+                           IsTextSelectionEnabled="True"
                            HorizontalAlignment="Center"/>
 
                 <!-- This section is now replaced by the Wallpaper Image Container with Overlay Buttons below -->

@@ -205,7 +205,7 @@ namespace Aura.Views.Backiee
                 // Initialize SourceUrl with a default value based on ID
                 if (string.IsNullOrEmpty(_currentWallpaper.SourceUrl) && !string.IsNullOrEmpty(_currentWallpaper.Id))
                 {
-                    _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{_currentWallpaper.Id}";
+                    _currentWallpaper.SourceUrl = BackieeApiParser.BuildWallpaperUrl(_currentWallpaper.Id);
                 }
 
                 // Set title at the top of the page
@@ -307,11 +307,10 @@ namespace Aura.Views.Backiee
                             // Update the SourceUrl property of the current wallpaper
                             _currentWallpaper.SourceUrl = sourceUrl;
                         }
-                        else
-                        {
-                            // If no source URL in API, create one based on wallpaper ID
-                            _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{wallpaperId}";
-                        }
+                        // no else: detail_page_v2 has NO self-URL field (root = tags/
+                        // colors/comments/publisher/related lists only) - inventing
+                        // https://backiee.com/wallpaper/<id> here clobbered every good
+                        // canonical URL with a 404 (View on Web bug, 2026-10-09)
 
                         // Update UI with publisher information on the UI thread
                         DispatcherQueue.TryEnqueue(() =>

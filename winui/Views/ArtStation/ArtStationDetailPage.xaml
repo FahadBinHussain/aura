@@ -14,6 +14,7 @@
                 <TextBlock x:Name="TitleTextBlock"
                            Text="ArtStation artwork"
                            Style="{StaticResource TitleTextBlockStyle}"
+                           IsTextSelectionEnabled="True"
                            TextWrapping="Wrap"/>
 
                 <TextBlock x:Name="DescriptionTextBlock"

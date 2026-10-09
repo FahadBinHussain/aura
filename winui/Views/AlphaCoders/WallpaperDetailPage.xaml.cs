@@ -299,7 +299,7 @@ namespace Aura.Views.AlphaCoders
                     }
                     else if (string.IsNullOrEmpty(_currentWallpaper.SourceUrl))
                     {
-                        _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{_currentWallpaper.Id}";
+                        _currentWallpaper.SourceUrl = BackieeApiParser.BuildWallpaperUrl(_currentWallpaper.Id);
                     }
                 }
 
@@ -411,11 +411,9 @@ namespace Aura.Views.AlphaCoders
                             // Update the SourceUrl property of the current wallpaper
                             _currentWallpaper.SourceUrl = sourceUrl;
                         }
-                        else
-                        {
-                            // If no source URL in API, create one based on wallpaper ID
-                            _currentWallpaper.SourceUrl = $"https://backiee.com/wallpaper/{wallpaperId}";
-                        }
+                        // no else: detail_page_v2 has NO self-URL field - an invented
+                        // https://backiee.com/wallpaper/<id> clobbered good SourceUrls
+                        // with a 404 (same fix as the backiee detail page, 2026-10-09)
 
                         // Update UI with publisher information on the UI thread
                         DispatcherQueue.TryEnqueue(() =>
