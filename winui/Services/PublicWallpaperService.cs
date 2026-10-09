@@ -523,6 +523,25 @@ namespace Aura.Services
             return SupportedPlatforms.OrderBy(platform => platform).ToList();
         }
 
+        // taxonomy-less sites stay FULLY supported in the platform picker, but they
+        // are REJECTED from every category surface - the Categories page's scope menu
+        // + merged cards today, the slideshow category checklist when it lands. a
+        // category list built from them would be fake entries ("Daily"/"Minimal" are
+        // fetcher modes, not taxonomy). one dynamic list, consulted by the consumer:
+        // add a platform name here to reject it from the category universe without
+        // touching any page code (user decision 2026-10-09; bing/simpledesktops
+        // proven zero taxonomy in automata-private/<site>/AGENTS.md).
+        public static readonly string[] CategoryExcludedPlatforms =
+        {
+            Bing,
+            SimpleDesktops,
+        };
+
+        public static bool IsCategoryExcluded(string? platformName)
+        {
+            return platformName != null && Array.IndexOf(CategoryExcludedPlatforms, platformName) >= 0;
+        }
+
         public static IReadOnlyList<string> GetModes(string platformName)
         {
             return platformName switch
@@ -533,7 +552,10 @@ namespace Aura.Services
                 Pexels => PexelsDiscoverTerms.Select(term => term.Term).ToArray(),
                 Pixabay => PixabayCollections.Select(collection => collection.Name).ToArray(),
                 WallpaperHub => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
-                // bing/simpledesktops have no taxonomy at all - one honest entry each (their AGENTS.md)
+                // bing/simpledesktops have no taxonomy at all - one honest entry each (their
+                // AGENTS.md). these entries only drive the platform's OWN grid chips/default
+                // mode; the Categories page rejects both platforms via
+                // CategoryExcludedPlatforms, so they never become category cards.
                 Bing => new[] { "Daily" },
                 SimpleDesktops => new[] { "Minimal" },
                 DesktopNexus => DesktopNexusCategories.Select(category => category.Title).ToArray(),

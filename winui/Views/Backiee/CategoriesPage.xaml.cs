@@ -28,10 +28,13 @@ namespace Aura.Views.Backiee
         // every platform the app implements - this array IS the scope menu. public sources derive
         // from PublicWallpaperService so a newly ported platform can never be forgotten here (the
         // scope menu, the merged cards and the not-implemented dialog all read that one list).
+        // taxonomy-less sites (PublicWallpaperService.CategoryExcludedPlatforms) are REJECTED
+        // from it - their scope would always render an empty grid.
         // per-site reversal evidence: automata-private/<site>/AGENTS.md
         private static readonly string[] CategoryPlatforms =
             new[] { "Backiee", "AlphaCoders", "ArtStation" }
                 .Concat(PublicWallpaperService.GetSupportedPlatformNames())
+                .Where(name => !PublicWallpaperService.IsCategoryExcluded(name))
                 .ToArray();
 
         private static readonly BitmapImage PlaceholderImage =
@@ -533,11 +536,18 @@ namespace Aura.Views.Backiee
             }
             // every other implemented platform contributes its GetModes() entries as categories
             // (pixabay docs list, pexels query modes, wallhaven bitmask, wallpaperhub collections,
-            //  bing/simpledesktops single honest entry - key = the mode the fetcher consumes).
-            // the public list derives from PublicWallpaperService: adding a platform to its
-            // SupportedPlatforms set is ALL it takes to appear here.
+            //  key = the mode the fetcher consumes). the public list derives from
+            // PublicWallpaperService: adding a platform to its SupportedPlatforms set is ALL it
+            // takes to appear here. the dynamic rejection list filters at the source - a
+            // taxonomy-less site contributes no fake cards here (its GetModes entries still
+            // drive its own grid page chips).
             foreach (var platform in PublicWallpaperService.GetSupportedPlatformNames())
             {
+                if (PublicWallpaperService.IsCategoryExcluded(platform))
+                {
+                    continue;
+                }
+
                 foreach (var mode in PublicWallpaperService.GetModes(platform))
                 {
                     Add(platform, mode, mode, DefaultAccentHex);

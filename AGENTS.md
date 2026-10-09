@@ -160,7 +160,9 @@ extended). key facts the code depends on:
   in it).
 - **bing + simple desktops**: proven zero taxonomy => one honest entry each
   (`Daily` / `Minimal`) so no scope ever renders an empty grid; their fetchers
-  ignore the mode.
+  ignore the mode. (SUPERSEDED 2026-10-09: both are now rejected from the
+  category page entirely via the dynamic exclusion list - see the dated
+  section; their grid chips keep the entries.)
 - **pexels**: categories = the site's own Wallpapers discover index, live
   loaded (see the dated pexels section below - the old read "API has no
   categories at all (Curated/Nature/Space stay), the website is
@@ -857,6 +859,42 @@ came from (site) and WHICH category it was set from - next to the existing
   `Slideshow`, purple site (`ArtStation`/`Simple Desktops`/...), orange
   `Latest Wallpapers` - thumbnails render, zero error banners.
 
+## taxonomy-less sites rejected from the category universe (2026-10-09)
+
+user decision: sites with proven zero taxonomy (bing, simple desktops) stay
+FULLY supported in the platform picker, but they are REJECTED from every
+category surface - a category list built from them would be fake entries
+(`Daily`/`Minimal` are fetcher modes, not taxonomy). enforcement is one
+DYNAMIC list so future rejects are a one-line add:
+
+- `PublicWallpaperService.CategoryExcludedPlatforms` (today `{ Bing,
+  SimpleDesktops }`) + `IsCategoryExcluded(name)`. consulted in
+  `CategoriesPage` twice: `CategoryPlatforms` (the scope menu - a rejected
+  scope would always render an empty grid) and `BuildMerged`'s GetModes loop
+  (no fake cards). `GetModes` itself stays factual on purpose: the
+  `Daily`/`Minimal` entries still drive each platform's OWN grid chips +
+  default mode (the platform picker is untouched by this rejection).
+- counts: Global **296 -> 294** (both were single-source; a live-index curl
+  check found no exact-name merge owner - wallpaperhub's "daily" hit is
+  description text, pexels' `minimalist wallpaper` is its own card); scope
+  menu 17 -> 15 platforms. supersessions: the "one honest entry each" bullet
+  in the all-9-platform section above, and the menuless canary list's
+  `Daily` `Minimal` (those two cards no longer exist).
+- pending slideshow category-selector feature: the checklist universe must
+  consult `IsCategoryExcluded` too - in Category mode bing/SD get no ticks
+  and take the LOUD per-platform skip (supersedes the earlier design call
+  where each resolved its own `Daily`/`Minimal` entry).
+- verified menuless with probe `C:\tmp\aura-categoryexclusion.ps1` (stays in
+  C:\tmp): cards=294, `Daily`+`Minimal` gone from the grid, 11 spot names
+  present, alpha `Vehicle` drill 15 items + title + bar clean, back rebuilds
+  294 with scope `Global`, 4x5s watch stable (no flip, bar clean). full-grid
+  FindText stays ~4-9s throughout - that is the PRE-EXISTING UI-thread peg
+  (measured 2026-10-09 at 296 cards), not a regression of this change, and
+  it means the probe's settle loop can never gate on "<1.5s walks": it is a
+  paced delay with heartbeats (the first run died silently at the tool
+  timeout because its 30x10s cap had no progress prints - heartbeats added,
+  cap 15).
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked
@@ -867,7 +905,8 @@ came from (site) and WHICH category it was set from - next to the existing
   check while the user is at the machine is MENULESS: Global card count +
   direct-navigate drills (every single-source merged card skips the chooser:
   `Celebration` `Vehicle` `General` `Windows 11` `Book Illustration`
-  `Backgrounds` `Daily` `Minimal` `dark academia wallpaper`) - zero scope menu, zero chooser,
+  `Backgrounds` `dark academia wallpaper`; `Daily` `Minimal` were retired
+  2026-10-09 with the category-rejection list) - zero scope menu, zero chooser,
   zero popup.
 - one menuless pass takes ~90s and verified everything on the CI build
   (2026-10-07): Global = **112** cards, scope `Global`, no error; drill
