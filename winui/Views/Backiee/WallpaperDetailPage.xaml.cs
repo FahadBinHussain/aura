@@ -587,7 +587,9 @@ namespace Aura.Views.Backiee
                         _currentWallpaper.Title ?? "Unknown",
                         !string.IsNullOrEmpty(savedFilePath) ? savedFilePath : (_currentWallpaper.FullPhotoUrl ?? ""),
                         wallpaperTypeLabel,
-                        "Manual");
+                        "Manual",
+                        _currentWallpaper,
+                        "Backiee");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else

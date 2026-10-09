@@ -737,7 +737,9 @@ namespace Aura.Views.AlphaCoders
                         _currentWallpaper.Title ?? "Unknown",
                         !string.IsNullOrEmpty(savedFilePath) ? savedFilePath : (_currentWallpaper.ImageUrl ?? ""),
                         wallpaperTypeLabel,
-                        "Manual");
+                        "Manual",
+                        _currentWallpaper,
+                        "AlphaCoders");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else

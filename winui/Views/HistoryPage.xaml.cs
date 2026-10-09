@@ -1,7 +1,11 @@
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Media.Imaging;
+using Aura.Models;
 using Aura.Services;
+using Microsoft.UI.Input;
 using System;
 
 namespace Aura.Views
@@ -53,7 +57,7 @@ namespace Aura.Views
             }
         }
 
-        private Border BuildEntryCard(HistoryEntry entry)
+        private UIElement BuildEntryCard(HistoryEntry entry)
         {
             // Thumbnail image wrapped in a clipped border for rounded corners
             var image = new Image
@@ -160,15 +164,91 @@ namespace Aura.Views
             row.Children.Add(imageBorder);
             row.Children.Add(textStack);
 
-            return new Border
+            var card = new Border
             {
                 Padding = new Thickness(12, 8, 12, 8),
                 CornerRadius = new CornerRadius(8),
-                Background = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
-                BorderBrush = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
+                Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"],
+                BorderBrush = (Brush)Application.Current.Resources["CardStrokeColorDefaultBrush"],
                 BorderThickness = new Thickness(1),
                 Child = row
             };
+
+            // the whole row is one button: click = navigate to the wallpaper's
+            // detail page. Name = title so UIA (and keyboard users) see a clean
+            // label instead of the concatenated badge soup.
+            var button = new HistoryEntryButton
+            {
+                Content = card,
+                Tag = entry,
+                Padding = new Thickness(0),
+                BorderThickness = new Thickness(0),
+                HorizontalAlignment = HorizontalAlignment.Stretch,
+                HorizontalContentAlignment = Microsoft.UI.Xaml.HorizontalAlignment.Stretch,
+                VerticalContentAlignment = Microsoft.UI.Xaml.VerticalAlignment.Center,
+                CornerRadius = new CornerRadius(8)
+            };
+            AutomationProperties.SetName(button, entry.Title);
+            button.PointerEntered += (s, args) =>
+                card.Background = (Brush)Application.Current.Resources["CardBackgroundFillColorSecondaryBrush"];
+            button.PointerExited += (s, args) =>
+                card.Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
+            button.Click += HistoryEntry_Click;
+            return button;
+        }
+
+        // Button subclass: ProtectedCursor is a protected member, so only the
+        // deriving type can set the hand cursor.
+        private sealed class HistoryEntryButton : Button
+        {
+            public HistoryEntryButton()
+            {
+                ProtectedCursor = InputSystemCursor.Create(InputSystemCursorShape.Hand);
+            }
+        }
+
+        private void HistoryEntry_Click(object sender, RoutedEventArgs e)
+        {
+            var entry = (sender as Button)?.Tag as HistoryEntry;
+            if (entry?.Navigation?.Wallpaper == null || string.IsNullOrEmpty(entry.Navigation.Page))
+            {
+                ShowStatus(
+                    "No detail page is stored for this entry — it was set by the Slideshow or saved before click-through. " +
+                    "Set the wallpaper again from its source page to make it clickable.",
+                    InfoBarSeverity.Error);
+                return;
+            }
+
+            var item = entry.Navigation.Wallpaper.ToWallpaperItem();
+            bool navigated = entry.Navigation.Page switch
+            {
+                "Public" => Frame.Navigate(typeof(PublicSources.PublicWallpaperDetailPage),
+                    new PublicWallpaperNavigationParameter(entry.Navigation.Platform, item)),
+                "Backiee" => Frame.Navigate(typeof(Backiee.WallpaperDetailPage), item),
+                "AlphaCoders" => Frame.Navigate(typeof(AlphaCoders.WallpaperDetailPage), item),
+                "ArtStation" => Frame.Navigate(typeof(ArtStation.ArtStationDetailPage), item),
+                _ => false
+            };
+
+            if (navigated)
+            {
+                StatusInfoBar.IsOpen = false;
+            }
+            else
+            {
+                ShowStatus(
+                    entry.Navigation.Page is "Public" or "Backiee" or "AlphaCoders" or "ArtStation"
+                        ? $"Could not open the detail page for \"{entry.Title}\"."
+                        : $"Unknown detail page '{entry.Navigation.Page}' stored for \"{entry.Title}\".",
+                    InfoBarSeverity.Error);
+            }
+        }
+
+        private void ShowStatus(string message, InfoBarSeverity severity)
+        {
+            StatusInfoBar.Message = message;
+            StatusInfoBar.Severity = severity;
+            StatusInfoBar.IsOpen = true;
         }
 
         private void ClearHistoryButton_Click(object sender, RoutedEventArgs e)

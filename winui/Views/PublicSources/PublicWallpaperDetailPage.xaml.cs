@@ -155,6 +155,9 @@ namespace Aura.Views.PublicSources
                         _wallpaper.Title,
                         file.Path,
                         isLockScreen ? "Lock Screen" : "Desktop",
+                        _platformName,
+                        _wallpaper,
+                        "Public",
                         _platformName);
 
                     ShowStatus($"{(isLockScreen ? "Lock screen" : "Desktop wallpaper")} set successfully.", InfoBarSeverity.Success);

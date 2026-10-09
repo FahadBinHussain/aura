@@ -169,7 +169,18 @@ namespace Aura.Services
             }
 
             var url = $"{BaseUrl}/projects/{Uri.EscapeDataString(wallpaper.Id)}.json";
-            var json = await _httpClient.GetStringAsync(url, cancellationToken);
+            // Cloudflare fingerprints the TLS client here: /projects/<hash>.json 403s
+            // SocketsHttpHandler (with or without full browser headers) while curl passes
+            // (side-by-side proof 2026-10-09) - same class as pixabay/cara/pexels, so this
+            // fetch is curl-only, not a fallback. the Sec-Fetch pair is REQUIRED (bare curl
+            // = a CF challenge page); fail is loud = curl exit code + stderr thrown.
+            var json = await CurlClient.GetStringAsync(url, cancellationToken,
+                new[]
+                {
+                    "Accept: application/json,text/plain,image/*,*/*",
+                    "Sec-Fetch-Mode: cors",
+                    "Sec-Fetch-Site: same-origin"
+                });
 
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;

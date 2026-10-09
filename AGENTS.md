@@ -622,6 +622,79 @@ page's Next.js payload, not the API.
   death section); run 3 passed end to end after pacing + an adaptive
   settle that waits for UIA walk latency instead of a fixed sleep.
 
+## history rows open the wallpaper's detail page (2026-10-09)
+
+user choice: clicking a Wallpaper History row opens the IN-APP detail page
+for that wallpaper (never a browser URL). rows store a serializable
+navigation snapshot at AddEntry time:
+
+- schema (`Services/WallpaperHistoryService.cs`): `HistoryNavigation {Page,
+  Platform, Wallpaper}` where `Wallpaper` is a `HistoryWallpaper` DTO -
+  the string/bool fields of `WallpaperItem` (ImageUrl, FullPhotoUrl,
+  SourceUrl, Title, Description, ...), explicitly EXCLUDING ImageSource +
+  DownloadCommand (not serializable). `AddEntry(..., WallpaperItem? wallpaper,
+  string? page = null, string? platform = null)` - optional tail params, so
+  SlideshowService's call is untouched and yields `Navigation = null`
+  (slideshow does not open detail pages - honest, not broken).
+- page discriminators: `"Public" | "Backiee" | "AlphaCoders" |
+  "ArtStation"`; `HistoryPage.HistoryEntry_Click` switches on them ->
+  `PublicSources.PublicWallpaperDetailPage` (+`PublicWallpaperNavigationParameter`),
+  `Backiee.WallpaperDetailPage`, `AlphaCoders.WallpaperDetailPage`,
+  `ArtStation.ArtStationDetailPage`. null Navigation or an unknown Page =
+  LOUD `StatusInfoBar` (row 0 in the XAML, `StatusInfoBar` + `ShowStatus`),
+  never a silent no-op; a navigate() returning false = loud "could not
+  open" with the reason. the exact null message: `No detail page is stored
+  for this entry — it was set by the Slideshow or saved before click-through.
+  Set the wallpaper again from its source page to make it clickable.`
+- rows are `HistoryEntryButton : Button` (a Button subclass because
+  `ProtectedCursor` is protected) - sets `InputSystemCursor.Create(Hand)`,
+  `AutomationProperties.Name` = the title (clean UIA: rows findable by
+  their title as a Button), hover swaps to `CardBackgroundFillColorSecondary`.
+- the 4 pre-existing entries were BACKFILLED by hand (ids/urls curl-verified
+  live): backiee 376636, alphacoders 996764 (x2 - desktop + lock screen),
+  simple-desktops traffic. **backiee SourceUrl trap**: the default
+  `https://backiee.com/wallpaper/{Id}` 404s - the real URL needs the
+  category slug (`/wallpaper/anime/376636`; `/wallpaper/376636` 301s there)
+  - the backfill stores the canonical URL.
+- **artstation detail refetch = curl-only (CF fingerprint)**: `/projects/
+  <hash>.json` 403s .NET even with full browser headers while
+  `projects.json` / search / channels all pass .NET; bare curl gets a CF
+  challenge page (looks like JSON), and curl + `Accept:
+  application/json,text/plain,image/*,*/*` + `Sec-Fetch-Mode: cors` +
+  `Sec-Fetch-Site: same-origin` = 200 (side-by-side proof 2026-10-09) ->
+  `GetProjectDetailsAsync` routes through `CurlClient` with exactly that
+  header triple (single method, not a fallback; failure = curl exit code +
+  stderr surfaced loud). same class as pixabay/cara/pexels. before this
+  fix the B4 probe run showed `Could not load ArtStation artwork: 403` +
+  empty title.
+- UIA verify gotcha: x:Name `TitleTextBlock` appears TWICE in the
+  backiee/alpha detail name scopes (XAML name-scope collision) - assert
+  titles via a TEXT element with the literal string, not AutomationId.
+  per-page unique markers: backiee `SetAsWallpaperButton`, alpha
+  `DebugBigThumbTextBlock`, public `PlatformTextBlock`, artstation
+  `ArtworkImage`.
+- probe (stays in `C:\tmp`, never committed): `aura-historyclick.ps1` -
+  stage A appends a `Source=(probe none)` no-Navigation row (rerun-safe:
+  the file may already be backfilled) and asserts the loud path; backfill
+  strips it, adds Navigation to nav-less real entries + a temp
+  `ArtStation (probe temp)` row for the 4th switch arm; stage B clicks all
+  4 rows (assert title + page marker + bar clean + back OK each time);
+  cleanup strips every `(probe ...)` row; final relaunch leaves History
+  visible. two probe-authoring traps: (1) `ConvertFrom-Json` PSCustomObject
+  rejects `$e.Nav = ...` assignment - use `Add-Member -NotePropertyName`;
+  (2) capture BEFORE the back-navigation - a Shot after GoDetail returns
+  shows History, not the detail page (first run wasted 4 captures that
+  way; `aura-histdetail-shot.ps1` did the visual proof attach-and-capture).
+- verified end-to-end 2026-10-09 (local `bin\Debug` build): stage A loud
+  exact message OK; B1 Backiee / B2 AlphaCoders (big thumb resolved live)
+  / B3 Public SimpleDesktops / B4 ArtStation (curl fix) all OK - title +
+  marker + clean bar + back each time; file ends with 4/4 entries carrying
+  Navigation, temp rows gone. vision (zengate): loud red InfoBar text
+  exact; backiee detail = real Santorini artwork + title + Set/Download/
+  View-on-Web buttons; public detail = `Traffic` + `Simple Desktops` +
+  2560x1600 image; final History = 4 rows, thumbnails render, no bars.
+  history file: `%APPDATA%\Aura\wallpaper_history.json`.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked

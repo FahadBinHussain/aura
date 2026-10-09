@@ -16,6 +16,10 @@ namespace Aura.Services
     // day, same proof shape: identical headers pass through curl and 403 through .NET (its
     // CDN and /api/ pass .NET, so only the HTML pages route here; pixabay additionally
     // requires the two Sec-Fetch-* headers passed as extraHeaders - plain curl = 403).
+    // artstation.com's /projects/<hash>.json (the detail-page refetch) joins that set -
+    // 2026-10-09: 403 to .NET with full browser headers, curl + Sec-Fetch-Mode: cors +
+    // Sec-Fetch-Site: same-origin = 200 (its channels/projects.json endpoints still pass
+    // .NET, so only the per-project fetch routes here).
     // this is NOT a fallback: these hosts only ever go through curl here, and a failure is
     // loud - curl exit != 0 (incl. --fail exit 22 on any 4xx/5xx) throws with stderr attached,
     // which surfaces as the page's StatusInfoBar / the category-thumbnail bar line.

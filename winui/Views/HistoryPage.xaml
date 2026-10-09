@@ -14,6 +14,7 @@
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto"/>
             <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
             <RowDefinition Height="*"/>
         </Grid.RowDefinitions>
 
@@ -23,8 +24,15 @@
             <TextBlock Text="Wallpaper History" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
         </StackPanel>
 
+        <!-- Loud status line (click-through errors, etc.) -->
+        <InfoBar x:Name="StatusInfoBar"
+                 Grid.Row="1"
+                 IsOpen="False"
+                 IsClosable="True"
+                 Margin="0,4,0,0"/>
+
         <!-- Subtitle + Clear button -->
-        <Grid Grid.Row="1" Margin="0,4,0,16">
+        <Grid Grid.Row="2" Margin="0,4,0,16">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="*"/>
                 <ColumnDefinition Width="Auto"/>
@@ -43,7 +51,7 @@
         </Grid>
 
         <!-- History List -->
-        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="HistoryListPanel" Spacing="4"/>
         </ScrollViewer>
 
