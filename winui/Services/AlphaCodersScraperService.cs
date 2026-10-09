@@ -104,6 +104,12 @@ namespace Aura.Services
                 // Create WallpaperItem objects directly from current scrape
                 wallpapers = CreateWallpaperItemsFromUrls(currentPageUrls);
 
+                // tag the category so history rows can show a category sticker
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Category = category;
+                }
+
                 return wallpapers;
             }
             catch (Exception ex)

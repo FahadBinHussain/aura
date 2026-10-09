@@ -804,6 +804,59 @@ fixes:
   rows at 15:25:39 / 15:26:56 / 15:27:58 / 15:28:59 = exactly 60s apart,
   2+ `next change time` log lines, info bar closed throughout.
 
+## history site + category stickers (2026-10-09)
+
+user ask: each Wallpaper History row should also show WHERE the wallpaper
+came from (site) and WHICH category it was set from - next to the existing
+`Desktop`/`Slideshow` pills.
+
+- **schema**: `HistoryEntry` gained `Platform` + `Category` (nullable - old
+  rows deserialize to null). `AddEntry` gained a tail `string category = ""`;
+  entry `Platform` = explicit `platform` arg, else `wallpaper.Platform`;
+  entry `Category` = explicit `category` arg, else `wallpaper.Category`.
+  slideshow calls pass `wallpaper, category: _desktopCategory` (page stays
+  empty so `Navigation` stays null - the click contract above is untouched).
+  backiee/alpha/artstation detail calls now pass explicit `platform:` (the
+  public one already passed `_platformName`).
+- **items get tagged at the source** (`WallpaperItem.Category`): backiee
+  `ThemeCat` in `BackieeApiParser.CreateWallpaperItem`; public mode in
+  `GetWallpapersAsync` (the per-platform switch arms already `await`, so the
+  wrapper assigns the switch result directly - an outer `await` there is a
+  CS1929); alpha category key in `ScrapeWallpapersByCategoryAsync` (covers
+  the grid AND the slideshow - both go through that scrape). artstation has
+  no per-item category (honest absence, no pill).
+- **old rows** (`RecoverSlideshowStickers`, one-shot from
+  `MainWindow.RestoreSlideshowsOnStartupAsync` after both starts):
+  `Source == "Slideshow"` rows take `Category` from the configured settings
+  and recover `Platform` by matching the local filename id
+  (`wallpaper-<id>.<ext>` / `lockscreen-<id>.<ext>`, first-dash split) against
+  the new read-only `SlideshowService.DesktopBatch` / `LockScreenBatch`. rows
+  whose id rolled off the live pages stay empty - never guessed (11/30 stayed
+  empty in the verify run; category filled 30/30).
+- **rendering** (`HistoryPage`): `MakeBadge` helper + pills in order type
+  (gray) / source (SteelBlue Manual, SeaGreen otherwise) / site
+  (MediumPurple, only when it differs from Source - public rows store the
+  site IN `Source`) / category (Chocolate, only when known). old rows go
+  through `DeriveSite`: `Platform` -> `Navigation.Platform` ->
+  `Navigation.Page` (Backiee/AlphaCoders/ArtStation) -> `Source` when it is
+  not Manual/Slideshow.
+- gotchas hit: `Windows.UI.Colors` does NOT exist in WinUI 3 (it is
+  `Microsoft.UI.Colors`; the helper's parameter type is `Windows.UI.Color`);
+  this run's XamlCompiler MSB3073 exit-1 was a CASCADE of the two C# errors
+  and went green once they were fixed (a standalone XAML failure would have
+  stayed red - see the quirk section below); `HistoryListPanel` (StackPanel)
+  has NO UIA peer so it always reads `ABSENT` - probe page detection uses
+  `ClearHistoryButton`; `wallpaper_history.json` is NOT append-ordered (find
+  new rows by `Timestamp`, never by array position).
+- verified menuless with probe `C:\tmp\aura-historystickers.ps1` (stays in
+  C:\tmp): run 2 full PASS - restore + next-change line OK, missing category
+  0, missing site no-regression vs baseline, badge counts 37 category /
+  30 site texts across 7 distinct sites, `StatusInfoBar` closed, a new
+  AddEntry row (`Garchomp`, ArtStation) carried both fields, focus restored.
+  vision (zengate): rows show exactly 4 pills - gray `Desktop`, green
+  `Slideshow`, purple site (`ArtStation`/`Simple Desktops`/...), orange
+  `Latest Wallpapers` - thumbnails render, zero error banners.
+
 ## focus-free verification: menuless protocol (2026-10-07)
 
 - **never open a flyout while the user is working**: with the window parked

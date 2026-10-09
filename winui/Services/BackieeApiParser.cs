@@ -37,6 +37,7 @@ namespace Aura.Services
                 ImageUrl = imageUrl,
                 FullPhotoUrl = fullPhotoUrl,
                 SourceUrl = GetString(wallpaperElement, "WallpaperUrl", BuildWallpaperUrl(id, GetString(wallpaperElement, "ThemeCat"))),
+                Category = GetString(wallpaperElement, "ThemeCat"),
                 Resolution = GetString(wallpaperElement, "Resolution"),
                 QualityTag = GetString(wallpaperElement, "UltraHDType"),
                 IsAI = GetBoolFlag(wallpaperElement, "AIGenerated"),

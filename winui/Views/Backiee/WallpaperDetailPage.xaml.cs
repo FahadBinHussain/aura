@@ -588,7 +588,8 @@ namespace Aura.Views.Backiee
                         wallpaperTypeLabel,
                         "Manual",
                         _currentWallpaper,
-                        "Backiee");
+                        "Backiee",
+                        platform: "Backiee");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else

@@ -584,7 +584,7 @@ namespace Aura.Services
         {
             page = Math.Max(page, 1);
 
-            return platformName switch
+            var wallpapers = platformName switch
             {
                 Wallhaven => await GetWallhavenWallpapersAsync(page, mode, cancellationToken),
                 Bing => await GetBingWallpapersAsync(page, cancellationToken),
@@ -602,6 +602,15 @@ namespace Aura.Services
                 Artgram => await GetArtgramWallpapersAsync(page, mode, cancellationToken),
                 _ => throw new NotSupportedException($"{platformName} is not implemented yet.")
             };
+
+            // the mode IS the category the caller asked for (term, collection,
+            // mode) - tag items so history rows can show a category sticker
+            var categoryLabel = string.IsNullOrWhiteSpace(mode) ? "latest" : mode;
+            foreach (var wallpaper in wallpapers)
+            {
+                if (string.IsNullOrEmpty(wallpaper.Category)) wallpaper.Category = categoryLabel;
+            }
+            return wallpapers;
         }
 
         public async Task<byte[]> GetImageBytesAsync(string imageUrl, CancellationToken cancellationToken = default)

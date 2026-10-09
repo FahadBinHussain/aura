@@ -737,7 +737,8 @@ namespace Aura.Views.AlphaCoders
                         wallpaperTypeLabel,
                         "Manual",
                         _currentWallpaper,
-                        "AlphaCoders");
+                        "AlphaCoders",
+                        platform: "AlphaCoders");
                     await ShowSuccessDialogAsync($"{(wallpaperType == WallpaperType.Desktop ? "Desktop wallpaper" : "Lock screen")} set successfully!");
                 }
                 else

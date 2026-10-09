@@ -1050,6 +1050,12 @@ namespace Aura
                     var interval = SlideshowService.ParseInterval(lockInterval);
                     await service.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue);
                 }
+
+                // one-shot: rows saved before the sticker feature recorded no
+                // site/category - recover them from the loaded batch (the local
+                // filename holds the wallpaper id) + the configured categories
+                Aura.Services.WallpaperHistoryService.Instance.RecoverSlideshowStickers(
+                    service.DesktopBatch, service.LockScreenBatch, desktopCategory, lockCategory);
             }
             catch (Exception ex)
             {

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Text.Json;
 using Aura.Models;
 
@@ -74,7 +75,9 @@ namespace Aura.Services
         public string ImageUrl { get; set; }   // Local file path or URL for thumbnail
         public DateTime Timestamp { get; set; }
         public string WallpaperType { get; set; }  // "Desktop" or "Lock Screen"
-        public string Source { get; set; }          // "Manual" or "Slideshow"
+        public string Source { get; set; }          // "Manual", "Slideshow", or the site name (public-source rows)
+        public string? Platform { get; set; }       // site sticker: Backiee / Wallhaven / ... (null on old rows)
+        public string? Category { get; set; }       // category sticker: Latest Wallpapers / term / collection (null when unknown)
         public HistoryNavigation? Navigation { get; set; }  // click-through target; null when none stored
     }
 
@@ -97,7 +100,7 @@ namespace Aura.Services
         public event EventHandler? HistoryChanged;
 
         public void AddEntry(string title, string imageUrl, string wallpaperType, string source,
-            WallpaperItem? wallpaper = null, string page = "", string platform = "")
+            WallpaperItem? wallpaper = null, string page = "", string platform = "", string category = "")
         {
             var entry = new HistoryEntry
             {
@@ -106,6 +109,10 @@ namespace Aura.Services
                 Timestamp = DateTime.Now,
                 WallpaperType = wallpaperType,
                 Source = source,
+                // stickers: explicit argument wins, then the item's own tagging
+                // (services tag the category they fetched with)
+                Platform = !string.IsNullOrEmpty(platform) ? platform : wallpaper?.Platform ?? "",
+                Category = !string.IsNullOrEmpty(category) ? category : wallpaper?.Category ?? "",
                 Navigation = wallpaper == null || string.IsNullOrEmpty(page)
                     ? null
                     : new HistoryNavigation
@@ -163,6 +170,65 @@ namespace Aura.Services
             {
                 // Silently ignore write errors
             }
+        }
+
+        // wallpaper_history.json rows created before the sticker feature recorded
+        // no site/category at set time - recover them ONCE from the CURRENT
+        // slideshow batch (the local filename stores the exact wallpaper id) +
+        // the configured slideshow categories. unmatched rows stay empty -
+        // never guessed.
+        public void RecoverSlideshowStickers(
+            IReadOnlyList<WallpaperItem> desktopBatch,
+            IReadOnlyList<WallpaperItem> lockScreenBatch,
+            string desktopCategory,
+            string lockScreenCategory)
+        {
+            bool changed = false;
+            foreach (var entry in Entries)
+            {
+                if (entry.Source != "Slideshow") continue;
+                bool isLock = entry.WallpaperType == "Lock Screen";
+
+                if (string.IsNullOrEmpty(entry.Category))
+                {
+                    var category = isLock ? lockScreenCategory : desktopCategory;
+                    if (!string.IsNullOrEmpty(category))
+                    {
+                        entry.Category = category;
+                        changed = true;
+                    }
+                }
+
+                if (string.IsNullOrEmpty(entry.Platform))
+                {
+                    var id = ExtractStoredId(entry.ImageUrl);
+                    if (!string.IsNullOrEmpty(id))
+                    {
+                        var batch = isLock ? lockScreenBatch : desktopBatch;
+                        var match = batch.FirstOrDefault(w => w.Id == id);
+                        if (match != null && !string.IsNullOrEmpty(match.Platform))
+                        {
+                            entry.Platform = match.Platform;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+
+            if (changed) SaveToDisk();
+        }
+
+        // local slideshow files are named wallpaper-<id>.<ext> /
+        // lockscreen-<id>.<ext> - the id is whatever sits between prefix and dot
+        private static string? ExtractStoredId(string imageUrl)
+        {
+            if (string.IsNullOrEmpty(imageUrl) || imageUrl.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                return null;
+            var name = Path.GetFileNameWithoutExtension(imageUrl);
+            var dash = name.IndexOf('-');
+            if (dash <= 0 || dash == name.Length - 1) return null;
+            var prefix = name[..dash];
+            return prefix is "wallpaper" or "lockscreen" ? name[(dash + 1)..] : null;
         }
     }
 }

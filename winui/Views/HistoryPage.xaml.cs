@@ -93,45 +93,26 @@ namespace Aura.Views
                 Child = image
             };
 
-            // Source badge (Manual / Slideshow)
-            var sourceColor = entry.Source == "Manual"
-                ? new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SteelBlue)
-                : new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.SeaGreen);
-
-            var sourceBadge = new Border
-            {
-                Background = sourceColor,
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(5, 2, 5, 2),
-                Child = new TextBlock
-                {
-                    Text = entry.Source,
-                    FontSize = 10,
-                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
-                }
-            };
-
-            // Type badge (Desktop / Lock Screen)
-            var typeBadge = new Border
-            {
-                Background = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray),
-                CornerRadius = new CornerRadius(4),
-                Padding = new Thickness(5, 2, 5, 2),
-                Child = new TextBlock
-                {
-                    Text = entry.WallpaperType,
-                    FontSize = 10,
-                    Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.White)
-                }
-            };
-
+            // Badges: type, source, then site + category stickers when known
             var badgeRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 4
             };
-            badgeRow.Children.Add(typeBadge);
-            badgeRow.Children.Add(sourceBadge);
+            badgeRow.Children.Add(MakeBadge(entry.WallpaperType, Microsoft.UI.Colors.Gray));
+            badgeRow.Children.Add(MakeBadge(entry.Source, entry.Source == "Manual"
+                ? Microsoft.UI.Colors.SteelBlue
+                : Microsoft.UI.Colors.SeaGreen));
+
+            var site = DeriveSite(entry);
+            if (!string.IsNullOrEmpty(site) && site != entry.Source)
+            {
+                badgeRow.Children.Add(MakeBadge(site, Microsoft.UI.Colors.MediumPurple));
+            }
+            if (!string.IsNullOrEmpty(entry.Category))
+            {
+                badgeRow.Children.Add(MakeBadge(entry.Category, Microsoft.UI.Colors.Chocolate));
+            }
 
             // Title + timestamp
             var titleText = new TextBlock
@@ -195,6 +176,34 @@ namespace Aura.Views
                 card.Background = (Brush)Application.Current.Resources["CardBackgroundFillColorDefaultBrush"];
             button.Click += HistoryEntry_Click;
             return button;
+        }
+
+        private static Border MakeBadge(string text, Windows.UI.Color background) =>
+            new Border
+            {
+                Background = new SolidColorBrush(background),
+                CornerRadius = new CornerRadius(4),
+                Padding = new Thickness(5, 2, 5, 2),
+                Child = new TextBlock
+                {
+                    Text = text,
+                    FontSize = 10,
+                    Foreground = new SolidColorBrush(Microsoft.UI.Colors.White)
+                }
+            };
+
+        // where the wallpaper came from: the entry's own field (new rows),
+        // then the navigation snapshot (backfilled rows), then a Source that
+        // is already a site name (public-source rows store the site there)
+        private static string DeriveSite(HistoryEntry entry)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.Platform)) return entry.Platform;
+            if (!string.IsNullOrWhiteSpace(entry.Navigation?.Platform)) return entry.Navigation.Platform;
+            var page = entry.Navigation?.Page ?? "";
+            if (page is "Backiee" or "AlphaCoders" or "ArtStation") return page;
+            if (!string.IsNullOrWhiteSpace(entry.Source)
+                && entry.Source != "Manual" && entry.Source != "Slideshow") return entry.Source;
+            return "";
         }
 
         // Button subclass: ProtectedCursor is a protected member, so only the

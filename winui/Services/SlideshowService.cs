@@ -70,6 +70,10 @@ namespace Aura.Services
         public TimeSpan DesktopInterval => _desktopInterval;
         public TimeSpan LockScreenInterval => _lockScreenInterval;
 
+        // read-only batch views for history sticker recovery (id -> site lookup)
+        public IReadOnlyList<WallpaperItem> DesktopBatch => _desktopWallpapers;
+        public IReadOnlyList<WallpaperItem> LockScreenBatch => _lockScreenWallpapers;
+
         // Loud failure state: a slideshow that cannot run says so here (InfoBar on
         // the Slideshow page + app.log), never a silent dead timer.
         public bool DesktopStarting { get; private set; }
@@ -777,7 +781,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
@@ -901,7 +905,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
@@ -1075,7 +1079,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
@@ -1185,7 +1189,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow");
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;
