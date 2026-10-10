@@ -874,8 +874,13 @@ namespace Aura.Services
             // every mode is a discover term now (the Curated endpoint entry is gone with the
             // old 3-mode table), and the site's pill links carry NO orientation param - the
             // search mirrors the site exactly, so "vertical wallpaper" resolves portrait.
-            var requestUrl =
-                $"https://api.pexels.com/v1/search?query={Uri.EscapeDataString(string.IsNullOrWhiteSpace(mode) ? "wallpaper" : mode)}&page={page}&per_page=30";
+            // "latest" is the SLIDESHOW Latest basis (Q1 audit 2026-10-09: a literal
+            // `query=latest` searched the WORD): it queries `wallpaper` with
+            // `order_by=latest` instead - the newest photos, not results about "latest".
+            bool latestOrder = string.IsNullOrWhiteSpace(mode) || mode.Equals("latest", StringComparison.OrdinalIgnoreCase);
+            var requestUrl = latestOrder
+                ? $"https://api.pexels.com/v1/search?query=wallpaper&order_by=latest&page={page}&per_page=30"
+                : $"https://api.pexels.com/v1/search?query={Uri.EscapeDataString(mode)}&page={page}&per_page=30";
 
             using var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
             request.Headers.TryAddWithoutValidation("Authorization", apiKey);

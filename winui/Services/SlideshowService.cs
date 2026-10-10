@@ -36,6 +36,12 @@ namespace Aura.Services
         private int _lockScreenCurrentBatch = 1;
         private string _desktopCategory = "";
         private string _lockScreenCategory = "";
+        // Category basis (multi-tick checklist) vs Latest basis. "Latest" default =
+        // old settings files (no basis key) keep behaving exactly as before.
+        private string _desktopBasis = "Latest";
+        private string _lockScreenBasis = "Latest";
+        private List<string> _desktopCategories = new();
+        private List<string> _lockScreenCategories = new();
         private DispatcherQueue? _desktopDispatcherQueue;
         private DispatcherQueue? _lockScreenDispatcherQueue;
         private TimeSpan _desktopInterval = TimeSpan.FromHours(12);
@@ -156,7 +162,7 @@ namespace Aura.Services
             }
         }
 
-        public async Task StartDesktopSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
+        public async Task StartDesktopSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue, string basis = "Latest", List<string>? categories = null)
         {
             DesktopStarting = true;
             try
@@ -164,6 +170,8 @@ namespace Aura.Services
                 // Store parameters for batch loading
                 _desktopPlatforms = platforms;
                 _desktopCategory = category;
+                _desktopBasis = basis == "Category" ? "Category" : "Latest";
+                _desktopCategories = categories ?? new List<string>();
                 _desktopDispatcherQueue = dispatcherQueue;
                 _desktopInterval = interval;
 
@@ -173,10 +181,17 @@ namespace Aura.Services
                 // Load progress if exists
                 LoadProgress();
 
+                if (_desktopBasis == "Category" && _desktopCategories.Count == 0)
+                {
+                    // nothing ticked can never load anything - say exactly that
+                    SetDesktopLoadError("Desktop slideshow not started: Category basis is saved with no categories - re-set the slideshow and tick at least one category.");
+                    return;
+                }
+
                 // Fetch wallpapers from every platform - one broken platform must
                 // never kill the batch (ArtStation used to hit a NotSupportedException
                 // in PublicWallpaperService and silently took all 8 platforms down)
-                var failures = await LoadWallpapersForDesktop(platforms, category);
+                var failures = await LoadWallpapersForDesktop(platforms, category, _desktopBasis, _desktopCategories);
 
                 if (_desktopWallpapers.Count == 0)
                 {
@@ -240,7 +255,7 @@ namespace Aura.Services
             }
         }
 
-        public async Task StartLockScreenSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue)
+        public async Task StartLockScreenSlideshow(List<string> platforms, string category, TimeSpan interval, DispatcherQueue dispatcherQueue, string basis = "Latest", List<string>? categories = null)
         {
             LockScreenStarting = true;
             try
@@ -248,6 +263,8 @@ namespace Aura.Services
                 // Store parameters for batch loading
                 _lockScreenPlatforms = platforms;
                 _lockScreenCategory = category;
+                _lockScreenBasis = basis == "Category" ? "Category" : "Latest";
+                _lockScreenCategories = categories ?? new List<string>();
                 _lockScreenDispatcherQueue = dispatcherQueue;
                 _lockScreenInterval = interval;
 
@@ -257,8 +274,15 @@ namespace Aura.Services
                 // Load progress if exists
                 LoadProgress();
 
+                if (_lockScreenBasis == "Category" && _lockScreenCategories.Count == 0)
+                {
+                    // nothing ticked can never load anything - say exactly that
+                    SetLockScreenLoadError("Lock screen slideshow not started: Category basis is saved with no categories - re-set the slideshow and tick at least one category.");
+                    return;
+                }
+
                 // Fetch wallpapers from every platform - isolated per platform
-                var failures = await LoadWallpapersForLockScreen(platforms, category);
+                var failures = await LoadWallpapersForLockScreen(platforms, category, _lockScreenBasis, _lockScreenCategories);
 
                 if (_lockScreenWallpapers.Count == 0)
                 {
@@ -363,7 +387,7 @@ namespace Aura.Services
                         // Load next batch
                         _desktopCurrentBatch++;
                         _desktopCurrentIndex = 0;
-                        var failures = await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory);
+                        var failures = await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory, _desktopBasis, _desktopCategories);
                         SaveProgress(); // Save progress after loading new batch
                         if (failures.Count > 0)
                         {
@@ -407,7 +431,7 @@ namespace Aura.Services
                         // Load next batch
                         _lockScreenCurrentBatch++;
                         _lockScreenCurrentIndex = 0;
-                        var failures = await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory);
+                        var failures = await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory, _lockScreenBasis, _lockScreenCategories);
                         SaveProgress(); // Save progress after loading new batch
                         if (failures.Count > 0)
                         {
@@ -436,7 +460,7 @@ namespace Aura.Services
             }
         }
 
-        private async Task<List<string>> LoadWallpapersForDesktop(List<string> platforms, string category)
+        private async Task<List<string>> LoadWallpapersForDesktop(List<string> platforms, string category, string basis, List<string> categories)
         {
             var failures = new List<string>();
             try
@@ -447,6 +471,13 @@ namespace Aura.Services
                 var allWallpapers = new List<WallpaperItem>();
                 string mode = NormalizePublicMode(category);
 
+                if (basis == "Category")
+                {
+                    // resolution needs the merged name universe - a failed index load
+                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line
+                    await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
+                }
+
                 foreach (var platform in platforms)
                 {
                     // isolate every platform: one broken fetch (ArtStation's old
@@ -454,7 +485,11 @@ namespace Aura.Services
                     // never take the whole batch down silently
                     try
                     {
-                        if (platform == "AlphaCoders")
+                        if (basis == "Category")
+                        {
+                            await LoadCategoryBasisForPlatformAsync(platform, categories, _desktopCurrentBatch, allWallpapers, failures);
+                        }
+                        else if (platform == "AlphaCoders")
                         {
                             // Get wallpapers from AlphaCoders service
                             string categoryKey = category switch
@@ -556,7 +591,7 @@ namespace Aura.Services
             return failures;
         }
 
-        private async Task<List<string>> LoadWallpapersForLockScreen(List<string> platforms, string category)
+        private async Task<List<string>> LoadWallpapersForLockScreen(List<string> platforms, string category, string basis, List<string> categories)
         {
             var failures = new List<string>();
             try
@@ -567,12 +602,23 @@ namespace Aura.Services
                 var allWallpapers = new List<WallpaperItem>();
                 string mode = NormalizePublicMode(category);
 
+                if (basis == "Category")
+                {
+                    // resolution needs the merged name universe - a failed index load
+                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line
+                    await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
+                }
+
                 foreach (var platform in platforms)
                 {
                     // isolated per platform, same as the desktop loader
                     try
                     {
-                        if (platform == "AlphaCoders")
+                        if (basis == "Category")
+                        {
+                            await LoadCategoryBasisForPlatformAsync(platform, categories, _lockScreenCurrentBatch, allWallpapers, failures);
+                        }
+                        else if (platform == "AlphaCoders")
                         {
                             // Get wallpapers from AlphaCoders service
                             string categoryKey = category switch
@@ -672,6 +718,119 @@ namespace Aura.Services
                 LogInfo($"wallpaper load failed: {ex.Message}");
             }
             return failures;
+        }
+
+        // Category basis: every ticked name that RESOLVES on this platform becomes its
+        // own fetch (the shuffle below pools them across platforms + ticks). a tick
+        // this platform does not have is a QUIET miss (only an empty TOTAL batch is
+        // loud), while a categoryless platform (bing/simple desktops - the
+        // CategoryExcludedPlatforms list) is a LOUD skip: the user must SEE why it
+        // contributes nothing instead of a silently shorter pool.
+        private async Task LoadCategoryBasisForPlatformAsync(string platform, List<string> tickedNames, int batch, List<WallpaperItem> target, List<string> failures)
+        {
+            if (PublicWallpaperService.IsCategoryExcluded(platform))
+            {
+                string reason = "categoryless platform - no categories exist here (use the Latest basis, or untick it)";
+                failures.Add($"{platform}: {reason}");
+                LogInfo($"category basis skip - {platform}: {reason}");
+                return;
+            }
+
+            foreach (var ticked in tickedNames)
+            {
+                var key = SlideshowCategoryCatalog.Instance.ResolveKey(platform, ticked);
+                if (key == null)
+                {
+                    continue; // quiet miss: this platform simply has no such category
+                }
+
+                try
+                {
+                    await LoadCategoryTickAsync(platform, ticked, key, batch, target);
+                }
+                catch (Exception ex)
+                {
+                    // one broken tick must not hide this platform's other ticks
+                    failures.Add($"{platform} [{ticked}]: {ex.Message}");
+                    LogInfo($"category tick load failed - {platform} [{ticked}]: {ex.Message}");
+                }
+            }
+        }
+
+        private async Task LoadCategoryTickAsync(string platform, string tickedName, string key, int batch, List<WallpaperItem> target)
+        {
+            if (platform == "Backiee")
+            {
+                int pageNumber = batch - 1;
+                string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category={Uri.EscapeDataString(key)}&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+
+                string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                if (string.IsNullOrWhiteSpace(jsonContent))
+                {
+                    throw new InvalidOperationException("empty response from the backiee list API");
+                }
+                using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                {
+                    if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                    {
+                        throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
+                    }
+                    foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
+                    {
+                        var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                        if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                        {
+                            wallpaper.Platform = "Backiee";
+                            wallpaper.Category = tickedName;
+                            target.Add(wallpaper);
+                        }
+                    }
+                }
+            }
+            else if (platform == "AlphaCoders")
+            {
+                // the scrape cache is STATIC and not thread-safe - the per-tick loop
+                // runs sequentially, the same contract the grid/thumb fill use
+                var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(key, batch, batch);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = "AlphaCoders";
+                    wallpaper.Category = tickedName;
+                    target.Add(wallpaper);
+                }
+            }
+            else if (platform == "ArtStation")
+            {
+                // key = channel:<id> - same strict contract as the drill/grid page
+                if (!key.StartsWith("channel:", StringComparison.Ordinal) ||
+                    !int.TryParse(key.Substring("channel:".Length), out int channelId))
+                {
+                    throw new InvalidOperationException($"unexpected artstation category key \"{key}\" (channel:<id> expected)");
+                }
+                var wallpapers = await new ArtStationService().GetChannelProjectsAsync(channelId, batch);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = "ArtStation";
+                    wallpaper.Category = tickedName;
+                    target.Add(wallpaper);
+                }
+            }
+            else if (PublicWallpaperService.IsSupportedPlatform(platform))
+            {
+                // public platforms: key = the canonical GetModes entry (wallhaven bits,
+                // collection titles, discover terms) - the fetcher routes on it
+                var wallpapers = await new PublicWallpaperService().GetWallpapersAsync(platform, batch, key);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = platform;
+                    wallpaper.Category = tickedName;
+                    target.Add(wallpaper);
+                }
+            }
+            else
+            {
+                throw new NotSupportedException("not an implemented platform");
+            }
         }
 
         private async Task SetDesktopWallpaper(WallpaperItem wallpaper)
@@ -781,7 +940,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopBasis == "Category" ? wallpaper.Category ?? "" : _desktopCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
@@ -905,7 +1064,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopBasis == "Category" ? wallpaper.Category ?? "" : _desktopCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
@@ -1079,7 +1238,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenBasis == "Category" ? wallpaper.Category ?? "" : _lockScreenCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
@@ -1189,7 +1348,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenBasis == "Category" ? wallpaper.Category ?? "" : _lockScreenCategory);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;

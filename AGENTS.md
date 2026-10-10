@@ -883,7 +883,8 @@ DYNAMIC list so future rejects are a one-line add:
 - pending slideshow category-selector feature: the checklist universe must
   consult `IsCategoryExcluded` too - in Category mode bing/SD get no ticks
   and take the LOUD per-platform skip (supersedes the earlier design call
-  where each resolved its own `Daily`/`Minimal` entry).
+  where each resolved its own `Daily`/`Minimal` entry). (SHIPPED 2026-10-10
+  - see the dated section below.)
 - verified menuless with probe `C:\tmp\aura-categoryexclusion.ps1` (stays in
   C:\tmp): cards=294, `Daily`+`Minimal` gone from the grid, 11 spot names
   present, alpha `Vehicle` drill 15 items + title + bar clean, back rebuilds
@@ -1015,3 +1016,87 @@ entries, (2) revert the last XAML edit -> build -> green = the edit is guilty,
   `Aliases https://aura2027.vercel.app` line, then curl the domain to verify.
 - the link writes root `.vercel/` + `.env.local` (OIDC token) - both are
   gitignored (root `.gitignore` `.vercel` + `.env*`), never commit them.
+
+## slideshow basis: Latest/Category selector with a category checklist (2026-10-10)
+
+user ask: the Set-slideshow dialog should choose the slideshow's BASIS -
+rotate through everything new (Latest) or through ONE OR MORE CATEGORIES
+(Category) - replacing the old single-category dropdown. the pending note in
+the taxonomy-less section above is discharged here: the checklist universe
+consults `IsCategoryExcluded`, so bing/SD get no ticks and take the LOUD
+per-platform skip instead.
+
+- dialog (`SlideshowPage.ShowSlideshowSettingsDialog`): a `Slideshow basis`
+  radio pair (Latest/Category) + a `Pick one or more categories` checklist,
+  lazily loaded on first Category select; the old category ComboBox is GONE.
+  outer ScrollViewer MaxHeight 460 (Set button stays outside the scroll),
+  checklist inner ScrollViewer MaxHeight 300.
+- universe = `SlideshowCategoryCatalog` (new service): the DIALOG's 7
+  category-capable platforms only (bing/SD excluded through the shared
+  exclusion list), merged case-insensitively + alphabetically = **257
+  names** today. it PUBLISHES the shared index snapshots
+  (SetPixabayCollections / SetWallpaperHubCollections /
+  SetAlphaCodersCategories / SetChannels / SetPexelsDiscoverTerms) so one
+  fetch serves dialog + Categories page, is cached for the process
+  lifetime, and any failed or empty source THROWS - the dialog shows
+  `Category list failed to load: <reason>` (loud, never a silently partial
+  list). per-site naming: backiee drops `8k-ultrahd`/`AI Generated` (no
+  sitemap slugs); the alpha legacy trio 4K/Harvest/Rain stays and
+  ResolveKey maps it to the live keys 4k/harvest/rain; artstation keys =
+  `channel:<id>`; public platforms keep their GetModes keys.
+- keys (`slideshow_settings.json`): `DesktopSlideshowBasis` +
+  `DesktopSlideshowCategories` (+ `LockScreen*` twins); a missing basis =
+  Latest, so every pre-feature file keeps working. a Latest save keeps the
+  ticked list (switching back restores it), normalizes `_desktopCategory`
+  to `Latest Wallpapers`, and still writes the legacy
+  `DesktopSlideshowCategory` for RecoverSlideshowStickers.
+- loader: Category basis resolves each tick through `ResolveKey` and loads
+  per platform (`LoadCategoryTickAsync` - backiee `category=<slug>`
+  paging_list, alpha `ScrapeWallpapersByCategoryAsync(key,batch,batch)`
+  SEQUENTIAL (its static scrape cache is not thread-safe), artstation
+  `GetChannelProjectsAsync`, public `GetWallpapersAsync(platform,batch,key)`).
+  every item is tagged `Category = <ticked name>` so history stickers name
+  the tick (`Nature|Backiee`), not the mode. bing/SD = LOUD skip
+  `categoryless platform - no categories exist here (use the Latest basis,
+  or untick it)`; a ticked name that no longer exists on a site = quiet
+  skip; a ticked fetch failure = `platform [tick]: reason`.
+- guards: Category basis + 0 saved categories at Start = loud not-started
+  error; dialog save validation = checklist still Loading -> `Categories
+  Still Loading` error dialog, Failed -> `Category List Failed` + reason,
+  0 ticks -> `No Category Selected`. status line = `{n} platforms -
+  Category: A, B (Refresh: ...)`; Latest keeps its exact old format.
+- two bugs the menuless probe caught (both fixed in this change): (1) the
+  checklist success path never re-ran `ApplyBasisVisibility`, so a
+  SUCCESSFUL load landed in a collapsed ScrollViewer - invisible to the
+  user AND to UIA (the dialog looked broken while the load had worked);
+  (2) the running-with-skips InfoBar rendered as Error `Slideshow not
+  running` because the warning fires BEFORE the timer exists
+  (`DesktopRunning` is timer-backed) - `DesktopStarting`/
+  `LockScreenStarting` now count as running for bar severity (Warning +
+  `Slideshow warning`).
+- verified menuless with probe `C:\tmp\aura-slideshowbasis.ps1` (stays in
+  C:\tmp): full PASS 2026-10-10 with the user's exact config - radios
+  Latest/Category present, 257 checklist boxes (8 spot names in, 5 stale
+  names out incl. the retired Daily/Minimal), tick Nature+Space -> Set ->
+  status `8 platforms - Category: Nature, Space (Refresh: 12 hours)`,
+  `Loaded 115 wallpapers from 8 platform(s) (2 failed)`, amber warning bar
+  carrying both loud skips, settings basis=Category cats=[Nature,Space],
+  a Next-button history row `Nature|Backiee|Desktop/Slideshow`, reopen ->
+  Latest -> Set keeps the ticked list + exact Latest status, restore +
+  relaunch -> exact `Refresh: 1 Minutes` status. vision (zengate, 3
+  shots): dialog renders, Category status + amber skip bar + real preview
+  photo, final restored state clean. NOTE: shot 1 shows the dialog's TOP
+  slice (platform checklist) - the basis block sits below the 460px
+  scroll fold; UIA carries that part of the proof.
+- probe gotchas (menuless, WinUI): WinUI RadioButton exposes
+  SelectionItemPattern ONLY - `Select()` is the way to check a radio
+  (Invoke/Toggle read nopattern); group the card toolbars GEOMETRICALLY
+  (Pane parents report empty RuntimeIds; a row of exactly 4, x-stride 56,
+  leftmost/topmost = desktop, child 2 = Edit, child 1 = Next) and poll
+  until the geometry is stable (cards split rows mid-arrangement);
+  wallpaper_history.json is capped at 200 rows - find new rows by
+  Timestamp, never by -Skip the baseline count; post-Set asserts must poll
+  PAST the first wallpaper download (Start awaits it, 10-20s, and
+  SaveSettings runs after Start returns); a probe's first launch can hang
+  on the splash window (title = exe path, UIA text = 0, Responding=True)
+  - kill + relaunch.

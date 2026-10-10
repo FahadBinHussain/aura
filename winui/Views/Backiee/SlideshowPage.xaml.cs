@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Aura.Models;
 using System.IO;
 using System.Text.Json;
+using System.Linq;
 
 namespace Aura.Views.Backiee
 {
@@ -18,11 +19,15 @@ namespace Aura.Views.Backiee
         private bool _desktopSlideshowEnabled = false;
         private List<string> _desktopPlatforms = new List<string>();
         private string _desktopCategory = "";
+        private string _desktopBasis = "Latest";
+        private List<string> _desktopCategories = new List<string>();
 
         // Lock screen slideshow settings
         private bool _lockScreenSlideshowEnabled = false;
         private List<string> _lockScreenPlatforms = new List<string>();
         private string _lockScreenCategory = "";
+        private string _lockScreenBasis = "Latest";
+        private List<string> _lockScreenCategories = new List<string>();
 
         // Separate refresh intervals for desktop and lock screen
         private string _desktopRefreshInterval = "12 hours";
@@ -337,6 +342,15 @@ namespace Aura.Views.Backiee
                 {
                     _desktopCategory = settings["DesktopSlideshowCategory"].GetString() ?? "Latest Wallpapers";
                 }
+                // missing basis/categories = Latest = old files behave exactly as before
+                if (settings.ContainsKey("DesktopSlideshowBasis"))
+                {
+                    _desktopBasis = settings["DesktopSlideshowBasis"].GetString() == "Category" ? "Category" : "Latest";
+                }
+                if (settings.ContainsKey("DesktopSlideshowCategories"))
+                {
+                    _desktopCategories = JsonSerializer.Deserialize<List<string>>(settings["DesktopSlideshowCategories"].GetRawText()) ?? new List<string>();
+                }
                 if (settings.ContainsKey("DesktopSlideshowInterval"))
                 {
                     _desktopRefreshInterval = settings["DesktopSlideshowInterval"].GetString() ?? "12 hours";
@@ -354,6 +368,15 @@ namespace Aura.Views.Backiee
                 if (settings.ContainsKey("LockScreenSlideshowCategory"))
                 {
                     _lockScreenCategory = settings["LockScreenSlideshowCategory"].GetString() ?? "Latest Wallpapers";
+                }
+                // missing basis/categories = Latest = old files behave exactly as before
+                if (settings.ContainsKey("LockScreenSlideshowBasis"))
+                {
+                    _lockScreenBasis = settings["LockScreenSlideshowBasis"].GetString() == "Category" ? "Category" : "Latest";
+                }
+                if (settings.ContainsKey("LockScreenSlideshowCategories"))
+                {
+                    _lockScreenCategories = JsonSerializer.Deserialize<List<string>>(settings["LockScreenSlideshowCategories"].GetRawText()) ?? new List<string>();
                 }
                 if (settings.ContainsKey("LockScreenSlideshowInterval"))
                 {
@@ -381,7 +404,10 @@ namespace Aura.Views.Backiee
             if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
             {
                 string platformsText = _desktopPlatforms.Count == 1 ? _desktopPlatforms[0] : $"{_desktopPlatforms.Count} platforms";
-                DesktopStatusText.Text = $"{platformsText} - {_desktopCategory} (Refresh: {_desktopRefreshInterval})";
+                string basisText = _desktopBasis == "Category"
+                    ? (_desktopCategories.Count > 0 ? $"Category: {string.Join(", ", _desktopCategories)}" : "Category: (none ticked)")
+                    : _desktopCategory;
+                DesktopStatusText.Text = $"{platformsText} - {basisText} (Refresh: {_desktopRefreshInterval})";
             }
             else
             {
@@ -392,16 +418,23 @@ namespace Aura.Views.Backiee
             if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
             {
                 string platformsText = _lockScreenPlatforms.Count == 1 ? _lockScreenPlatforms[0] : $"{_lockScreenPlatforms.Count} platforms";
-                LockScreenStatusText.Text = $"{platformsText} - {_lockScreenCategory} (Refresh: {_lockScreenRefreshInterval})";
+                string basisText = _lockScreenBasis == "Category"
+                    ? (_lockScreenCategories.Count > 0 ? $"Category: {string.Join(", ", _lockScreenCategories)}" : "Category: (none ticked)")
+                    : _lockScreenCategory;
+                LockScreenStatusText.Text = $"{platformsText} - {basisText} (Refresh: {_lockScreenRefreshInterval})";
             }
             else
             {
                 LockScreenStatusText.Text = "No slideshow set";
             }
 
-            // Loud failure lines: a slideshow that cannot run says so here
-            ApplyErrorBar(DesktopSlideshowInfoBar, service.DesktopError, service.DesktopRunning);
-            ApplyErrorBar(LockScreenSlideshowInfoBar, service.LockScreenError, service.LockScreenRunning);
+            // Loud failure lines: a slideshow that cannot run says so here.
+            // DesktopStarting/LockScreenStarting count as running: the skip
+            // warning is raised BEFORE the timer is created (DesktopRunning is
+            // timer-backed), so without this the bar mislabels a warning as
+            // "not running" during the start window
+            ApplyErrorBar(DesktopSlideshowInfoBar, service.DesktopError, service.DesktopRunning || service.DesktopStarting);
+            ApplyErrorBar(LockScreenSlideshowInfoBar, service.LockScreenError, service.LockScreenRunning || service.LockScreenStarting);
 
             // Wait a moment for the service to update next change times
             await Task.Delay(100);
@@ -444,11 +477,15 @@ namespace Aura.Views.Backiee
                     ["DesktopSlideshowEnabled"] = _desktopSlideshowEnabled,
                     ["DesktopSlideshowPlatforms"] = _desktopPlatforms.Count > 0 ? _desktopPlatforms : new List<string> { "Backiee" },
                     ["DesktopSlideshowCategory"] = string.IsNullOrEmpty(_desktopCategory) ? "Latest Wallpapers" : _desktopCategory,
+                    ["DesktopSlideshowBasis"] = _desktopBasis,
+                    ["DesktopSlideshowCategories"] = _desktopCategories,
                     ["DesktopSlideshowInterval"] = string.IsNullOrEmpty(_desktopRefreshInterval) ? "12 hours" : _desktopRefreshInterval,
                     
                     ["LockScreenSlideshowEnabled"] = _lockScreenSlideshowEnabled,
                     ["LockScreenSlideshowPlatforms"] = _lockScreenPlatforms.Count > 0 ? _lockScreenPlatforms : new List<string> { "Backiee" },
                     ["LockScreenSlideshowCategory"] = string.IsNullOrEmpty(_lockScreenCategory) ? "Latest Wallpapers" : _lockScreenCategory,
+                    ["LockScreenSlideshowBasis"] = _lockScreenBasis,
+                    ["LockScreenSlideshowCategories"] = _lockScreenCategories,
                     ["LockScreenSlideshowInterval"] = string.IsNullOrEmpty(_lockScreenRefreshInterval) ? "12 hours" : _lockScreenRefreshInterval
                 };
 
@@ -474,7 +511,7 @@ namespace Aura.Views.Backiee
                     && !service.DesktopRunning && !service.DesktopStarting)
                 {
                     var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                    await service.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await service.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _desktopBasis, _desktopCategories);
                 }
                 
                 // Restore lock screen slideshow if it was enabled - same guard
@@ -482,7 +519,7 @@ namespace Aura.Views.Backiee
                     && !service.LockScreenRunning && !service.LockScreenStarting)
                 {
                     var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                    await service.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                    await service.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _lockScreenBasis, _lockScreenCategories);
                 }
             }
             catch (Exception ex)
@@ -534,7 +571,8 @@ namespace Aura.Views.Backiee
             // Load existing settings for this slideshow type
             bool currentEnabled = slideshowType == "Desktop" ? _desktopSlideshowEnabled : _lockScreenSlideshowEnabled;
             List<string> currentPlatforms = slideshowType == "Desktop" ? _desktopPlatforms : _lockScreenPlatforms;
-            string currentCategory = slideshowType == "Desktop" ? _desktopCategory : _lockScreenCategory;
+            string currentBasis = slideshowType == "Desktop" ? _desktopBasis : _lockScreenBasis;
+            List<string> currentCategories = slideshowType == "Desktop" ? _desktopCategories : _lockScreenCategories;
 
             var toggleSwitch = new ToggleSwitch
             {
@@ -630,99 +668,135 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(platformCheckBoxPixabay);
 
-            // Category dropdown
-            var categoryComboBox = new ComboBox
+            // Basis selector: Latest (default) vs Category (multi-tick checklist).
+            // the checklist universe = SlideshowCategoryCatalog (the same LIVE indexes
+            // the Categories page uses), loaded LAZILY on first Category selection so a
+            // Latest-only set never pays the network. a failed/empty index load is LOUD
+            // here and makes a Category save impossible - never a silently empty list.
+            string checklistState = "NotLoaded"; // NotLoaded | Loading | Ready | Failed
+            string checklistError = "";
+            var checklistPanel = new StackPanel { Spacing = 2 };
+            var checklistStatus = new TextBlock
             {
-                Header = "Select Category",
-                PlaceholderText = "Choose a category",
-                HorizontalAlignment = HorizontalAlignment.Stretch,
-                MinWidth = 400
+                FontSize = 13,
+                TextWrapping = TextWrapping.Wrap,
+                Visibility = Visibility.Collapsed
             };
-            
-            // Initialize categories based on current platforms selection
-            var updateCategories = new Action(() =>
+            var checklistScroll = new ScrollViewer
             {
-                categoryComboBox.Items.Clear();
-                bool hasBackiee = platformCheckBoxBackiee.IsChecked == true;
-                bool hasAlphaCoders = platformCheckBoxAlphaCoders.IsChecked == true;
-                bool hasArtStation = platformCheckBoxArtStation.IsChecked == true;
-                bool hasWallhaven = platformCheckBoxWallhaven.IsChecked == true;
-                bool hasBing = platformCheckBoxBing.IsChecked == true;
-                bool hasSimpleDesktops = platformCheckBoxSimpleDesktops.IsChecked == true;
-                bool hasWallpaperHub = platformCheckBoxWallpaperHub.IsChecked == true;
-                bool hasPexels = platformCheckBoxPexels.IsChecked == true;
-                bool hasPixabay = platformCheckBoxPixabay.IsChecked == true;
-                
-                // Backiee categories
-                if (hasBackiee)
-                {
-                    categoryComboBox.Items.Add("Latest Wallpapers");
-                    categoryComboBox.Items.Add("8K UltraHD");
-                    categoryComboBox.Items.Add("AI Generated");
-                }
-                
-                // AlphaCoders categories
-                if (hasAlphaCoders)
-                {
-                    categoryComboBox.Items.Add("4K Wallpapers");
-                    categoryComboBox.Items.Add("Harvest Wallpapers");
-                    categoryComboBox.Items.Add("Rain Wallpapers");
-                }
-                
-                // For other platforms, add a generic "All" category
-                if (hasArtStation || hasWallhaven || hasBing || hasSimpleDesktops || hasWallpaperHub || hasPexels || hasPixabay)
-                {
-                    if (categoryComboBox.Items.Count == 0 || !categoryComboBox.Items.Contains("All"))
-                    {
-                        categoryComboBox.Items.Add("All");
-                    }
-                }
-                
-                // Set selected category based on saved settings
-                if (!string.IsNullOrEmpty(currentCategory))
-                {
-                    for (int i = 0; i < categoryComboBox.Items.Count; i++)
-                    {
-                        if (categoryComboBox.Items[i]?.ToString() == currentCategory)
-                        {
-                            categoryComboBox.SelectedIndex = i;
-                            return;
-                        }
-                    }
-                }
-                
-                if (categoryComboBox.Items.Count > 0)
-                {
-                    categoryComboBox.SelectedIndex = 0;
-                }
-            });
-            
-            // Update categories when platform checkboxes change
-            platformCheckBoxBackiee.Checked += (s, e) => updateCategories();
-            platformCheckBoxBackiee.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxAlphaCoders.Checked += (s, e) => updateCategories();
-            platformCheckBoxAlphaCoders.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxArtStation.Checked += (s, e) => updateCategories();
-            platformCheckBoxArtStation.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxWallhaven.Checked += (s, e) => updateCategories();
-            platformCheckBoxWallhaven.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxBing.Checked += (s, e) => updateCategories();
-            platformCheckBoxBing.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxSimpleDesktops.Checked += (s, e) => updateCategories();
-            platformCheckBoxSimpleDesktops.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxWallpaperHub.Checked += (s, e) => updateCategories();
-            platformCheckBoxWallpaperHub.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxPexels.Checked += (s, e) => updateCategories();
-            platformCheckBoxPexels.Unchecked += (s, e) => updateCategories();
-            platformCheckBoxPixabay.Checked += (s, e) => updateCategories();
-            platformCheckBoxPixabay.Unchecked += (s, e) => updateCategories();
-            
-            // Initial category setup
-            updateCategories();
-            
-            contentPanel.Children.Add(categoryComboBox);
+                MaxHeight = 300,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                ZoomMode = Microsoft.UI.Xaml.Controls.ZoomMode.Disabled,
+                Content = checklistPanel,
+                Visibility = Visibility.Collapsed
+            };
 
-            dialog.Content = contentPanel;
+            var basisLabel = new TextBlock
+            {
+                Text = "Slideshow basis",
+                FontSize = 14,
+                Margin = new Thickness(0, 8, 0, 4)
+            };
+            contentPanel.Children.Add(basisLabel);
+
+            var basisLatest = new RadioButton
+            {
+                Content = "Latest",
+                GroupName = $"Basis-{slideshowType}",
+                IsChecked = currentBasis != "Category"
+            };
+            var basisCategory = new RadioButton
+            {
+                Content = "Category",
+                GroupName = $"Basis-{slideshowType}",
+                IsChecked = currentBasis == "Category"
+            };
+            contentPanel.Children.Add(basisLatest);
+            contentPanel.Children.Add(basisCategory);
+
+            var checklistHeader = new TextBlock
+            {
+                Text = "Pick one or more categories",
+                FontSize = 13,
+                Margin = new Thickness(24, 4, 0, 0)
+            };
+            contentPanel.Children.Add(checklistHeader);
+            contentPanel.Children.Add(checklistStatus);
+            contentPanel.Children.Add(checklistScroll);
+
+            async Task EnsureChecklistAsync()
+            {
+                if (checklistState == "Ready" || checklistState == "Loading") return;
+                checklistState = "Loading";
+                checklistStatus.Text = "Loading categories...";
+                checklistStatus.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.Gray);
+                checklistStatus.Visibility = Visibility.Visible;
+                LogInfo("slideshow basis checklist: loading category universe...");
+                try
+                {
+                    var universe = await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
+                    checklistPanel.Children.Clear();
+                    foreach (var name in universe)
+                    {
+                        checklistPanel.Children.Add(new CheckBox
+                        {
+                            Content = name,
+                            IsChecked = currentCategories.Any(c => c.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        });
+                    }
+                    checklistState = "Ready";
+                    // the checklist only becomes visible through ApplyBasisVisibility -
+                    // without this call a SUCCESSFUL load lands in a collapsed
+                    // ScrollViewer (invisible to the user AND to UIA); found by the
+                    // menuless probe 2026-10-10
+                    ApplyBasisVisibility();
+                    LogInfo($"slideshow basis checklist ready: {checklistPanel.Children.Count} names");
+                }
+                catch (Exception ex)
+                {
+                    checklistState = "Failed";
+                    checklistError = ex.Message;
+                    checklistStatus.Text = $"Category list failed to load: {ex.Message}";
+                    checklistStatus.Foreground = new Microsoft.UI.Xaml.Media.SolidColorBrush(Microsoft.UI.Colors.OrangeRed);
+                    ApplyBasisVisibility();
+                    LogInfo($"slideshow basis checklist FAILED: {ex.Message}");
+                }
+            }
+
+            void ApplyBasisVisibility()
+            {
+                bool categoryBasis = basisCategory.IsChecked == true;
+                checklistHeader.Visibility = categoryBasis ? Visibility.Visible : Visibility.Collapsed;
+                checklistScroll.Visibility = categoryBasis && checklistState == "Ready" ? Visibility.Visible : Visibility.Collapsed;
+                bool showStatus = categoryBasis && checklistState != "Ready";
+                checklistStatus.Visibility = showStatus ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            basisCategory.Checked += (s, e) => { ApplyBasisVisibility(); _ = EnsureChecklistAsync(); };
+            basisCategory.Unchecked += (s, e) => ApplyBasisVisibility();
+            basisLatest.Checked += (s, e) => ApplyBasisVisibility();
+
+            // initial visibility - the events above attach after construction, so the
+            // starting state is applied by hand (and a saved Category basis kicks its
+            // lazy load immediately)
+            ApplyBasisVisibility();
+            if (currentBasis == "Category")
+            {
+                _ = EnsureChecklistAsync();
+            }
+
+            // the dialog content (9 platform rows + basis + up to ~270 checklist rows)
+            // must scroll - everything below the fold used to be silently cut off (the
+            // Pixabay checkbox + old category dropdown were clipped)
+            dialog.Content = new ScrollViewer
+            {
+                Content = contentPanel,
+                MaxHeight = 460,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
+                ZoomMode = Microsoft.UI.Xaml.Controls.ZoomMode.Disabled
+            };
 
             var result = await dialog.ShowAsync();
 
@@ -769,9 +843,73 @@ namespace Aura.Views.Backiee
 
                 // Save slideshow settings
                 bool isEnabled = toggleSwitch.IsOn;
-                string selectedCategory = categoryComboBox.SelectedItem?.ToString() ?? "Latest Wallpapers";
+                bool categoryBasis = basisCategory.IsChecked == true;
+                string selectedBasis = categoryBasis ? "Category" : "Latest";
+                var selectedCategories = new List<string>();
+                string selectedCategory;
+
+                if (categoryBasis)
+                {
+                    // loud validation: a Category basis can never save without a loaded,
+                    // non-empty checklist (the error state is shown, never guessed)
+                    if (checklistState == "Loading")
+                    {
+                        var errorDialog = new ContentDialog
+                        {
+                            XamlRoot = this.XamlRoot,
+                            Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+                            Title = "Categories Still Loading",
+                            Content = "The category list is still loading - wait for it to finish, then press Set again.",
+                            CloseButtonText = "OK"
+                        };
+                        await errorDialog.ShowAsync();
+                        return;
+                    }
+                    if (checklistState != "Ready")
+                    {
+                        var errorDialog = new ContentDialog
+                        {
+                            XamlRoot = this.XamlRoot,
+                            Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+                            Title = "Category List Failed",
+                            Content = $"The category list could not be loaded, so a Category basis cannot be set. {checklistError}",
+                            CloseButtonText = "OK"
+                        };
+                        await errorDialog.ShowAsync();
+                        return;
+                    }
+
+                    foreach (var child in checklistPanel.Children)
+                    {
+                        if (child is CheckBox box && box.IsChecked == true && box.Content is string name)
+                        {
+                            selectedCategories.Add(name);
+                        }
+                    }
+
+                    if (selectedCategories.Count == 0)
+                    {
+                        var errorDialog = new ContentDialog
+                        {
+                            XamlRoot = this.XamlRoot,
+                            Style = Application.Current.Resources["DefaultContentDialogStyle"] as Style,
+                            Title = "No Category Selected",
+                            Content = "Tick at least one category for the slideshow, or switch to the Latest basis.",
+                            CloseButtonText = "OK"
+                        };
+                        await errorDialog.ShowAsync();
+                        return;
+                    }
+
+                    selectedCategory = string.Join(", ", selectedCategories);
+                }
+                else
+                {
+                    // canonical Latest display - the loader's mode mapping is unchanged
+                    selectedCategory = "Latest Wallpapers";
+                }
                 
-                LogInfo($"Toggle enabled: {isEnabled}, Category: {selectedCategory}, Type: {slideshowType}");
+                LogInfo($"Toggle enabled: {isEnabled}, Basis: {selectedBasis}, Category: {selectedCategory}, Type: {slideshowType}");
 
 
                 // Save to class fields and start/stop slideshow
@@ -780,13 +918,19 @@ namespace Aura.Views.Backiee
                     _desktopSlideshowEnabled = isEnabled;
                     _desktopPlatforms = selectedPlatforms;
                     _desktopCategory = selectedCategory;
+                    _desktopBasis = selectedBasis;
+                    if (categoryBasis)
+                    {
+                        // Latest keeps the last ticked list so switching back restores it
+                        _desktopCategories = selectedCategories;
+                    }
                     
 
                     // Start or stop slideshow
                     if (isEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_desktopRefreshInterval);
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _desktopBasis, _desktopCategories);
                     }
                     else
                     {
@@ -798,12 +942,18 @@ namespace Aura.Views.Backiee
                     _lockScreenSlideshowEnabled = isEnabled;
                     _lockScreenPlatforms = selectedPlatforms;
                     _lockScreenCategory = selectedCategory;
+                    _lockScreenBasis = selectedBasis;
+                    if (categoryBasis)
+                    {
+                        // Latest keeps the last ticked list so switching back restores it
+                        _lockScreenCategories = selectedCategories;
+                    }
 
                     // Start or stop slideshow
                     if (isEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
                         var interval = SlideshowService.ParseInterval(_lockScreenRefreshInterval);
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _lockScreenBasis, _lockScreenCategories);
                     }
                     else
                     {
@@ -934,7 +1084,7 @@ namespace Aura.Views.Backiee
                     // Restart desktop slideshow with new interval if enabled
                     if (_desktopSlideshowEnabled && _desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(_desktopCategory))
                     {
-                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartDesktopSlideshow(_desktopPlatforms, _desktopCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _desktopBasis, _desktopCategories);
                     }
                 }
                 else
@@ -944,7 +1094,7 @@ namespace Aura.Views.Backiee
                     // Restart lock screen slideshow with new interval if enabled
                     if (_lockScreenSlideshowEnabled && _lockScreenPlatforms.Count > 0 && !string.IsNullOrEmpty(_lockScreenCategory))
                     {
-                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue);
+                        await SlideshowService.Instance.StartLockScreenSlideshow(_lockScreenPlatforms, _lockScreenCategory, interval, App.MainDispatcherQueue ?? this.DispatcherQueue, _lockScreenBasis, _lockScreenCategories);
                     }
                 }
                 

@@ -1021,6 +1021,11 @@ namespace Aura
                         ? new List<string> { dpOldVal }
                         : new List<string>();
                 string desktopCategory = settings.TryGetValue("DesktopSlideshowCategory", out var dc) ? dc.GetString() ?? "" : "";
+                // missing basis/categories = Latest = old files behave exactly as before
+                string desktopBasis = settings.TryGetValue("DesktopSlideshowBasis", out var db) && db.GetString() == "Category" ? "Category" : "Latest";
+                List<string> desktopCategories = settings.TryGetValue("DesktopSlideshowCategories", out var dcs)
+                    ? JsonSerializer.Deserialize<List<string>>(dcs.GetRawText()) ?? new List<string>()
+                    : new List<string>();
                 string desktopInterval = settings.TryGetValue("DesktopSlideshowInterval", out var di) ? di.GetString() ?? "12 hours" : "12 hours";
 
                 bool lockEnabled = settings.TryGetValue("LockScreenSlideshowEnabled", out var le) && le.GetBoolean();
@@ -1030,6 +1035,11 @@ namespace Aura
                         ? new List<string> { lpOldVal }
                         : new List<string>();
                 string lockCategory = settings.TryGetValue("LockScreenSlideshowCategory", out var lc) ? lc.GetString() ?? "" : "";
+                // missing basis/categories = Latest = old files behave exactly as before
+                string lockBasis = settings.TryGetValue("LockScreenSlideshowBasis", out var lb) && lb.GetString() == "Category" ? "Category" : "Latest";
+                List<string> lockCategories = settings.TryGetValue("LockScreenSlideshowCategories", out var lcs)
+                    ? JsonSerializer.Deserialize<List<string>>(lcs.GetRawText()) ?? new List<string>()
+                    : new List<string>();
                 string lockInterval = settings.TryGetValue("LockScreenSlideshowInterval", out var li) ? li.GetString() ?? "12 hours" : "12 hours";
 
                 var dispatcherQueue = App.MainDispatcherQueue ?? DispatcherQueue;
@@ -1041,14 +1051,14 @@ namespace Aura
                     && !service.DesktopRunning && !service.DesktopStarting)
                 {
                     var interval = SlideshowService.ParseInterval(desktopInterval);
-                    await service.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue);
+                    await service.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue, desktopBasis, desktopCategories);
                 }
 
                 if (lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory)
                     && !service.LockScreenRunning && !service.LockScreenStarting)
                 {
                     var interval = SlideshowService.ParseInterval(lockInterval);
-                    await service.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue);
+                    await service.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue, lockBasis, lockCategories);
                 }
 
                 // one-shot: rows saved before the sticker feature recorded no
