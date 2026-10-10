@@ -401,6 +401,21 @@ tile -> `_1280.jpg` full - SINGLE underscore, `__1280`/`__640`/bare = 403).
   drills OK, bar clean through the whole fill + a 90s watch, no flip. vision
   (zengate, `C:\tmp\zengate-vision.ps1`): real Halloween artwork tiles, no
   broken/placeholder tiles.
+- **the slideshow's `latest` mode = the site's own newest wallpaper results**
+  (fix 2026-10-10): `/images/search/wallpaper/?order=latest&pagi=N` via the
+  same curl transport. ~100 tiles/page, `?pagi=99` serves older DISTINCT ids
+  (NO wrap like the collections index), every tile ships a schema.org
+  ImageObject JSON-LD block (`contentUrl` = full `_1280`, `acquireLicensePage`
+  = item href, `name` = title; parse independent per-key, no key-order
+  contract). TRAP: the visible `<img>` is eager on only ~19 tiles (the rest
+  render `src=/static/img/blank.gif` with the URL living ONLY in the JSON-LD)
+  - the collection-page tile-img parse matches 19/100 here. before this fix,
+  `mode=latest` (Latest basis + the All fast path) fell into the
+  collection-name lookup and threw `No pixabay collection named 'latest' is
+  loaded` on EVERY start; it only surfaced when the user added pixabay to the
+  desktop platform list (their original 8-platform config had no pixabay, so
+  no probe ever hit it). full facts in
+  `automata-private\pixabay.com\AGENTS.md` under "latest wallpaper search".
 
 ## wallpaperhub categories live from the collections index (2026-10-08)
 
@@ -1149,3 +1164,25 @@ selected by default ... the modal is kinda small and ive to scroll a lot".
   (11KB flat white, vision confirmed empty content) - settle 2s +
   recapture produced the real 121KB frame; both restores end with exact
   `Refresh: 1 Minutes` status.
+- **pixabay latest-route fix (same day, found by the user's live run)**:
+  the user added Pixabay to the platform list (8 -> 9) and got `Pixabay:
+  No pixabay collection named 'latest' is loaded - the collections index
+  fetch failed` in the warning bar - mode `latest` (Latest basis AND this
+  fast path) fell into the collections-name lookup and ALWAYS threw for
+  pixabay (the earlier probes never had pixabay selected). fix =
+  `GetPixabayWallpapersAsync` routes empty/`latest` modes to
+  `GetPixabayLatestAsync` (search page + JSON-LD parse, facts in the
+  pixabay section above); every other mode stays a loud collection-name
+  throw. probe hardened in the same pass: platform count derived from
+  the settings file (8 hardcoded -> `$platCount` = 9), startup clean
+  assert (0 platform failures), both info-bar asserts require NO
+  `Pixabay` line, the final-relaunch expected status builds from the
+  CAPTURED original basis/cats (was hardcoded Latest - caught by run 1
+  showing `9 platforms - Category: All categories (Refresh: 1 Minutes)`
+  as a probe-assert miss, app state was correct), and the settings
+  patch also normalizes the legacy `DesktopSlideshowCategory` to
+  `Latest Wallpapers` (leaving the user's `All categories` there fed
+  the restored-Latest loader a foreign mode string). full PASS second
+  run 2026-10-10: startup `Loaded 324 ... 0 platform failures`, both
+  bars bing/SD-only, final restore + relaunch exact with the user's
+  real `Category: All categories` state loading 324/324 clean.

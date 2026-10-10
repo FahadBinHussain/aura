@@ -932,6 +932,16 @@ namespace Aura.Services
         // throw (the index fetch failed - no silent empty grid, no stale default).
         private async Task<List<WallpaperItem>> GetPixabayWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
+            // "latest" (the slideshow's Latest basis + the All-categories fast path -
+            // NormalizePublicMode maps the legacy names onto it) is NOT a collection
+            // name: it routes to the site's own newest wallpaper results. without
+            // this arm every pixabay slideshow start threw "No pixabay collection
+            // named 'latest'" and skipped the platform (found live 2026-10-10).
+            if (string.IsNullOrWhiteSpace(mode) || mode.Equals("latest", StringComparison.OrdinalIgnoreCase))
+            {
+                return await GetPixabayLatestAsync(page, cancellationToken);
+            }
+
             var slug = PixabayCollections
                 .FirstOrDefault(collection => collection.Name.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 .Slug;
@@ -1000,6 +1010,70 @@ namespace Aura.Services
                     Downloads = string.Empty,
                     IsAI = false
                 });
+            }
+
+            return wallpapers;
+        }
+
+        // pixabay's newest wallpaper results = `/images/search/wallpaper/
+        // ?order=latest&pagi=N` (curl-transport like every pixabay html fetch).
+        // reversed live 2026-10-10: the page serves ~100 tiles per page, real deep
+        // pagination (?pagi=99 returns older DISTINCT ids - no wrap like the
+        // collections index), and every tile ships a schema.org ImageObject
+        // JSON-LD block with the FULL `_1280` contentUrl, the item href, and the
+        // title - the visible <img> is eager on only ~19 tiles (the rest render
+        // src=/static/img/blank.gif with the url living ONLY in the JSON-LD), so
+        // the tile-img parse that works on collection pages matches 19/100 here.
+        private async Task<List<WallpaperItem>> GetPixabayLatestAsync(int page, CancellationToken cancellationToken)
+        {
+            var url = $"https://pixabay.com/images/search/wallpaper/?order=latest&pagi={page}";
+            var html = await GetPixabayHtmlAsync(url, cancellationToken);
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (Match block in Regex.Matches(html, "<script type=\"application/ld\\+json\">(?<json>\\{.*?\\})</script>", RegexOptions.Singleline))
+            {
+                var json = block.Groups["json"].Value;
+                if (!json.Contains("\"ImageObject\""))
+                {
+                    continue;
+                }
+
+                // independent lookups per block - key order is the serializer's, not a contract
+                var contentUrl = Regex.Match(json, "\"contentUrl\":\"(?<url>https://cdn\\.pixabay\\.com/(?:photo|video)/[^\"]+)\"");
+                var href = Regex.Match(json, "\"acquireLicensePage\":\"(?<href>/[^\"]+)\"");
+                var name = Regex.Match(json, "\"name\":\"(?<name>[^\"]*)\"");
+                if (!contentUrl.Success || !href.Success)
+                {
+                    continue;
+                }
+
+                var id = Regex.Match(href.Groups["href"].Value, "(\\d+)/?$").Groups[1].Value;
+                if (string.IsNullOrEmpty(id) || !seen.Add(id))
+                {
+                    continue;
+                }
+
+                var preview = contentUrl.Groups["url"].Value;
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = id,
+                    Title = WebUtility.HtmlDecode(name.Groups["name"].Value).Trim(),
+                    Description = "Pixabay latest wallpaper",
+                    ImageUrl = preview,
+                    // contentUrl already carries the _1280 rung - the same CDN
+                    // pass-through the collection parser upgrades __340/_640 into
+                    FullPhotoUrl = preview,
+                    SourceUrl = $"https://pixabay.com{WebUtility.HtmlDecode(href.Groups["href"].Value)}",
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    IsAI = false
+                });
+            }
+
+            if (wallpapers.Count == 0)
+            {
+                throw new InvalidOperationException("pixabay latest search returned no items - its /images/search markup may have changed");
             }
 
             return wallpapers;
