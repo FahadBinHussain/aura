@@ -530,9 +530,13 @@ namespace Aura.Services
         // fetcher modes, not taxonomy). one dynamic list, consulted by the consumer:
         // add a platform name here to reject it from the category universe without
         // touching any page code (user decision 2026-10-09; bing/simpledesktops
-        // proven zero taxonomy in automata-private/<site>/AGENTS.md).
+        // proven zero taxonomy in automata-private/<site>/AGENTS.md). wallhaven
+        // joined 2026-10-10 (user verdict: its general/anime/people checkboxes are
+        // a content-type filter on search, not a category taxonomy) - its modes
+        // stay factual GetModes chips on its OWN grid, like bing/SD's Daily/Minimal.
         public static readonly string[] CategoryExcludedPlatforms =
         {
+            Wallhaven,
             Bing,
             SimpleDesktops,
         };
@@ -687,13 +691,10 @@ namespace Aura.Services
                     Id = id,
                     Title = $"Wallhaven #{id}",
                     Description = $"{ToTitleCase(category)} wallpaper from Wallhaven.",
-                    // the per-hit facet (general/anime/people) IS the item's own
-                    // category - the slideshow's history pill shows it under the
-                    // All/latest paths ("wallpaper" = this parser's description
-                    // default, not a wallhaven facet -> honest empty)
-                    Category = string.Equals(category, "wallpaper", StringComparison.OrdinalIgnoreCase)
-                        ? string.Empty
-                        : ToTitleCase(category),
+                    // no Category on purpose: wallhaven's general/anime/people is a
+                    // content-type FILTER, not a category taxonomy (user verdict
+                    // 2026-10-10, the platform is category-rejected) - its history
+                    // pill stays empty, like every source without real categories
                     ImageUrl = string.IsNullOrWhiteSpace(thumbnail) ? fullUrl : thumbnail,
                     FullPhotoUrl = fullUrl,
                     SourceUrl = sourceUrl,

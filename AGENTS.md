@@ -1236,3 +1236,40 @@ its source knows it, and NO chip when it does not (empty = no pill).
   `4K Wallpapers` (key `4k` -> canonical), tick rows `Space|Backiee`
   unchanged, `mode-label rows left: 0`, all 16 legacy `fantasy` rows
   migrated to `Fantasy`.
+
+### wallhaven category-rejected (2026-10-10, same day)
+
+user verdict on audit #6: wallhaven's `general/anime/people` checkboxes
+(the `categories=111` search filter) are a CONTENT-TYPE axis, not a
+category taxonomy - rejected from every category surface, same doctrine
+as bing/simple desktops:
+
+- `CategoryExcludedPlatforms` = {Wallhaven, Bing, SimpleDesktops} (the
+  one-line designed extension point) - Categories page scope menu
+  15 -> 14, no wallhaven merged cards, and the slideshow checklist
+  universe dropped wallhaven's `AddPlatform` line: 257 -> **255 names**
+  (`General` + `People` left, `Anime` SURVIVES on backiee). under the
+  Category basis wallhaven now takes the LOUD skip next to bing/SD
+  (3 skip lines, `Loaded ... (3 failed)`); its Latest loading and its
+  OWN grid chips are untouched (GetModes stays factual, the bing/SD
+  `Daily`/`Minimal` precedent).
+- **history pill too**: the per-hit facet stamp was REMOVED the same day
+  it shipped (the `Category = ToTitleCase(category)` line in the
+  wallhaven arm) - wallhaven rows are blank like pixabay/pexels. old
+  `People`-stickered rows keep their recorded value verbatim
+  (TryCanonicalName finds no wallhaven names anymore - historical
+  data, never re-labeled).
+- supersessions: the all-9-platform wallhaven bullet (its 3 modes are
+  grid chips only now), the history-pill section's "wallhaven always
+  pills" line, and the menuless canary list's `General` single-source
+  card (gone from Global; `Anime` stays via backiee). the categories
+  probe's expected Global count (294) needs its next run updated:
+  `General` is gone for sure (documented single-source), `People` too
+  iff wallhaven-exclusive there.
+- probe updated: universe spot list swaps the present-check `General`
+  for `Anime` and adds `General` to the ABSENT list (rejection
+  canary); the All-cycle `$knownSrc` drops Wallhaven (blank pill is
+  the correct answer now). full PASS 2026-10-10: `checklist boxes:
+  256 new (total 265)` = 255 names + All master, `stale/rejected
+  names absent: all 6 OK`, the bar carries 3 loud skips incl.
+  `Wallhaven: categoryless platform...`, `mode-label rows left: 0`.
