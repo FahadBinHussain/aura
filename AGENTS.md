@@ -1186,3 +1186,53 @@ selected by default ... the modal is kinda small and ive to scroll a lot".
   run 2026-10-10: startup `Loaded 324 ... 0 platform failures`, both
   bars bing/SD-only, final restore + relaunch exact with the user's
   real `Category: All categories` state loading 324/324 clean.
+
+### history pill = the item's own category (2026-10-10, same day)
+
+user follow-up: every row under the `All categories` basis showed the
+SAME `All categories` chip - that string was the SLIDESHOW's basis, not
+the picture's category. the chip now shows the item's OWN category when
+its source knows it, and NO chip when it does not (empty = no pill).
+
+- **one choke point owns the contract**: `WallpaperHistoryService.
+  AddEntry` runs every value through `NormalizeCategory(platform, value)`
+  - the three mode labels (`latest`, `Latest Wallpapers`, the old
+  `All categories` blanket stamp) are fetch context -> empty = no pill;
+  any real value (backiee ThemeCat slug, alpha's `4k` key, wallhaven's
+  per-hit facet, a tick name) canonicalizes via the catalog's new
+  `TryCanonicalName` (reverse lookup: the name whose key equals the
+  value, e.g. `fantasy` -> `Fantasy`, `4k` -> `4K Wallpapers`).
+  `TryCanonicalName` never throws (unlike ResolveKey): unloaded
+  universe (fresh Latest-basis install never opened the dialog) = null
+  -> the source value stays verbatim, still honest, re-canonicalizes at
+  the next Category-basis startup.
+- **slideshow call sites dropped the `category:` arg entirely** (all 4 -
+  desktop + lock): AddEntry's documented fallback to
+  `wallpaper.Category` takes over, so the Latest basis no longer stamps
+  its mode label onto rows - and wallhaven items keep showing their
+  facet (`General`/`Anime`/`People`) even under Latest. the fast path
+  also stopped rewriting items; it passes source values through.
+- **wallhaven now records its per-hit facet** (the API's `category`
+  field general/anime/people -> `ToTitleCase` into the item's
+  `Category`; the parser's own `wallpaper` description-default maps to
+  empty) - the one source that gained a category in this pass.
+  known-vs-unknown today: backiee + wallhaven + alpha always pill,
+  pixabay/pexels/artstation/wallpaperhub never do (their latest
+  surfaces carry no per-item category), bing/SD are loud-skipped under
+  Category anyway.
+- **startup recovery migrates legacy rows** (runs every startup,
+  idempotent): the sentinel stamp recovers the item's real category
+  from the live batch (same id match as the Platform backfill) then
+  normalizes; every other value normalizes too (`latest`/`Latest
+  Wallpapers` -> empty, raw slug `fantasy` -> `Fantasy`); the settings
+  backfill stays NULL-only (a recorded "" = the source knows nothing -
+  never re-stamped) and its fill value is normalized (a Latest-basis
+  install's `Latest Wallpapers` legacy field fills nothing, correct).
+- probe (same file): the All-cycle history assert now wants a new row
+  WITHOUT the sentinel (plus non-empty Category required when the row
+  lands on Backiee/Wallhaven/AlphaCoders - their sources always know),
+  and the final assert wants 0 mode-label rows file-wide. full PASS
+  2026-10-10: All row `Anime|Backiee` (slug -> canonical), alpha rows
+  `4K Wallpapers` (key `4k` -> canonical), tick rows `Space|Backiee`
+  unchanged, `mode-label rows left: 0`, all 16 legacy `fantasy` rows
+  migrated to `Fantasy`.

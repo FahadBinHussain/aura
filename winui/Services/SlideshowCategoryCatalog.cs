@@ -91,6 +91,31 @@ namespace Aura.Services
                 : new List<string>();
         }
 
+        // the display name whose key equals this source value (backiee slug
+        // "fantasy" -> "Fantasy", alpha key "4k" -> "4K Wallpapers"); null when
+        // the universe was never loaded (a fresh Latest-basis install has no
+        // list - the caller keeps the source value, which is still honest) or
+        // when no name maps to it (channel names, custom values - keep those).
+        // unlike ResolveKey this never throws: it is cosmetic canonicalization
+        // for a history pill, not a loader contract.
+        public string? TryCanonicalName(string platform, string value)
+        {
+            if (_universe == null || string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            foreach (var name in GetPlatformNames(platform))
+            {
+                if (string.Equals(ResolveKey(platform, name), value, StringComparison.OrdinalIgnoreCase))
+                {
+                    return name;
+                }
+            }
+
+            return null;
+        }
+
         // null = this platform honestly has no such category (a QUIET miss in the
         // loader: only an empty TOTAL batch is loud). categoryless platforms are
         // never resolvable. throws if the universe was never loaded (a programming

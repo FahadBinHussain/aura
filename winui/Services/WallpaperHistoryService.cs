@@ -102,6 +102,7 @@ namespace Aura.Services
         public void AddEntry(string title, string imageUrl, string wallpaperType, string source,
             WallpaperItem? wallpaper = null, string page = "", string platform = "", string category = "")
         {
+            var effectivePlatform = !string.IsNullOrEmpty(platform) ? platform : wallpaper?.Platform ?? "";
             var entry = new HistoryEntry
             {
                 Title = title,
@@ -111,8 +112,17 @@ namespace Aura.Services
                 Source = source,
                 // stickers: explicit argument wins, then the item's own tagging
                 // (services tag the category they fetched with)
-                Platform = !string.IsNullOrEmpty(platform) ? platform : wallpaper?.Platform ?? "",
-                Category = !string.IsNullOrEmpty(category) ? category : wallpaper?.Category ?? "",
+                Platform = effectivePlatform,
+                // the history-pill contract, owned HERE (the single normalizer
+                // for every writer): a row shows the item's OWN category, never
+                // the slideshow's basis/mode label. "latest" / "Latest Wallpapers"
+                // / the old "All categories" blanket stamp are fetch context ->
+                // empty = no pill; a real source value (backiee slug, alpha key,
+                // wallhaven facet, a tick name) canonicalizes to the catalog's
+                // display name, kept verbatim when the universe was never loaded
+                // (fresh Latest-basis install - no list exists, and the source
+                // value is still the honest answer).
+                Category = NormalizeCategory(effectivePlatform, !string.IsNullOrEmpty(category) ? category : wallpaper?.Category ?? ""),
                 Navigation = wallpaper == null || string.IsNullOrEmpty(page)
                     ? null
                     : new HistoryNavigation
@@ -132,6 +142,22 @@ namespace Aura.Services
 
             SaveToDisk();
             HistoryChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        // see the AddEntry pill contract above: mode labels are fetch context
+        // (never pills), a real source value canonicalizes through the loaded
+        // category universe and survives verbatim when it was never loaded.
+        private static string NormalizeCategory(string platform, string value)
+        {
+            if (string.IsNullOrWhiteSpace(value) ||
+                value.Equals("latest", StringComparison.OrdinalIgnoreCase) ||
+                value.Equals("Latest Wallpapers", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase))
+            {
+                return string.Empty;
+            }
+
+            return SlideshowCategoryCatalog.Instance.TryCanonicalName(platform, value) ?? value;
         }
 
         private void LoadFromDisk()
@@ -189,12 +215,40 @@ namespace Aura.Services
                 if (entry.Source != "Slideshow") continue;
                 bool isLock = entry.WallpaperType == "Lock Screen";
 
-                if (string.IsNullOrEmpty(entry.Category))
+                // every non-null value goes through the pill normalizer. null =
+                // pre-feature row (backfill from the configured category, itself
+                // normalized - "Latest Wallpapers" is fetch context, never a
+                // sticker); the old "All categories" blanket stamp recovers the
+                // item's own category from the live batch (same id match as the
+                // Platform backfill below); legacy mode stamps + raw source
+                // slugs canonicalize ("latest" -> empty = no pill, backiee
+                // "fantasy" -> "Fantasy"). only null gets a settings backfill,
+                // or every startup would re-stamp the configured category onto
+                // rows that honestly have none.
+                if (entry.Category == null)
                 {
-                    var category = isLock ? lockScreenCategory : desktopCategory;
-                    if (!string.IsNullOrEmpty(category))
+                    var configured = NormalizeCategory(entry.Platform, isLock ? lockScreenCategory : desktopCategory);
+                    if (!string.IsNullOrEmpty(configured))
                     {
-                        entry.Category = category;
+                        entry.Category = configured;
+                        changed = true;
+                    }
+                }
+                else
+                {
+                    var raw = entry.Category;
+                    if (string.Equals(raw, SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase))
+                    {
+                        var batch = isLock ? lockScreenBatch : desktopBatch;
+                        var id = ExtractStoredId(entry.ImageUrl);
+                        var match = string.IsNullOrEmpty(id) ? null : batch.FirstOrDefault(w => w.Id == id);
+                        raw = match?.Category ?? string.Empty;
+                    }
+
+                    var normalized = NormalizeCategory(entry.Platform, raw);
+                    if (!string.Equals(normalized, entry.Category, StringComparison.Ordinal))
+                    {
+                        entry.Category = normalized;
                         changed = true;
                     }
                 }

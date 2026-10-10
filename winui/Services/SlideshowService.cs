@@ -682,7 +682,12 @@ namespace Aura.Services
                 var wallpapers = await LoadLatestFeedAsync(platform, "Latest Wallpapers", "latest", batch);
                 foreach (var wallpaper in wallpapers)
                 {
-                    wallpaper.Category = SlideshowCategoryCatalog.AllCategories;
+                    // items keep their source category as-is (backiee ThemeCat,
+                    // wallhaven facet, alpha's key, the public "latest" mode
+                    // stamp) - WallpaperHistoryService.AddEntry is the single
+                    // normalizer that turns it into the history pill (the
+                    // source's real name, or empty = no pill for mode labels
+                    // and unknown sources)
                     target.Add(wallpaper);
                 }
 
@@ -893,7 +898,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopBasis == "Category" ? wallpaper.Category ?? "" : _desktopCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
@@ -1017,7 +1022,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper, category: _desktopBasis == "Category" ? wallpaper.Category ?? "" : _desktopCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
@@ -1191,7 +1196,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenBasis == "Category" ? wallpaper.Category ?? "" : _lockScreenCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
@@ -1301,7 +1306,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"AlphaCoders lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper, category: _lockScreenBasis == "Category" ? wallpaper.Category ?? "" : _lockScreenCategory);
+                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;

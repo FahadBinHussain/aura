@@ -687,6 +687,13 @@ namespace Aura.Services
                     Id = id,
                     Title = $"Wallhaven #{id}",
                     Description = $"{ToTitleCase(category)} wallpaper from Wallhaven.",
+                    // the per-hit facet (general/anime/people) IS the item's own
+                    // category - the slideshow's history pill shows it under the
+                    // All/latest paths ("wallpaper" = this parser's description
+                    // default, not a wallhaven facet -> honest empty)
+                    Category = string.Equals(category, "wallpaper", StringComparison.OrdinalIgnoreCase)
+                        ? string.Empty
+                        : ToTitleCase(category),
                     ImageUrl = string.IsNullOrWhiteSpace(thumbnail) ? fullUrl : thumbnail,
                     FullPhotoUrl = fullUrl,
                     SourceUrl = sourceUrl,
