@@ -26,10 +26,16 @@ namespace Aura.Services
     // discover terms, wallhaven's 3 bits).
     public sealed class SlideshowCategoryCatalog
     {
+        // the "All categories" master tick: the dialog's DEFAULT Category state,
+        // saved as this single sentinel instead of ~270 names, and resolved by the
+        // slideshow loader as "no filter" (one latest-feed fetch per platform)
+        public const string AllCategories = "All categories";
+
         public static SlideshowCategoryCatalog Instance { get; } = new();
 
         private readonly SemaphoreSlim _loadGate = new(1, 1);
         private List<string>? _universe;
+        private Dictionary<string, List<string>> _platformNames = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, string> _backieeNameToSlug = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, string> _alphaNameToKey = new(StringComparer.OrdinalIgnoreCase);
         private Dictionary<string, string> _artStationNameToKey = new(StringComparer.OrdinalIgnoreCase);
@@ -67,6 +73,22 @@ namespace Aura.Services
             {
                 _loadGate.Release();
             }
+        }
+
+        // this platform's own display names (empty = unknown or categoryless
+        // platform). the loader compares a platform's names against the tick set:
+        // every one of them ticked (or the AllCategories sentinel) = no filter at
+        // all - one latest-feed fetch instead of N category fetches
+        public List<string> GetPlatformNames(string platform)
+        {
+            if (_universe == null)
+            {
+                throw new InvalidOperationException("SlideshowCategoryCatalog is not loaded - await GetUniverseAsync() first");
+            }
+
+            return _platformNames.TryGetValue(platform, out var names)
+                ? new List<string>(names)
+                : new List<string>();
         }
 
         // null = this platform honestly has no such category (a QUIET miss in the
@@ -296,46 +318,39 @@ namespace Aura.Services
             AlphaCodersService.SetCategories(alphaCategories);
             ArtStationService.SetChannels(artChannels);
 
-            // the universe: every source's display names, merged case-insensitively
+            // per-platform display names first (the loader's "all of this platform's
+            // categories are ticked" check needs them), then merge the universe
+            _platformNames = new Dictionary<string, List<string>>(StringComparer.OrdinalIgnoreCase);
+            void AddPlatform(string platform, IEnumerable<string> displayNames)
+            {
+                var list = new List<string>();
+                foreach (var display in displayNames)
+                {
+                    var trimmed = display.Trim();
+                    if (trimmed.Length > 0 && !list.Contains(trimmed, StringComparer.OrdinalIgnoreCase))
+                    {
+                        list.Add(trimmed);
+                    }
+                }
+
+                _platformNames[platform] = list;
+            }
+
+            AddPlatform("Backiee", backieeCategories.Select(c => c.Name));
+            AddPlatform("AlphaCoders", alphaCategories.Select(t => t.Name).Concat(AlphaLegacyEntries.Select(l => l.Name)));
+            AddPlatform("ArtStation", artChannels.Select(t => t.Name));
+            AddPlatform("Pixabay", pixabayCollections.Select(t => t.Name));
+            AddPlatform("WallpaperHub", hubCollections.Select(t => t.Title));
+            AddPlatform("Pexels", pexelsTerms.Select(t => t.Term));
+            AddPlatform("Wallhaven", PublicWallpaperService.GetModes("Wallhaven"));
+
             var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (var category in backieeCategories)
+            foreach (var list in _platformNames.Values)
             {
-                names.Add(category.Name.Trim());
-            }
-
-            foreach (var (_, name) in alphaCategories)
-            {
-                names.Add(name.Trim());
-            }
-
-            foreach (var legacy in AlphaLegacyEntries)
-            {
-                names.Add(legacy.Name);
-            }
-
-            foreach (var (_, name) in artChannels)
-            {
-                names.Add(name.Trim());
-            }
-
-            foreach (var (name, _) in pixabayCollections)
-            {
-                names.Add(name.Trim());
-            }
-
-            foreach (var (title, _) in hubCollections)
-            {
-                names.Add(title.Trim());
-            }
-
-            foreach (var (term, _) in pexelsTerms)
-            {
-                names.Add(term.Trim());
-            }
-
-            foreach (var mode in PublicWallpaperService.GetModes("Wallhaven"))
-            {
-                names.Add(mode);
+                foreach (var name in list)
+                {
+                    names.Add(name);
+                }
             }
 
             _universe = names.ToList();

@@ -489,84 +489,9 @@ namespace Aura.Services
                         {
                             await LoadCategoryBasisForPlatformAsync(platform, categories, _desktopCurrentBatch, allWallpapers, failures);
                         }
-                        else if (platform == "AlphaCoders")
-                        {
-                            // Get wallpapers from AlphaCoders service
-                            string categoryKey = category switch
-                            {
-                                "4K Wallpapers" => "4k",
-                                "Harvest Wallpapers" => "harvest",
-                                "Rain Wallpapers" => "rain",
-                                _ => "4k"
-                            };
-
-                            // Use scraper directly to avoid cache issues
-                            var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _desktopCurrentBatch, _desktopCurrentBatch);
-
-                            // Tag wallpapers with their platform
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = "AlphaCoders";
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
-                        else if (platform == "Backiee")
-                        {
-                            // Use batch number as page number (0-indexed so subtract 1)
-                            int pageNumber = _desktopCurrentBatch - 1;
-                            string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-
-                            string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                            if (string.IsNullOrWhiteSpace(jsonContent))
-                            {
-                                throw new InvalidOperationException("empty response from the backiee list API");
-                            }
-                            using (JsonDocument doc = JsonDocument.Parse(jsonContent))
-                            {
-                                if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                                {
-                                    throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
-                                }
-                                foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
-                                {
-                                    var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
-                                    if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
-                                    {
-                                        wallpaper.Platform = "Backiee";
-                                        allWallpapers.Add(wallpaper);
-                                    }
-                                }
-                            }
-                        }
-                        else if (platform == "ArtStation")
-                        {
-                            // its own service - PublicWallpaperService has NO ArtStation
-                            // arm and throws NotSupportedException for it
-                            var artStationService = new ArtStationService();
-                            var sorting = mode == "latest" ? "latest" : "trending";
-                            var wallpapers = await artStationService.GetProjectsAsync(sorting, _desktopCurrentBatch);
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = "ArtStation";
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
-                        else if (PublicWallpaperService.IsSupportedPlatform(platform))
-                        {
-                            // Use PublicWallpaperService for the other public platforms
-                            var publicService = new PublicWallpaperService();
-                            var wallpapers = await publicService.GetWallpapersAsync(platform, _desktopCurrentBatch, mode);
-
-                            // Tag wallpapers with their platform
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = platform;
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
                         else
                         {
-                            throw new NotSupportedException("not an implemented platform");
+                            allWallpapers.AddRange(await LoadLatestFeedAsync(platform, category, mode, _desktopCurrentBatch));
                         }
                     }
                     catch (Exception ex)
@@ -618,84 +543,9 @@ namespace Aura.Services
                         {
                             await LoadCategoryBasisForPlatformAsync(platform, categories, _lockScreenCurrentBatch, allWallpapers, failures);
                         }
-                        else if (platform == "AlphaCoders")
-                        {
-                            // Get wallpapers from AlphaCoders service
-                            string categoryKey = category switch
-                            {
-                                "4K Wallpapers" => "4k",
-                                "Harvest Wallpapers" => "harvest",
-                                "Rain Wallpapers" => "rain",
-                                _ => "4k"
-                            };
-
-                            // Use scraper directly to avoid cache issues
-                            var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, _lockScreenCurrentBatch, _lockScreenCurrentBatch);
-
-                            // Tag wallpapers with their platform
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = "AlphaCoders";
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
-                        else if (platform == "Backiee")
-                        {
-                            // Use batch number as page number (0-indexed so subtract 1)
-                            int pageNumber = _lockScreenCurrentBatch - 1;
-                            string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
-
-                            string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
-                            if (string.IsNullOrWhiteSpace(jsonContent))
-                            {
-                                throw new InvalidOperationException("empty response from the backiee list API");
-                            }
-                            using (JsonDocument doc = JsonDocument.Parse(jsonContent))
-                            {
-                                if (doc.RootElement.ValueKind != JsonValueKind.Array)
-                                {
-                                    throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
-                                }
-                                foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
-                                {
-                                    var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
-                                    if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
-                                    {
-                                        wallpaper.Platform = "Backiee";
-                                        allWallpapers.Add(wallpaper);
-                                    }
-                                }
-                            }
-                        }
-                        else if (platform == "ArtStation")
-                        {
-                            // its own service - PublicWallpaperService has NO ArtStation
-                            // arm and throws NotSupportedException for it
-                            var artStationService = new ArtStationService();
-                            var sorting = mode == "latest" ? "latest" : "trending";
-                            var wallpapers = await artStationService.GetProjectsAsync(sorting, _lockScreenCurrentBatch);
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = "ArtStation";
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
-                        else if (PublicWallpaperService.IsSupportedPlatform(platform))
-                        {
-                            // Use PublicWallpaperService for the other public platforms
-                            var publicService = new PublicWallpaperService();
-                            var wallpapers = await publicService.GetWallpapersAsync(platform, _lockScreenCurrentBatch, mode);
-
-                            // Tag wallpapers with their platform
-                            foreach (var wallpaper in wallpapers)
-                            {
-                                wallpaper.Platform = platform;
-                                allWallpapers.Add(wallpaper);
-                            }
-                        }
                         else
                         {
-                            throw new NotSupportedException("not an implemented platform");
+                            allWallpapers.AddRange(await LoadLatestFeedAsync(platform, category, mode, _lockScreenCurrentBatch));
                         }
                     }
                     catch (Exception ex)
@@ -720,6 +570,89 @@ namespace Aura.Services
             return failures;
         }
 
+        // the per-platform LATEST feed - the Latest basis uses it, and so does the
+        // Category basis when a platform's whole category set is ticked (the
+        // "All categories" default): one fetch instead of N category fetches.
+        // throws on failure; the caller's per-platform try/catch makes it loud.
+        private async Task<List<WallpaperItem>> LoadLatestFeedAsync(string platform, string category, string mode, int batch)
+        {
+            var result = new List<WallpaperItem>();
+            if (platform == "AlphaCoders")
+            {
+                string categoryKey = category switch
+                {
+                    "4K Wallpapers" => "4k",
+                    "Harvest Wallpapers" => "harvest",
+                    "Rain Wallpapers" => "rain",
+                    _ => "4k"
+                };
+
+                var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, batch, batch);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = "AlphaCoders";
+                    result.Add(wallpaper);
+                }
+            }
+            else if (platform == "Backiee")
+            {
+                // Use batch number as page number (0-indexed so subtract 1)
+                int pageNumber = batch - 1;
+                string apiUrl = $"https://backiee.com/api/wallpaper/list.php?action=paging_list&list_type=latest&page={pageNumber}&page_size=50&category=all&is_ai=all&sort_by=popularity&4k=false&5k=false&8k=false&status=active&args=";
+
+                string jsonContent = await BackieeNetworkClient.GetStringAsync(apiUrl);
+                if (string.IsNullOrWhiteSpace(jsonContent))
+                {
+                    throw new InvalidOperationException("empty response from the backiee list API");
+                }
+                using (JsonDocument doc = JsonDocument.Parse(jsonContent))
+                {
+                    if (doc.RootElement.ValueKind != JsonValueKind.Array)
+                    {
+                        throw new InvalidOperationException($"unexpected backiee response shape ({jsonContent.Length} bytes, not a wallpaper array)");
+                    }
+                    foreach (JsonElement wallpaperElement in doc.RootElement.EnumerateArray())
+                    {
+                        var wallpaper = BackieeApiParser.CreateWallpaperItem(wallpaperElement);
+                        if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))
+                        {
+                            wallpaper.Platform = "Backiee";
+                            result.Add(wallpaper);
+                        }
+                    }
+                }
+            }
+            else if (platform == "ArtStation")
+            {
+                // its own service - PublicWallpaperService has NO ArtStation
+                // arm and throws NotSupportedException for it
+                var artStationService = new ArtStationService();
+                var sorting = mode == "latest" ? "latest" : "trending";
+                var wallpapers = await artStationService.GetProjectsAsync(sorting, batch);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = "ArtStation";
+                    result.Add(wallpaper);
+                }
+            }
+            else if (PublicWallpaperService.IsSupportedPlatform(platform))
+            {
+                var publicService = new PublicWallpaperService();
+                var wallpapers = await publicService.GetWallpapersAsync(platform, batch, mode);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Platform = platform;
+                    result.Add(wallpaper);
+                }
+            }
+            else
+            {
+                throw new NotSupportedException("not an implemented platform");
+            }
+
+            return result;
+        }
+
         // Category basis: every ticked name that RESOLVES on this platform becomes its
         // own fetch (the shuffle below pools them across platforms + ticks). a tick
         // this platform does not have is a QUIET miss (only an empty TOTAL batch is
@@ -733,6 +666,26 @@ namespace Aura.Services
                 string reason = "categoryless platform - no categories exist here (use the Latest basis, or untick it)";
                 failures.Add($"{platform}: {reason}");
                 LogInfo($"category basis skip - {platform}: {reason}");
+                return;
+            }
+
+            // "All categories" (the dialog's DEFAULT Category state) or every one of
+            // this platform's own categories ticked = no filter at all: ONE latest-
+            // feed fetch instead of N category fetches (the full universe would
+            // otherwise fire ~270 requests per start)
+            var platformNames = SlideshowCategoryCatalog.Instance.GetPlatformNames(platform);
+            bool allTicked =
+                tickedNames.Any(t => t.Equals(SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase)) ||
+                (platformNames.Count > 0 && platformNames.All(n => tickedNames.Any(t => t.Equals(n, StringComparison.OrdinalIgnoreCase))));
+            if (allTicked)
+            {
+                var wallpapers = await LoadLatestFeedAsync(platform, "Latest Wallpapers", "latest", batch);
+                foreach (var wallpaper in wallpapers)
+                {
+                    wallpaper.Category = SlideshowCategoryCatalog.AllCategories;
+                    target.Add(wallpaper);
+                }
+
                 return;
             }
 

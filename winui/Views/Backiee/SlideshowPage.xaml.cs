@@ -596,7 +596,9 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(changeSlideshowLabel);
 
-            // Platform selection with checkboxes
+            // Platform selection with checkboxes - wrapped into rows of 4: the old
+            // 9-row vertical stack ate ~230px and pushed the basis picker + category
+            // list below the fold (the user had to scroll just to reach them)
             var platformLabel = new TextBlock
             {
                 Text = "Select Platforms",
@@ -610,63 +612,71 @@ namespace Aura.Views.Backiee
                 Content = "Backiee",
                 IsChecked = currentPlatforms.Contains("Backiee")
             };
-            contentPanel.Children.Add(platformCheckBoxBackiee);
 
             var platformCheckBoxAlphaCoders = new CheckBox
             {
                 Content = "AlphaCoders",
                 IsChecked = currentPlatforms.Contains("AlphaCoders")
             };
-            contentPanel.Children.Add(platformCheckBoxAlphaCoders);
 
             var platformCheckBoxArtStation = new CheckBox
             {
                 Content = "ArtStation",
                 IsChecked = currentPlatforms.Contains("ArtStation")
             };
-            contentPanel.Children.Add(platformCheckBoxArtStation);
 
             var platformCheckBoxWallhaven = new CheckBox
             {
                 Content = "Wallhaven",
                 IsChecked = currentPlatforms.Contains("Wallhaven")
             };
-            contentPanel.Children.Add(platformCheckBoxWallhaven);
 
             var platformCheckBoxBing = new CheckBox
             {
                 Content = "Bing Wallpaper Archive",
                 IsChecked = currentPlatforms.Contains("Bing Wallpaper Archive")
             };
-            contentPanel.Children.Add(platformCheckBoxBing);
 
             var platformCheckBoxSimpleDesktops = new CheckBox
             {
                 Content = "Simple Desktops",
                 IsChecked = currentPlatforms.Contains("Simple Desktops")
             };
-            contentPanel.Children.Add(platformCheckBoxSimpleDesktops);
 
             var platformCheckBoxWallpaperHub = new CheckBox
             {
                 Content = "WallpaperHub",
                 IsChecked = currentPlatforms.Contains("WallpaperHub")
             };
-            contentPanel.Children.Add(platformCheckBoxWallpaperHub);
 
             var platformCheckBoxPexels = new CheckBox
             {
                 Content = "Pexels",
                 IsChecked = currentPlatforms.Contains("Pexels")
             };
-            contentPanel.Children.Add(platformCheckBoxPexels);
 
             var platformCheckBoxPixabay = new CheckBox
             {
                 Content = "Pixabay",
                 IsChecked = currentPlatforms.Contains("Pixabay")
             };
-            contentPanel.Children.Add(platformCheckBoxPixabay);
+
+            var platformChecks = new[]
+            {
+                platformCheckBoxBackiee, platformCheckBoxAlphaCoders, platformCheckBoxArtStation,
+                platformCheckBoxWallhaven, platformCheckBoxBing, platformCheckBoxSimpleDesktops,
+                platformCheckBoxWallpaperHub, platformCheckBoxPexels, platformCheckBoxPixabay
+            };
+            for (int rowStart = 0; rowStart < platformChecks.Length; rowStart += 4)
+            {
+                var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
+                for (int i = rowStart; i < Math.Min(rowStart + 4, platformChecks.Length); i++)
+                {
+                    row.Children.Add(platformChecks[i]);
+                }
+
+                contentPanel.Children.Add(row);
+            }
 
             // Basis selector: Latest (default) vs Category (multi-tick checklist).
             // the checklist universe = SlideshowCategoryCatalog (the same LIVE indexes
@@ -684,7 +694,7 @@ namespace Aura.Views.Backiee
             };
             var checklistScroll = new ScrollViewer
             {
-                MaxHeight = 300,
+                MaxHeight = 420,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 ZoomMode = Microsoft.UI.Xaml.Controls.ZoomMode.Disabled,
@@ -712,8 +722,10 @@ namespace Aura.Views.Backiee
                 GroupName = $"Basis-{slideshowType}",
                 IsChecked = currentBasis == "Category"
             };
-            contentPanel.Children.Add(basisLatest);
-            contentPanel.Children.Add(basisCategory);
+            var basisRow = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 24 };
+            basisRow.Children.Add(basisLatest);
+            basisRow.Children.Add(basisCategory);
+            contentPanel.Children.Add(basisRow);
 
             var checklistHeader = new TextBlock
             {
@@ -722,6 +734,42 @@ namespace Aura.Views.Backiee
                 Margin = new Thickness(24, 4, 0, 0)
             };
             contentPanel.Children.Add(checklistHeader);
+
+            // master "All categories" tick - sits OUTSIDE the scroll (always visible),
+            // checked by DEFAULT whenever a saved list is absent (the user asked for
+            // Category to start fully ticked); checking it ticks everything, and
+            // unchecking ANY category drops it back off
+            var checkAllBox = new CheckBox
+            {
+                Content = SlideshowCategoryCatalog.AllCategories,
+                IsChecked = false,
+                Margin = new Thickness(24, 4, 0, 0),
+                Visibility = Visibility.Collapsed
+            };
+            bool syncingAll = false;
+
+            void SetAllChildren(bool on)
+            {
+                syncingAll = true;
+                try
+                {
+                    foreach (var child in checklistPanel.Children)
+                    {
+                        if (child is CheckBox box) box.IsChecked = on;
+                    }
+
+                    checkAllBox.IsChecked = on;
+                }
+                finally
+                {
+                    syncingAll = false;
+                }
+            }
+
+            checkAllBox.Checked += (s, e) => { if (!syncingAll) SetAllChildren(true); };
+            checkAllBox.Unchecked += (s, e) => { if (!syncingAll) SetAllChildren(false); };
+
+            contentPanel.Children.Add(checkAllBox);
             contentPanel.Children.Add(checklistStatus);
             contentPanel.Children.Add(checklistScroll);
 
@@ -737,13 +785,50 @@ namespace Aura.Views.Backiee
                 {
                     var universe = await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
                     checklistPanel.Children.Clear();
+                    // the DEFAULT Category state = everything ticked (a saved list -
+                    // including the All sentinel - overrides it), so Category works
+                    // out of the box with zero scrolling
+                    bool restoreAll = currentCategories.Count == 0 ||
+                        currentCategories.Any(c => c.Equals(SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase));
                     foreach (var name in universe)
                     {
-                        checklistPanel.Children.Add(new CheckBox
+                        var box = new CheckBox
                         {
                             Content = name,
-                            IsChecked = currentCategories.Any(c => c.Equals(name, StringComparison.OrdinalIgnoreCase))
-                        });
+                            IsChecked = restoreAll || currentCategories.Any(c => c.Equals(name, StringComparison.OrdinalIgnoreCase))
+                        };
+                        // keep the master in sync with the children: one category off
+                        // drops All, every category on lifts All back
+                        box.Unchecked += (s, e) =>
+                        {
+                            if (syncingAll) return;
+                            syncingAll = true;
+                            try { checkAllBox.IsChecked = false; }
+                            finally { syncingAll = false; }
+                        };
+                        box.Checked += (s, e) =>
+                        {
+                            if (syncingAll) return;
+                            syncingAll = true;
+                            try
+                            {
+                                bool allOn = checklistPanel.Children.Count > 0;
+                                foreach (var child in checklistPanel.Children)
+                                {
+                                    if (child is CheckBox b && b.IsChecked != true) { allOn = false; break; }
+                                }
+
+                                checkAllBox.IsChecked = allOn;
+                            }
+                            finally { syncingAll = false; }
+                        };
+                        checklistPanel.Children.Add(box);
+                    }
+                    if (restoreAll)
+                    {
+                        syncingAll = true;
+                        try { checkAllBox.IsChecked = true; }
+                        finally { syncingAll = false; }
                     }
                     checklistState = "Ready";
                     // the checklist only becomes visible through ApplyBasisVisibility -
@@ -751,7 +836,7 @@ namespace Aura.Views.Backiee
                     // ScrollViewer (invisible to the user AND to UIA); found by the
                     // menuless probe 2026-10-10
                     ApplyBasisVisibility();
-                    LogInfo($"slideshow basis checklist ready: {checklistPanel.Children.Count} names");
+                    LogInfo($"slideshow basis checklist ready: {checklistPanel.Children.Count} names (all={restoreAll})");
                 }
                 catch (Exception ex)
                 {
@@ -767,8 +852,10 @@ namespace Aura.Views.Backiee
             void ApplyBasisVisibility()
             {
                 bool categoryBasis = basisCategory.IsChecked == true;
+                bool listReady = categoryBasis && checklistState == "Ready";
                 checklistHeader.Visibility = categoryBasis ? Visibility.Visible : Visibility.Collapsed;
-                checklistScroll.Visibility = categoryBasis && checklistState == "Ready" ? Visibility.Visible : Visibility.Collapsed;
+                checkAllBox.Visibility = listReady ? Visibility.Visible : Visibility.Collapsed;
+                checklistScroll.Visibility = listReady ? Visibility.Visible : Visibility.Collapsed;
                 bool showStatus = categoryBasis && checklistState != "Ready";
                 checklistStatus.Visibility = showStatus ? Visibility.Visible : Visibility.Collapsed;
             }
@@ -786,13 +873,18 @@ namespace Aura.Views.Backiee
                 _ = EnsureChecklistAsync();
             }
 
-            // the dialog content (9 platform rows + basis + up to ~270 checklist rows)
-            // must scroll - everything below the fold used to be silently cut off (the
-            // Pixabay checkbox + old category dropdown were clipped)
+            // sized off the actual window instead of a fixed 460px fold - the old
+            // dialog forced scrolling through 9 platform rows before reaching the
+            // basis picker (user complaint 2026-10-10: "modal is kinda small and ive
+            // to scroll a lot"); the ContentDialog clamps to its XamlRoot anyway
+            var rootEl = XamlRoot?.Content as FrameworkElement;
+            double availH = rootEl?.ActualHeight ?? 720;
+            double availW = rootEl?.ActualWidth ?? 900;
+            dialog.MaxHeight = Math.Max(480, availH - 96);
+            dialog.MaxWidth = Math.Min(1040, Math.Max(560, availW - 96));
             dialog.Content = new ScrollViewer
             {
                 Content = contentPanel,
-                MaxHeight = 460,
                 VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                 HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled,
                 ZoomMode = Microsoft.UI.Xaml.Controls.ZoomMode.Disabled
@@ -885,6 +977,15 @@ namespace Aura.Views.Backiee
                         {
                             selectedCategories.Add(name);
                         }
+                    }
+
+                    // an ALL-checked list saves as the one sentinel (the children are
+                    // the source of truth: every one ticked = the All master), so the
+                    // settings file stays one line instead of ~270 names and the
+                    // loader resolves it against the live universe at start time
+                    if (checklistPanel.Children.Count > 0 && selectedCategories.Count == checklistPanel.Children.Count)
+                    {
+                        selectedCategories = new List<string> { SlideshowCategoryCatalog.AllCategories };
                     }
 
                     if (selectedCategories.Count == 0)

@@ -1100,3 +1100,52 @@ per-platform skip instead.
   SaveSettings runs after Start returns); a probe's first launch can hang
   on the splash window (title = exe path, UIA text = 0, Responding=True)
   - kill + relaunch.
+
+### All categories master + bigger dialog (2026-10-10, same day)
+
+user follow-up: "wheres the all category checkbox ... make that all
+selected by default ... the modal is kinda small and ive to scroll a lot".
+
+- **`All categories` master tick** = `SlideshowCategoryCatalog
+  .AllCategories` (the const IS the sentinel string, checkbox label too).
+  it sits OUTSIDE the checklist scroll (visible whenever the list is
+  Ready), is checked by DEFAULT whenever the saved list is empty (fresh
+  Category = fully working out of the box, zero scrolling), unchecking ANY
+  category drops it, checking every category lifts it back. an all-checked
+  checklist saves as the ONE sentinel `["All categories"]` (children are
+  the save-time source of truth - the count match collapses them), never
+  the ~270-name list.
+- **loader fast path**: sentinel ticked OR every one of a platform's own
+  names ticked = NO filter -> one latest-feed fetch, items tagged
+  `Category = All categories` (~7 requests per start, not ~270). the
+  per-platform Latest switch was factored out of BOTH loaders into
+  `LoadLatestFeedAsync(platform, category, mode, batch)` (identical code
+  moved) and serves the Latest basis + this path. the loud bing/SD
+  categoryless skip still runs FIRST (All mode skips them too), and
+  `GetPlatformNames(platform)` (new catalog API over the per-platform
+  lists, built before the universe merge) powers the per-platform
+  all-ticked check.
+- **bigger dialog**: `dialog.MaxHeight/MaxWidth` derive from the XamlRoot
+  content (`availH - 96` / `availW - 96`, clamped 480..1040), the outer
+  ScrollViewer lost its fixed 460 cap (the dialog clamps itself), the
+  checklist inner scroll went 300 -> 420, the 9 platform checkboxes wrap
+  into horizontal rows of 4 (was 9 vertical rows ~230px), the two basis
+  radios sit on one row. at the default 900x640 window the default path
+  needs no scrolling at all (Set stays outside the scroll).
+- re-verified by the updated `C:\tmp\aura-slideshowbasis.ps1` (the
+  settings patch now also normalizes basis/cats so step 5 sees the fresh
+  default; flow = default-All assert -> untick All -> Nature+Space cycle
+  -> All cycle -> Latest cycle): full PASS first run 2026-10-10 -
+  `All master default: On` + spot children On, subset save
+  `cats=[Nature,Space]`, reopen restore `All=Off Nature=On`, sentinel
+  status `8 platforms - Category: All categories (Refresh: 12 hours)`,
+  settings `cats=[All categories]`, history sticker `All categories`,
+  Latest keeps the sentinel, final restore exact.
+- `C:\tmp\aura-slideshowbasis-tall.ps1` = the 900x1200 dialog shot for
+  the UX change (vision: All checked, category rows below it,
+  Latest/Category one row with Category selected, platforms rows of 4,
+  Set/Cancel, no errors). capture trap: a shot taken right after
+  resizing the PARKED window to 900x1200 caught an unpainted swapchain
+  (11KB flat white, vision confirmed empty content) - settle 2s +
+  recapture produced the real 121KB frame; both restores end with exact
+  `Refresh: 1 Minutes` status.
