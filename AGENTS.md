@@ -1351,3 +1351,38 @@ category surface, same doctrine as bing/SD/wallhaven/pixiv:
   exact (Category / All categories / 1 Minutes / 9 platforms, backup file
   removed) + app relaunched visible on Categories.
 - supersessions: the pixiv section's scope-menu count (13 -> 12).
+
+### wallpaper engine category-rejected (2026-10-11)
+
+user verdict on audit #16: steam workshop's `requiredtags` axis is a FILTER
+over one flat upload pool, not a browsable taxonomy - the declared tag
+vocabulary (`mtx_tags` on the workshop home: Scene, Video, 3D, Audio
+responsive, Customizable, Puppet Warp, HDR, ...) is upload plumbing, and the
+tag-filtered browse URLs are just filtered views of the same feed (same class
+as wallhaven's content-type checkboxes) - rejected from every category
+surface, same doctrine as bing/SD/wallhaven/pixiv/cara:
+
+- `CategoryExcludedPlatforms` = {Wallhaven, Pixiv, Cara, WallpaperEngine,
+  Bing, SimpleDesktops}. wallpaper engine was never in the slideshow
+  checklist universe (no `AddPlatform` line), so the universe stays **255
+  names**; only the Categories page changed: scope menu 12 -> 11, and 4 mode
+  cards left the merged grid. `GetModes(WallpaperEngine)` still returns its
+  7 modes on purpose (the bing/SD `Daily`/`Minimal` precedent - its OWN grid
+  chips stay factual), and wallpaper engine is not in the user's 9-platform
+  slideshow config (loud-skip count stays 3).
+- counts: Global **289 -> 285**: `Scene` `Video` `Interactive` `Audio
+  Responsive` were wallpaper-engine-exclusive (source grep + live-index curl
+  checks across artstation/wallpaperhub/pixabay/pexels/alpha/backiee found
+  zero exact-name owners); `Trending` survives on artgram, `Anime` on
+  hdwallpapers+desktopnexus, `3D` on hdwallpapers.
+- probe updated (`C:\tmp\aura-categoryexclusion.ps1`): floor 289 -> 285 with
+  the arithmetic in the comment, rejected list += `Scene` `Video`
+  `Interactive` `Audio Responsive`.
+- verified menuless 2026-10-11: cards=285 exact, all 10 rejected names gone,
+  11 spot names present, alpha `Vehicle` drill 15 items + title + bar clean,
+  back rebuilds 285 with scope `Global` (NO back-lands-on-Home anomaly this
+  run), watch stable. the watch DID again catch the loud `DesktopNexus
+  category thumbnails: 9/9 failed - 403` line - the pre-existing live-site
+  block (see the pixiv section), surfaced loudly per the contract. settings
+  restored exact + app relaunched visible on Categories.
+- supersessions: the cara section's scope-menu count (12 -> 11).

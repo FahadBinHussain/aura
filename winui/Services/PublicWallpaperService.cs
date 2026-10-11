@@ -538,7 +538,10 @@ namespace Aura.Services
         // cara on 2026-10-11 (user verdict: feed-only surface - /explore is a
         // single SSR feed, /trending/* are sort tabs, every /collections,
         // /tags/*, /hashtags route 404s and the hashtags are plain-text UGC;
-        // curl-proven, see automata-private/cara.app/AGENTS.md) - their
+        // curl-proven, see automata-private/cara.app/AGENTS.md), and wallpaper
+        // engine the same day (user verdict: steam workshop's requiredtags
+        // axis is a filter over one flat upload pool, not a browsable
+        // taxonomy - the declared tag vocabulary is upload plumbing) - their
         // modes stay factual GetModes chips on their OWN grids, like bing/SD's
         // Daily/Minimal.
         public static readonly string[] CategoryExcludedPlatforms =
@@ -546,6 +549,7 @@ namespace Aura.Services
             Wallhaven,
             Pixiv,
             Cara,
+            WallpaperEngine,
             Bing,
             SimpleDesktops,
         };
