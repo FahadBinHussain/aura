@@ -367,9 +367,11 @@ namespace Aura.Services
             AddPlatform("Pixabay", pixabayCollections.Select(t => t.Name));
             AddPlatform("WallpaperHub", hubCollections.Select(t => t.Title));
             AddPlatform("Pexels", pexelsTerms.Select(t => t.Term));
-            // wallhaven never joins the universe: its general/anime/people checkboxes
-            // are a content-type filter on search, not a category taxonomy
-            // (category-rejected 2026-10-10, same doctrine as bing/simple desktops)
+            // wallhaven + pixiv never join the universe: wallhaven's
+            // general/anime/people checkboxes are a content-type filter on search
+            // and pixiv's tag search is unbounded user-generated taxonomy - neither
+            // is a category taxonomy (category-rejected 2026-10-10, same doctrine
+            // as bing/simple desktops)
 
             var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var list in _platformNames.Values)

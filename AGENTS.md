@@ -1273,3 +1273,48 @@ as bing/simple desktops:
   256 new (total 265)` = 255 names + All master, `stale/rejected
   names absent: all 6 OK`, the bar carries 3 loud skips incl.
   `Wallhaven: categoryless platform...`, `mode-label rows left: 0`.
+
+
+### pixiv category-rejected (2026-10-11)
+
+user verdict on audit #13: pixiv's 3 shipped tags (`Wallpaper`,
+`Landscape`, `Nature`) are hand-picked SEARCH QUERIES over unbounded
+user-generated content, not a curated taxonomy - rejected from every
+category surface, same doctrine as bing/SD/wallhaven:
+
+- `CategoryExcludedPlatforms` = {Wallhaven, Pixiv, Bing, SimpleDesktops}.
+  pixiv was never in the slideshow checklist universe (the catalog has
+  no pixiv `AddPlatform` line), so the universe stays **255 names**;
+  only the Categories page changed: scope menu 14 -> 13, and pixiv's 3
+  mode cards left the merged grid. `GetModes(Pixiv)` still returns
+  `PixivTags` on purpose (the bing/SD `Daily`/`Minimal` precedent -
+  pixiv's OWN grid chips stay factual). the pixiv fetcher never stamped
+  a per-item Category (nothing to revert), and pixiv is not in the
+  user's 9-platform slideshow config (loud-skip count stays 3).
+- counts: Global **294 -> 290**: `Wallpaper` + `Landscape` were
+  pixiv-exclusive (`Nature` survives on backiee/hdwallpapers/
+  desktopnexus), and artstation's live channel index drifted **64 -> 63**
+  on 2026-10-11 (`VFX for Film, TV & Animation` gone from
+  `channels.json` total_count and the grid - verified by live curl, NOT
+  a regression of this change).
+- probe updated (`C:\tmp\aura-categoryexclusion.ps1`, stays in C:\tmp):
+  floor 294 -> 290 with the drift arithmetic in the comment, rejected
+  list += `Wallpaper` `Landscape`, spot list swaps `General` for
+  `Anime`. probe hardening from the 2026-10-11 run: the probe now
+  BACKS UP + PAUSES the user's 1-minute ticker (interval -> 12 hours,
+  basis -> Latest) before launch and restores + relaunches at the end -
+  with the live ticker running every UIA call took ~8s and the probe
+  silently ground for 15+ min on its first attempt (the nav retry loop
+  had no heartbeat; heartbeats added).
+- verified menuless 2026-10-11: cards=290 OK, all 5 rejected names gone
+  (`Daily` `Minimal` `General` `Wallpaper` `Landscape`), 11 spot names
+  present, alpha `Vehicle` drill 15 items + title + bar clean, back
+  rebuilds 290 with scope `Global`, 6x5s watch stable. the watch DID
+  catch one loud bar - `DesktopNexus category thumbnails: 9/9 failed -
+  403 (Forbidden)` - curl confirmed desktopnexus.com 403s everything
+  site-wide as of 2026-10-11 (pre-existing live-site block, surfaced
+  loudly per the contract, unrelated to this change).
+- supersessions: the artstation section's `per-scope ArtStation = 64`
+  (live index, now 63) and the wallhaven section's pending note that
+  "the categories probe's expected Global count (294) needs updating"
+  (discharged here: 290).

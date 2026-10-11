@@ -532,11 +532,15 @@ namespace Aura.Services
         // touching any page code (user decision 2026-10-09; bing/simpledesktops
         // proven zero taxonomy in automata-private/<site>/AGENTS.md). wallhaven
         // joined 2026-10-10 (user verdict: its general/anime/people checkboxes are
-        // a content-type filter on search, not a category taxonomy) - its modes
-        // stay factual GetModes chips on its OWN grid, like bing/SD's Daily/Minimal.
+        // a content-type filter on search, not a category taxonomy) and pixiv the
+        // same day (user verdict: its unbounded user-generated tag search has no
+        // curated taxonomy - the 3 shipped tags are hand-picked queries) - their
+        // modes stay factual GetModes chips on their OWN grids, like bing/SD's
+        // Daily/Minimal.
         public static readonly string[] CategoryExcludedPlatforms =
         {
             Wallhaven,
+            Pixiv,
             Bing,
             SimpleDesktops,
         };
