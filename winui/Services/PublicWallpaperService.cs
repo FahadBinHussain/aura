@@ -534,13 +534,18 @@ namespace Aura.Services
         // joined 2026-10-10 (user verdict: its general/anime/people checkboxes are
         // a content-type filter on search, not a category taxonomy) and pixiv the
         // same day (user verdict: its unbounded user-generated tag search has no
-        // curated taxonomy - the 3 shipped tags are hand-picked queries) - their
+        // curated taxonomy - the 3 shipped tags are hand-picked queries), and
+        // cara on 2026-10-11 (user verdict: feed-only surface - /explore is a
+        // single SSR feed, /trending/* are sort tabs, every /collections,
+        // /tags/*, /hashtags route 404s and the hashtags are plain-text UGC;
+        // curl-proven, see automata-private/cara.app/AGENTS.md) - their
         // modes stay factual GetModes chips on their OWN grids, like bing/SD's
         // Daily/Minimal.
         public static readonly string[] CategoryExcludedPlatforms =
         {
             Wallhaven,
             Pixiv,
+            Cara,
             Bing,
             SimpleDesktops,
         };

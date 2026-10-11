@@ -1318,3 +1318,36 @@ category surface, same doctrine as bing/SD/wallhaven:
   (live index, now 63) and the wallhaven section's pending note that
   "the categories probe's expected Global count (294) needs updating"
   (discharged here: 290).
+
+### cara category-rejected (2026-10-11)
+
+user verdict on audit #14: cara is a FEED-ONLY surface - `/explore` is a
+single SSR feed (~65 posts, no pagination), `/trending/*` are sort tabs on
+that same feed, and every `/collections`, `/tags/*`, `/tag/*`, `/hashtags`,
+`/explore/<x>` route 404s; the hashtags on posts are plain-text UGC (~106
+unique per page, pixiv-class) with zero tag/topic/genre hrefs in the HTML
+(curl-proven, see automata-private/cara.app/AGENTS.md) - rejected from every
+category surface, same doctrine as bing/SD/wallhaven/pixiv:
+
+- `CategoryExcludedPlatforms` = {Wallhaven, Pixiv, Cara, Bing,
+  SimpleDesktops}. cara was never in the slideshow checklist universe (the
+  catalog has no cara `AddPlatform` line), so the universe stays **255
+  names**; only the Categories page changed: scope menu 13 -> 12, and cara's
+  1 mode card left the merged grid. `GetModes(Cara)` still returns
+  `["Explore"]` on purpose (the bing/SD `Daily`/`Minimal` precedent - cara's
+  OWN grid chip stays factual), and cara is not in the user's 9-platform
+  slideshow config (loud-skip count stays 3).
+- counts: Global **290 -> 289** (`Explore` was cara-exclusive - source grep
+  proved no other GetModes arm returns it).
+- probe updated (`C:\tmp\aura-categoryexclusion.ps1`): floor 290 -> 289 with
+  the drift arithmetic in the comment, rejected list += `Explore`.
+- verified menuless 2026-10-11: cards=289 OK, all 6 rejected names gone
+  (`Daily` `Minimal` `General` `Wallpaper` `Landscape` `Explore`), 11 spot
+  names present, alpha `Vehicle` drill 15 items + title + bar clean (vision:
+  4 real car tiles, no error banners), back rebuilds + 6x5s watch. the back
+  landed on the Home/picker again (`scope ABSENT`, `picker=True`) = the
+  KNOWN back-lands-on-Home anomaly (now seen 3 times, root cause open,
+  pre-existing - re-navigating to Categories works). settings restored
+  exact (Category / All categories / 1 Minutes / 9 platforms, backup file
+  removed) + app relaunched visible on Categories.
+- supersessions: the pixiv section's scope-menu count (13 -> 12).
