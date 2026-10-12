@@ -199,6 +199,120 @@ namespace Aura.Services
             return firstTag;
         }
 
+        // ---- history pill enrichment: per-item category lookups (registry ItemCategory) ----
+        // one resolver per platform whose LATEST feed carries no usable category but whose
+        // OWN item page does. the slideshow runs it once per APPLIED wallpaper (1 fetch per
+        // tick, 60s apart - far under every host's rate limit) right before AddEntry.
+        // contract: return the item's own first real value; "" = the page genuinely carries
+        // none (honest no-pill, logged as `category: none`); throw = lookup failed (logged).
+        // never a failed apply, never a guessed pill.
+
+        // pexels: the API photo object has no category field, but the photo PAGE ships its
+        // tags in <meta name="keywords"> ("Gradients, Green Gradient, ..." - verified live
+        // across 4 photos 2026-10-12). transport = the same sanctioned full-browser-header
+        // curl path every other www.pexels.com HTML fetch uses (GetPexelsHtmlAsync).
+        public async Task<string> GetPexelsItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("pexels item url is empty - cannot look up its keywords", nameof(itemUrl));
+            }
+
+            var html = await GetPexelsHtmlAsync(itemUrl, cancellationToken);
+
+            // attribute order can flip - name-first, then content-first
+            var keywords = Regex.Match(html, "<meta\\s+name=\"keywords\"\\s+content=\"(?<v>[^\"]+)\"",
+                RegexOptions.IgnoreCase).Groups["v"].Value;
+            if (string.IsNullOrEmpty(keywords))
+            {
+                keywords = Regex.Match(html, "<meta\\s+content=\"(?<v>[^\"]+)\"\\s+name=\"keywords\"",
+                    RegexOptions.IgnoreCase).Groups["v"].Value;
+            }
+
+            if (string.IsNullOrEmpty(keywords))
+            {
+                throw new InvalidOperationException(
+                    $"no keywords meta on {itemUrl} - pexels photo markup may have changed (or the page challenged)");
+            }
+
+            var firstTag = keywords.Split(',')[0].Trim();
+            if (string.IsNullOrEmpty(firstTag))
+            {
+                throw new InvalidOperationException($"empty first keyword in the meta of {itemUrl}");
+            }
+
+            return firstTag;
+        }
+
+        // digital blasphemy: feeds carry no category, but every item page lists the site's
+        // own product tags as rel="tag" anchors - the FIRST is always the year ("2026"),
+        // so years are skipped and the first real tag is the theme ("Autumn" on
+        // /sec/autumnwood2k262/ - verified live 2026-10-12). the nav dropdown also links
+        // product-tag pages but carries no rel="tag", so it can never match. plain .NET
+        // fetch, same transport as the feed.
+        public async Task<string> GetDigitalBlasphemyItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("digital blasphemy item url is empty - cannot look up its tags", nameof(itemUrl));
+            }
+
+            var html = await _httpClient.GetStringAsync(itemUrl, cancellationToken);
+            var tags = Regex.Matches(
+                html,
+                "<a(?=[^>]*href=\"https://digitalblasphemy\\.com/product-tag/[^\"]+\")(?=[^>]*\\brel=\"tag\")[^>]*>(?<t>.*?)</a>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match tag in tags)
+            {
+                var value = WebUtility.HtmlDecode(Regex.Replace(tag.Groups["t"].Value, "<[^>]+>", string.Empty)).Trim();
+                if (string.IsNullOrEmpty(value) || Regex.IsMatch(value, "^\\d{4}$"))
+                {
+                    continue;
+                }
+
+                return value;
+            }
+
+            throw new InvalidOperationException(
+                $"no non-year product-tag anchors on {itemUrl} - digital blasphemy item markup may have changed");
+        }
+
+        // wallpaper cave: feeds carry no category, but each item page's breadcrumb root IS
+        // the site's taxonomy ("Devices" / "Screen" / "Games" - the first
+        // <span itemprop="name"> inside #breadcrumbs; Home uses a <meta> so it never
+        // matches). the breadcrumb is the ONLY per-item category signal on the site
+        // (metas/description/JSON-LD carry none - curl-diffed 2026-10-12), and the
+        // site only assigns it to SOME uploads: 18 of 53 items on the current
+        // /wallpapers feed ship a populated nav, 34 ship it PRESENT but EMPTY
+        // (<nav id="breadcrumbs"> </nav>, uncategorized uploads) - that is honest
+        // no-pill on those rows, never a guess; a missing nav = markup drift = thrown.
+        public async Task<string> GetWallpaperCaveItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("wallpaper cave item url is empty - cannot read its breadcrumbs", nameof(itemUrl));
+            }
+
+            var html = await _httpClient.GetStringAsync(itemUrl, cancellationToken);
+            var nav = Regex.Match(html, "<nav id=\"breadcrumbs\"[^>]*>(?<bc>.*?)</nav>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            if (!nav.Success)
+            {
+                throw new InvalidOperationException(
+                    $"no breadcrumbs nav on {itemUrl} - wallpaper cave item markup may have changed");
+            }
+
+            var crumb = Regex.Match(nav.Groups["bc"].Value, "<span itemprop=\"name\">(?<n>[^<]+)</span>",
+                RegexOptions.IgnoreCase);
+            if (!crumb.Success)
+            {
+                return string.Empty;
+            }
+
+            return WebUtility.HtmlDecode(crumb.Groups["n"].Value).Trim();
+        }
+
         // pexels categories = the site's own Wallpapers discover index
         // (https://www.pexels.com/discover/wallpapers/ - the __NEXT_DATA__
         // props.pageProps.topics[] array: 9 topics of search-term pills, each
@@ -561,6 +675,8 @@ namespace Aura.Services
         //   fetch routing           -> GetWallpapersAsync() (the row's Fetch delegate)
         //   live index error lines  -> HasLiveIndex()
         //   thumbnail gate          -> NeedsSoloThumbGate() (solo = 1-wide fill, else 4-wide)
+        //   history pill lookup     -> GetItemCategoryResolver() (the row's ItemCategory
+        //                              delegate; null = no per-item category source)
         //
         // kinds: Planned = listed in the picker but not built yet (7 WAF-walled + 2 needing
         // credentials, see the picker's not-implemented dialog); Local = owns its own service
@@ -594,6 +710,13 @@ namespace Aura.Services
 
             // null = not fetchable here (Local/Planned) - GetWallpapersAsync throws for it
             public Func<PublicWallpaperService, int, string, CancellationToken, Task<List<WallpaperItem>>>? Fetch;
+
+            // null = no per-item category source for this platform (its rows pill from a
+            // parse-time stamp or its own service's source tag). non-null = the slideshow's
+            // pre-AddEntry enrichment fetches the applied item's OWN category through it:
+            // return the first real value, "" = the page genuinely carries none, throw =
+            // the lookup failed - both are honest no-pills, logged, never a failed apply.
+            public Func<PublicWallpaperService, string, Task<string>>? ItemCategory;
         }
 
         private static readonly PlatformSpec[] PlatformRegistry =
@@ -652,7 +775,9 @@ namespace Aura.Services
                 LiveIndex = true,
                 Description = "The site's own discover/wallpapers search terms, live-loaded. Add a Pexels API key in Settings.",
                 Modes = () => PexelsDiscoverTerms.Select(term => term.Term).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetPexelsWallpapersAsync(page, mode, ct)
+                Fetch = (svc, page, mode, ct) => svc.GetPexelsWallpapersAsync(page, mode, ct),
+                // API photos carry no category field - the photo page's keywords meta does
+                ItemCategory = (svc, url) => svc.GetPexelsItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -664,7 +789,9 @@ namespace Aura.Services
                 SoloThumbGate = true,
                 Description = "Pixabay's curated collections, live from pixabay.com/collections (no key needed).",
                 Modes = () => PixabayCollections.Select(collection => collection.Name).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetPixabayWallpapersAsync(page, mode, ct)
+                Fetch = (svc, page, mode, ct) => svc.GetPixabayWallpapersAsync(page, mode, ct),
+                // search JSON-LD is title+url only - the detail page's ImageObject keywords tag
+                ItemCategory = (svc, url) => svc.GetPixabayItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -682,7 +809,9 @@ namespace Aura.Services
                 CategoryCapable = true,
                 Description = "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
                 Modes = () => DigitalBlasphemyModes.Select(category => category.Title).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetDigitalBlasphemyWallpapersAsync(page, mode, ct)
+                Fetch = (svc, page, mode, ct) => svc.GetDigitalBlasphemyWallpapersAsync(page, mode, ct),
+                // feeds carry no category - the item page's product-tag links do (year skipped)
+                ItemCategory = (svc, url) => svc.GetDigitalBlasphemyItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -720,7 +849,9 @@ namespace Aura.Services
                 CategoryCapable = true,
                 Description = "Curated albums from Wallpaper Cave (single-shot album pages).",
                 Modes = () => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetWallpaperCaveWallpapersAsync(page, mode, ct)
+                Fetch = (svc, page, mode, ct) => svc.GetWallpaperCaveWallpapersAsync(page, mode, ct),
+                // feeds carry no category - the item page's breadcrumb root does
+                ItemCategory = (svc, url) => svc.GetWallpaperCaveItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -772,7 +903,10 @@ namespace Aura.Services
                 Kind = PlatformKind.Local,
                 CategoryCapable = true,
                 LiveIndex = true,
-                Description = "ArtStation's own channels directory, loaded live from its community index."
+                Description = "ArtStation's own channels directory, loaded live from its community index.",
+                // projects.json hits carry no category - the project's own detail JSON does
+                // (curl-only); Local only means Fetch is null, the pill lookup still lives here
+                ItemCategory = (svc, url) => new ArtStationService().GetItemCategoryAsync(url)
             },
 
             // ---- planned: named in the picker, not built yet --------------------------------
@@ -947,6 +1081,16 @@ namespace Aura.Services
         {
             var description = FindPlatform(platformName)?.Description;
             return string.IsNullOrEmpty(description) ? "Browse wallpapers from this source." : description;
+        }
+
+        // the slideshow's pre-AddEntry pill enrichment reads the row's ItemCategory
+        // delegate through this: null = this platform has no per-item lookup (nothing
+        // to fetch - its rows keep whatever the feed/parse-time stamp recorded), a
+        // resolver = the fetch + 3-shape log contract in
+        // SlideshowService.EnrichItemCategoryAsync (value / none / failed).
+        public static Func<PublicWallpaperService, string, Task<string>>? GetItemCategoryResolver(string? platformName)
+        {
+            return FindPlatform(platformName)?.ItemCategory;
         }
 
         public async Task<List<WallpaperItem>> GetWallpapersAsync(
@@ -1191,6 +1335,11 @@ namespace Aura.Services
                     continue;
                 }
 
+                // the LATEST feed's entities all carry the site's own label ("Bing
+                // Wallpaper" on 20/20 sampled 2026-10-12) - stamp it at parse time, zero
+                // fetch. collection items stay unstamped so the wrapper's tick label wins.
+                var category = string.IsNullOrWhiteSpace(collectionId) ? GetString(item, "label") : string.Empty;
+
                 wallpapers.Add(new WallpaperItem
                 {
                     Id = id,
@@ -1199,6 +1348,7 @@ namespace Aura.Services
                     ImageUrl = thumbnail,
                     FullPhotoUrl = string.IsNullOrWhiteSpace(full) ? thumbnail : full,
                     SourceUrl = sourceUrl,
+                    Category = category,
                     Likes = string.Empty,
                     Downloads = GetString(item, "downloads", string.Empty),
                     Resolution = string.IsNullOrWhiteSpace(resolution) ? resolutionLabel : resolution,
@@ -1576,9 +1726,22 @@ namespace Aura.Services
 
                 var full = thumb;
                 var detail = Regex.Match(href, "/(?<cat>[^/]+)/(?<slug>[a-z0-9-]+)-wallpaper-(?<id>\\d+)\\.htm$");
+                var category = string.Empty;
                 if (detail.Success)
                 {
                     full = $"https://www.hdwallpapers.net/previews/{detail.Groups["slug"].Value}-{detail.Groups["id"].Value}.jpg";
+
+                    // the href's first path segment IS the site's own category slug ("3d",
+                    // "nature", "city-and-architecture" - live across the latest feed
+                    // 2026-10-12) - stamp it at parse time, zero fetch. "latest-wallpapers"
+                    // is OUR feed slug, not a category, so it stays empty (= no pill).
+                    var catSlug = detail.Groups["cat"].Value;
+                    if (!catSlug.Equals("latest-wallpapers", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var catMode = HdwallpapersModes
+                            .FirstOrDefault(entry => entry.Slug.Equals(catSlug, StringComparison.OrdinalIgnoreCase));
+                        category = string.IsNullOrEmpty(catMode.Title) ? catSlug : catMode.Title;
+                    }
                 }
 
                 wallpapers.Add(new WallpaperItem
@@ -1589,6 +1752,7 @@ namespace Aura.Services
                     ImageUrl = thumb,
                     FullPhotoUrl = full,
                     SourceUrl = href,
+                    Category = category,
                     Likes = string.Empty,
                     Downloads = string.Empty,
                     IsAI = false

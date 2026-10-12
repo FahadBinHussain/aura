@@ -1728,3 +1728,56 @@ per site - and every platform surface derives from it.
   `category basis skip - `) are stable, the values are not.
   picker note: any future picker probe must look for `AlphaCoders`, not the
   old display spelling `Alpha Coders`.
+
+### history pills for every platform: per-item resolvers + parse stamps (2026-10-12)
+
+user ask: "why some times dont have category card in history. this is breaking symmetry" - rows from
+Wallpaper Cave / Digital Blasphemy / ArtStation / Pexels / WallpaperHub / HDwallpapers carried no
+orange pill (pixabay's detail-page resolver had shipped earlier the same day).
+
+- registry: `PlatformSpec` gained a 7th field `ItemCategory`
+  (`Func<PublicWallpaperService, string, Task<string>>?` - null = platform has no per-item lookup),
+  read through the public `GetItemCategoryResolver(platformName)`. contract: return the REAL value;
+  `""` = the page genuinely carries none (honest no-pill); THROW = lookup failed (loud
+  `item category lookup failed - <title>: <reason>` log line). never a failed apply over a cosmetic
+  tag, never a guessed pill.
+- resolver rows (5): pexels = photo-page `<meta name="keywords">` first comma value through
+  `GetPexelsHtmlAsync`; digital blasphemy = item-page `rel="tag"` product-tag anchors (skip
+  `^\d{4}$` years) on plain `_httpClient`; wallpaper cave = first `<span itemprop="name">` inside
+  `<nav id="breadcrumbs">` (nav missing = throw, nav-present-but-empty = ""); artstation = Local row
+  -> `new ArtStationService().GetItemCategoryAsync(url)` (new `ProjectDetailHeaders` const = the
+  shared curl-only header triple; permalink last segment = hash_id -> `categories[0].name` ->
+  `mediums[0].name` -> throw); pixabay keeps its detail-page resolver.
+- parse stamps (zero fetch): hdwallpapers = the item href's `cat` slug -> `HdwallpapersModes` Title
+  (skip `latest-wallpapers`; unknown slug verbatim); wallpaperhub = the feed entity's `label`,
+  stamped ONLY when `collectionId` is empty (latest feed = Bing-mirror label e.g. `Bing Wallpaper`;
+  a ticked collection keeps its tick pill).
+- `SlideshowService.EnrichItemCategoryAsync` (replaces `EnrichPixabayCategoryAsync`) runs at BOTH
+  apply arms (desktop + lock); guard = resolver null OR `NormalizeCategory` non-empty -> skip; 3
+  log shapes: `<platform> item category: <v> (<title>)` / `... : none (<title>)` /
+  `... lookup failed - <title>: <reason>`.
+- **wallpaper cave distribution (curl-proven over the 53-item `/wallpapers` feed)**: the breadcrumb
+  root is the site's ONLY per-item category signal (metas/JSON-LD carry none - diffed) and the site
+  assigns it to SOME uploads only: 18 populated navs, 34 PRESENT-but-EMPTY
+  (`<nav id="breadcrumbs"> </nav>` = uncategorized upload), 0 missing. wcave rows therefore pill on
+  ~1/3 of applies and honestly stay blank on the rest - never guessed. the resolver's comment
+  carries the numbers.
+- probe (stays in C:\tmp): `aura-pillfill.ps1` (6 single-platform mini-runs, pure file polling:
+  app.log offsets + history rows by Timestamp, focus restored whenever a launch steals it) and
+  `aura-pillfill2.ps1` (wcave retry, 540s cap across ticker draws + paced final-relaunch retries
+  for the known silent exit=0 death). results: leg 1 = 5/6 PASS (ArtStation `Graphic Design`,
+  Pexels `Shadows`, Digital Blasphemy `Abstracts`, HDwallpapers `Abstract`, WallpaperHub
+  `Bing Wallpaper`); leg 2 wcave false-failed on a PROBE bug - its value-line regex matched the
+  OLDEST enrich line (an honest `none`), so a real pill could never pass - while ground truth proved
+  it twice: history rows `Devices` (#5) + `Nature` (#29), and the SAME item #5 applied at 17:15 by
+  the old build = `cat=''` (before/after on one item). ZERO `lookup failed` lines across both legs;
+  after byte-exact settings restore (sha256 match) + relaunch the user's real 10-platform config
+  loaded `Loaded 381 wallpapers from 10 platform(s) (1 failed)` (the known DesktopNexus 403) and its
+  own ticker kept enriching live (DB `Day Scenes`, Pexels `Newspaper`, Pixabay `Seamless`).
+  probe lesson: assert enrich VALUES by finding a non-`none` match, never the first match - and
+  probe launch steals focus on this box every time (restore at every heartbeat, assert at end).
+- old pill-less rows are not re-labeled (recovery never guesses) - the 200-row cap rolls them out;
+  every row created from now on carries what its source knows.
+- supersessions: the pixabay pill section's "wallpaperhub/pexels/artstation absence stands" line
+  (all three have a real source now), and the history-pill section's "pixabay/pexels/artstation/
+  wallpaperhub never do" line.

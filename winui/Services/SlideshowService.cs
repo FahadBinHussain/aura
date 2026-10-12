@@ -800,28 +800,24 @@ namespace Aura.Services
             }
         }
 
-        // All-categories/Latest pill enrichment (2026-10-12): pixabay's latest feed
-        // carries no per-item category (its search JSON-LD is title+url only), so
-        // every pixabay history row stayed pill-less while backiee rows pill'd their
-        // ThemeCat. the item's own detail page DOES carry pixabay's tag list - look
-        // it up ONCE per applied wallpaper (1 fetch per tick, 60s apart) and tag the
-        // item with its FIRST tag before AddEntry. items that already carry a
-        // category (collection ticks) and non-pixabay platforms are untouched; a
-        // lookup failure is logged and the pill stays honestly empty (the wallpaper
-        // itself already applied - never fail the apply over a cosmetic tag).
-        private async Task EnrichPixabayCategoryAsync(WallpaperItem wallpaper)
+        // per-item pill enrichment (registry ItemCategory - supersedes the pixabay-only
+        // version 2026-10-12): every platform whose LATEST feed carries no per-item
+        // category but whose OWN item page does resolves it ONCE per applied wallpaper
+        // (1 fetch per tick, 60s apart - far under each host's rate limit) before
+        // AddEntry, so history rows show the item's real category instead of a gap.
+        // NormalizeCategory stays the guard that tells fetch context (a mode label -
+        // replace) from a REAL category (a tick or a parse-time stamp - keep). "" from
+        // the resolver = the page genuinely carries none, a throw = the lookup failed -
+        // both are logged and the pill stays honestly empty (the wallpaper itself
+        // already applied - never fail the apply over a cosmetic tag).
+        private async Task EnrichItemCategoryAsync(WallpaperItem wallpaper)
         {
-            if (!string.Equals(wallpaper.Platform, "Pixabay", StringComparison.OrdinalIgnoreCase)
-                || string.IsNullOrWhiteSpace(wallpaper.SourceUrl))
+            var resolver = PublicWallpaperService.GetItemCategoryResolver(wallpaper.Platform);
+            if (resolver == null || string.IsNullOrWhiteSpace(wallpaper.SourceUrl))
             {
                 return;
             }
 
-            // the public loader stamps a MODE label ("latest" - fetch context) onto
-            // every item, so an IsNullOrWhiteSpace check would skip EVERY pixabay
-            // item. NormalizeCategory is the one choke point that tells that label
-            // from a REAL category - a collection tick ("Halloween") must keep its
-            // tick, a mode label gets replaced by the item's own first tag.
             if (!string.IsNullOrEmpty(WallpaperHistoryService.NormalizeCategory(wallpaper.Platform, wallpaper.Category)))
             {
                 return;
@@ -829,13 +825,19 @@ namespace Aura.Services
 
             try
             {
-                var category = await new PublicWallpaperService().GetPixabayItemCategoryAsync(wallpaper.SourceUrl);
+                var category = (await resolver(new PublicWallpaperService(), wallpaper.SourceUrl))?.Trim();
+                if (string.IsNullOrEmpty(category))
+                {
+                    LogInfo($"{wallpaper.Platform} item category: none ({wallpaper.Title})");
+                    return;
+                }
+
                 wallpaper.Category = category;
-                LogInfo($"pixabay item category: {category} ({wallpaper.Title})");
+                LogInfo($"{wallpaper.Platform} item category: {category} ({wallpaper.Title})");
             }
             catch (Exception ex)
             {
-                LogInfo($"pixabay item category lookup failed - {wallpaper.Title}: {ex.Message}");
+                LogInfo($"{wallpaper.Platform} item category lookup failed - {wallpaper.Title}: {ex.Message}");
             }
         }
 
@@ -946,7 +948,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
-                    await EnrichPixabayCategoryAsync(wallpaper);
+                    await EnrichItemCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
@@ -1247,7 +1249,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
-                    await EnrichPixabayCategoryAsync(wallpaper);
+                    await EnrichItemCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event

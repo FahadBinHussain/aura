@@ -11,6 +11,19 @@ namespace Aura.Services
     public sealed class ArtStationService
     {
         private const string BaseUrl = "https://www.artstation.com";
+
+        // curl-only transport for /projects/<hash>.json - Cloudflare fingerprints the TLS
+        // client there: the endpoint 403s SocketsHttpHandler (with or without full browser
+        // headers) while curl passes (side-by-side proof 2026-10-09), and the Sec-Fetch
+        // pair is REQUIRED (bare curl = a CF challenge page that looks like JSON); fail is
+        // loud = curl exit code + stderr thrown. shared by the detail refetch and the
+        // history-pill category lookup.
+        private static readonly string[] ProjectDetailHeaders =
+        {
+            "Accept: application/json,text/plain,image/*,*/*",
+            "Sec-Fetch-Mode: cors",
+            "Sec-Fetch-Site: same-origin"
+        };
         private readonly HttpClient _httpClient;
 
         public ArtStationService()
@@ -169,18 +182,8 @@ namespace Aura.Services
             }
 
             var url = $"{BaseUrl}/projects/{Uri.EscapeDataString(wallpaper.Id)}.json";
-            // Cloudflare fingerprints the TLS client here: /projects/<hash>.json 403s
-            // SocketsHttpHandler (with or without full browser headers) while curl passes
-            // (side-by-side proof 2026-10-09) - same class as pixabay/cara/pexels, so this
-            // fetch is curl-only, not a fallback. the Sec-Fetch pair is REQUIRED (bare curl
-            // = a CF challenge page); fail is loud = curl exit code + stderr thrown.
-            var json = await CurlClient.GetStringAsync(url, cancellationToken,
-                new[]
-                {
-                    "Accept: application/json,text/plain,image/*,*/*",
-                    "Sec-Fetch-Mode: cors",
-                    "Sec-Fetch-Site: same-origin"
-                });
+            // (see ProjectDetailHeaders above for the fingerprint proof)
+            var json = await CurlClient.GetStringAsync(url, cancellationToken, ProjectDetailHeaders);
 
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
@@ -209,6 +212,61 @@ namespace Aura.Services
             }
 
             return wallpaper;
+        }
+
+        // history-pill enrichment (registry ItemCategory): the project's OWN category
+        // from its detail JSON - categories[].name first ("Concept Art", "Fashion &
+        // Costume Design", ... on ~5/8 latest hits), mediums[].name as the honest
+        // fallback when the project lists no category ("Digital 3D", ... - both proven
+        // live 2026-10-12). itemUrl = the project's permalink; its LAST segment is the
+        // hash_id this endpoint wants (artwork/KR3nPy -> /projects/KR3nPy.json, curl-
+        // proven 2026-10-12). a published project carrying NEITHER is thrown (honest -
+        // the caller logs it and the pill stays empty, never guessed).
+        public async Task<string> GetItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("artstation item url is empty - cannot look up its category", nameof(itemUrl));
+            }
+
+            var path = itemUrl.Split(new[] { '?' }, 2)[0].TrimEnd('/');
+            var lastSlash = path.LastIndexOf('/');
+            var hash = lastSlash >= 0 && lastSlash < path.Length - 1 ? path.Substring(lastSlash + 1) : path;
+            if (string.IsNullOrWhiteSpace(hash) || hash.Equals("artwork", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException(
+                    $"no project hash in {itemUrl} - artstation permalink markup may have changed");
+            }
+
+            var url = $"{BaseUrl}/projects/{Uri.EscapeDataString(hash)}.json";
+            var json = await CurlClient.GetStringAsync(url, cancellationToken, ProjectDetailHeaders);
+
+            using var document = JsonDocument.Parse(json);
+            var root = document.RootElement;
+            foreach (var key in new[] { "categories", "mediums" })
+            {
+                if (!root.TryGetProperty(key, out var entries) || entries.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var entry in entries.EnumerateArray())
+                {
+                    if (entry.ValueKind == JsonValueKind.Object &&
+                        entry.TryGetProperty("name", out var name) &&
+                        name.ValueKind == JsonValueKind.String)
+                    {
+                        var value = name.GetString()?.Trim();
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"no categories or mediums in the project JSON of {itemUrl} - artstation detail markup may have changed");
         }
 
         public async Task<byte[]> GetImageBytesAsync(string imageUrl, CancellationToken cancellationToken = default)
