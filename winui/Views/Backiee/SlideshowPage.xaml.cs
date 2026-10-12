@@ -910,6 +910,21 @@ namespace Aura.Views.Backiee
                 checklistScroll.Visibility = listReady ? Visibility.Visible : Visibility.Collapsed;
                 bool showStatus = categoryBasis && checklistState != "Ready";
                 checklistStatus.Visibility = showStatus ? Visibility.Visible : Visibility.Collapsed;
+
+                // category-rejected sites (the shared CategoryExcludedPlatforms
+                // list) VANISH from Select Platforms the moment basis =
+                // Category (user ask 2026-10-12): a category run can never use
+                // them - the loader only produces the loud "categoryless
+                // platform" skip - so showing them ticked there invites "why
+                // is this wired to a category slideshow". Collapsed keeps
+                // their Latest-basis tick for the session; the Category SAVE
+                // drops them from the saved platform list (collect block).
+                foreach (var box in platformChecks)
+                {
+                    box.Visibility = categoryBasis && PublicWallpaperService.IsCategoryExcluded(box.Content as string)
+                        ? Visibility.Collapsed
+                        : Visibility.Visible;
+                }
             }
 
             basisCategory.Checked += (s, e) => { ApplyBasisVisibility(); _ = EnsureChecklistAsync(); };
@@ -966,6 +981,20 @@ namespace Aura.Views.Backiee
                     selectedPlatforms.Add("Pexels");
                 if (platformCheckBoxPixabay.IsChecked == true)
                     selectedPlatforms.Add("Pixabay");
+
+                // a Category save cannot carry rejected sites (their boxes are
+                // collapsed-but-ticked right now; on the saved list they would
+                // only ever produce the loud loader skip) - drop them here so
+                // the run + status line reflect what Category can actually use.
+                if (basisCategory.IsChecked == true)
+                {
+                    var dropped = selectedPlatforms.FindAll(PublicWallpaperService.IsCategoryExcluded);
+                    if (dropped.Count > 0)
+                    {
+                        selectedPlatforms.RemoveAll(PublicWallpaperService.IsCategoryExcluded);
+                        LogInfo($"category basis drops rejected platforms: {string.Join(", ", dropped)}");
+                    }
+                }
 
                 LogInfo($"Set button clicked. Selected platforms: {string.Join(", ", selectedPlatforms)}");
 

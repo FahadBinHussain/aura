@@ -1548,3 +1548,46 @@ simple desktops, wallhaven, pixiv, cara, wallpaper engine, artgram).
 - supersessions: the history-pill section's "known-vs-unknown today" line -
   pixabay now pills under Latest + All-categories; wallpaperhub/pexels/
   artstation absence stands (payload proofs above).
+
+### category-rejected platforms vanish from the Set dialog under Category (2026-10-12)
+
+user ask (with screenshot): "the moment i select category here, those rejected
+sites should disappear" - the Set-slideshow dialog's Select Platforms checklist
+kept showing Wallhaven / Bing Wallpaper Archive / Simple Desktops ticked under
+basis = Category even though a category run can only ever LOUD-skip them (the 3
+amber skip lines).
+
+- `ApplyBasisVisibility` (SlideshowPage dialog) now also collapses every platform
+  checkbox whose display name is in the shared
+  `PublicWallpaperService.IsCategoryExcluded` list (dynamic - any future reject
+  needs no dialog change) while basis = Category; flipping back to Latest restores
+  them WITH their ticks (Collapsed preserves IsChecked). the dialog builds exactly
+  9 platform checkboxes; of the 7 rejected sites only those 3 appear here (pixiv/
+  cara/wallpaper engine/artgram were never in this dialog).
+- a Category SAVE drops them from the saved platform list too (collect block +
+  `category basis drops rejected platforms: ...` log line) - so the run + status
+  reflect only what Category can use: `6 platforms - Category: All categories`,
+  no skip lines, post-Set load clean. a later Latest save shows the 3 boxes
+  UNTICKED (visible + retickable - saving under Category = they left the run on
+  purpose; their tick was never silently kept in the saved list).
+- the loader's LOUD `categoryless platform` skip is untouched and still fires for
+  a PRE-EXISTING 9-platforms+Category config (one saved before this change) - the
+  next save from the new dialog self-heals it. supersession: the basis section's
+  "bing/SD = LOUD skip" line becomes legacy-state-only.
+- verified menuless 2026-10-12 (probe `C:\tmp\aura-platformrejection.ps1`, stays
+  in C:\tmp): full PASS - dialog opened on the saved Category basis shows 6 boxes
+  (all 3 rejected absent), Latest flip brings them back, Category flip drops them
+  again, checklist reaches Ready, Set -> log drop line + settings
+  `[Backiee, AlphaCoders, ArtStation, WallpaperHub, Pexels, Pixabay]` basis
+  Category + status exact `6 platforms - Category: All categories (Refresh: 1
+  Minutes)` + load with 0 failed platforms, then byte-exact settings restore +
+  relaunch back to `9 platforms - Category: All categories (Refresh: 1 Minutes)`
+  exact with the legacy loud skip lines still firing. vision (zengate, captured
+  mid-dialog): exactly the 6 capable boxes all ticked, Category radio selected,
+  zero rejected names, no error banners. probe traps: (1) both card toolbars sit
+  at the SAME y (desktop left / lock right), so a y-only grouping sees 8 buttons
+  and never matches - split x-runs by gap > 100 first (topmost-leftmost run,
+  x-sorted index 2 = Edit = Expand/Next/Edit/Schedule); (2) `Get-Content -Tail N
+  -Raw` is an invalid combination; (3) the restored-state loud-skip assert must
+  POLL (skip lines land only after the startup load). flat-build rule applies
+  (no `-p:Platform`, assert `bin\Debug\Aura.exe` freshness).
