@@ -28,6 +28,13 @@ namespace Aura.Services
         private const string WallpaperEngine = "Wallpaper Engine";
         private const string Artgram = "Artgram";
 
+        // the three LOCAL platforms (their own services + pages). they sit in the
+        // same registry as the public ones below, so every platform list in the
+        // app is built from ONE table
+        private const string Backiee = "Backiee";
+        private const string AlphaCoders = "AlphaCoders";
+        private const string ArtStation = "ArtStation";
+
         // pixabay categories = the site's curated Collections index
         // (https://pixabay.com/collections/ - 2 pages: pagi=1 = 40 + pagi=2 = 23 = 63
         // collections; TRAP: ?pagi>=3 silently WRAPS to page 1, so the index loader
@@ -538,22 +545,250 @@ namespace Aura.Services
             "Trending", "Latest", "Oldest"
         };
 
-        private static readonly HashSet<string> SupportedPlatforms = new(StringComparer.OrdinalIgnoreCase)
+        // ===== platform registry =============================================================
+        // THE single list: one row per site the app knows about. adding a platform is ONE row
+        // here - every platform surface below derives from it, so no other file needs a list,
+        // a switch arm, or a name literal:
+        //   picker grid             -> GetPickerPlatformNames()
+        //   not-implemented dialog  -> IsImplementedPlatform() + GetImplementedPlatformNames()
+        //   Set-slideshow boxes     -> GetImplementedPlatformNames()
+        //   Categories scope menu   -> GetCategoryPlatformNames()
+        //   category rejection      -> IsCategoryExcluded() (an implemented row with
+        //                              CategoryCapable = false is the whole change)
+        //   merged cards + ticks    -> GetSupportedPlatformNames() + IsCategoryExcluded()
+        //   grid chips / fetch keys -> GetModes()
+        //   grid description        -> GetPlatformDescription()
+        //   fetch routing           -> GetWallpapersAsync() (the row's Fetch delegate)
+        //   live index error lines  -> HasLiveIndex()
+        //   thumbnail gate          -> NeedsSoloThumbGate() (solo = 1-wide fill, else 4-wide)
+        //
+        // kinds: Planned = listed in the picker but not built yet (7 WAF-walled + 2 needing
+        // credentials, see the picker's not-implemented dialog); Local = owns its own service
+        // and page, so its Fetch stays NULL - routing it through this service must fail LOUD
+        // with NotSupportedException; Public = fetched by the private fetcher below.
+        private enum PlatformKind { Planned, Local, Public }
+
+        private sealed class PlatformSpec
         {
-            Wallhaven,
-            Bing,
-            SimpleDesktops,
-            WallpaperHub,
-            Pexels,
-            Pixabay,
-            DesktopNexus,
-            DigitalBlasphemy,
-            Hdwallpapers,
-            Pixiv,
-            Cara,
-            WallpaperCave,
-            WallpaperEngine,
-            Artgram
+            public string Name = string.Empty;
+            public PlatformKind Kind;
+
+            // false = rejected from EVERY category surface (the per-site audit verdict, dated
+            // in each row): no scope menu entry, no merged cards, no checklist ticks, and a
+            // LOUD categoryless skip under the Category basis. its OWN grid chips stay
+            // factual - GetModes is never filtered by this flag.
+            public bool CategoryCapable;
+
+            // true = the Categories page fetches this platform's category INDEX live, so it
+            // feeds BuildMerged as an index source and its load errors show for its scope.
+            public bool LiveIndex;
+
+            // true = its thumbnail fills run alone through a 1-wide gate (a static, non
+            // thread-safe scrape cache or a rate-limited host) instead of the shared one.
+            public bool SoloThumbGate;
+
+            public string? Description;
+
+            // null = no modes here (Local/Planned platforms list categories in their own service)
+            public Func<IReadOnlyList<string>>? Modes;
+
+            // null = not fetchable here (Local/Planned) - GetWallpapersAsync throws for it
+            public Func<PublicWallpaperService, int, string, CancellationToken, Task<List<WallpaperItem>>>? Fetch;
+        }
+
+        private static readonly PlatformSpec[] PlatformRegistry =
+        {
+            // ---- public sources: fetched through this service ------------------------------
+            new PlatformSpec
+            {
+                Name = Wallhaven,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-10: general/anime/people is a content-type filter on
+                // search, not a category taxonomy
+                CategoryCapable = false,
+                Description = "Wallhaven's public JSON search, split into General / Anime / People categories.",
+                // the API's 3-bit mask (general/anime/people), automata wallhaven.cc/AGENTS.md
+                Modes = () => new[] { "General", "Anime", "People" },
+                Fetch = (svc, page, mode, ct) => svc.GetWallhavenWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Bing,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-09: proven zero taxonomy
+                CategoryCapable = false,
+                Description = "Recent daily Bing homepage wallpapers from Microsoft's public archive endpoint.",
+                // one honest entry so the platform's own grid has a default mode - it never
+                // becomes a category card (the rejection flag above)
+                Modes = () => new[] { "Daily" },
+                Fetch = (svc, page, mode, ct) => svc.GetBingWallpapersAsync(page, ct)
+            },
+            new PlatformSpec
+            {
+                Name = SimpleDesktops,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-09: proven zero taxonomy
+                CategoryCapable = false,
+                Description = "Minimal, distraction-free wallpapers from Simple Desktops.",
+                Modes = () => new[] { "Minimal" },
+                Fetch = (svc, page, mode, ct) => svc.GetSimpleDesktopWallpapersAsync(page, ct)
+            },
+            new PlatformSpec
+            {
+                Name = WallpaperHub,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                LiveIndex = true,
+                Description = "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
+                // live snapshot from the site's own Collections index (see the field above)
+                Modes = () => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetWallpaperHubWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Pexels,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                LiveIndex = true,
+                Description = "The site's own discover/wallpapers search terms, live-loaded. Add a Pexels API key in Settings.",
+                Modes = () => PexelsDiscoverTerms.Select(term => term.Term).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetPexelsWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Pixabay,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                LiveIndex = true,
+                // Cloudflare rate-limits rapid collection fetches (live 2026-10-08)
+                SoloThumbGate = true,
+                Description = "Pixabay's curated collections, live from pixabay.com/collections (no key needed).",
+                Modes = () => PixabayCollections.Select(collection => collection.Name).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetPixabayWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = DesktopNexus,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                Description = "15 category galleries plus All from Desktop Nexus's public browse pages.",
+                Modes = () => DesktopNexusCategories.Select(category => category.Title).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetDesktopNexusWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = DigitalBlasphemy,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                Description = "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
+                Modes = () => DigitalBlasphemyModes.Select(category => category.Title).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetDigitalBlasphemyWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Hdwallpapers,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                Description = "Latest feed plus 25 category listings from HDwallpapers.net.",
+                Modes = () => HdwallpapersModes.Select(category => category.Title).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetHdwallpapersWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Pixiv,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-11: 3 hand-picked search queries over unbounded UGC
+                CategoryCapable = false,
+                Description = "Safe-for-work illustrations from Pixiv's public search (restrict=safe, no key).",
+                Modes = () => PixivTags,
+                Fetch = (svc, page, mode, ct) => svc.GetPixivWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Cara,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-11: feed-only surface, every /collections|/tags route 404s
+                CategoryCapable = false,
+                Description = "Explore feed from the Cara art community's server-rendered page.",
+                Modes = () => new[] { "Explore" },
+                Fetch = (svc, page, mode, ct) => svc.GetCaraWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = WallpaperCave,
+                Kind = PlatformKind.Public,
+                CategoryCapable = true,
+                Description = "Curated albums from Wallpaper Cave (single-shot album pages).",
+                Modes = () => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetWallpaperCaveWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = WallpaperEngine,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-11: steam workshop's requiredtags axis is a filter over
+                // one flat upload pool, not a browsable taxonomy
+                CategoryCapable = false,
+                Description = "Wallpaper Engine's Steam Workshop browse pages with public preview images.",
+                Modes = () => WallpaperEngineModes,
+                Fetch = (svc, page, mode, ct) => svc.GetWallpaperEngineWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
+                Name = Artgram,
+                Kind = PlatformKind.Public,
+                // rejected 2026-10-12: one flat gallery feed with only a sortBy switch
+                CategoryCapable = false,
+                Description = "Trending, latest, and oldest gallery feeds from the Artgram art community (50 cards per page).",
+                Modes = () => ArtgramModes,
+                Fetch = (svc, page, mode, ct) => svc.GetArtgramWallpapersAsync(page, mode, ct)
+            },
+
+            // ---- local sources: their own service + their own page --------------------------
+            // their category lists live in their own live indexes (BackieeHtmlParser /
+            // AlphaCodersService.Categories / ArtStationService.Channels), so Modes stays
+            // null here - SlideshowCategoryCatalog resolves them directly.
+            new PlatformSpec
+            {
+                Name = Backiee,
+                Kind = PlatformKind.Local,
+                CategoryCapable = true,
+                LiveIndex = true,
+                Description = "Backiee's own wallpaper catalog, loaded from its categories page."
+            },
+            new PlatformSpec
+            {
+                Name = AlphaCoders,
+                Kind = PlatformKind.Local,
+                CategoryCapable = true,
+                LiveIndex = true,
+                // static, non thread-safe scrape cache in AlphaCodersService
+                SoloThumbGate = true,
+                Description = "AlphaCoders' own catalog, live from its real category index."
+            },
+            new PlatformSpec
+            {
+                Name = ArtStation,
+                Kind = PlatformKind.Local,
+                CategoryCapable = true,
+                LiveIndex = true,
+                Description = "ArtStation's own channels directory, loaded live from its community index."
+            },
+
+            // ---- planned: named in the picker, not built yet --------------------------------
+            // 7 are WAF/anti-bot walled (ArtFol, Behance, CGSociety,
+            // CharacterDesignReferences, Dribbble, NewGrounds, Peakpx) and 2 need credentials
+            // (Unsplash = API key with a hosting-terms caveat, DeviantArt = OAuth). a future
+            // port flips its row to Local/Public and fills it in - nothing else to touch.
+            new PlatformSpec { Name = "ArtFol", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "Behance", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "CGSociety", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "CharacterDesignReferences", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "DeviantArt", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "Dribbble", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "NewGrounds", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "Peakpx", Kind = PlatformKind.Planned },
+            new PlatformSpec { Name = "Unsplash", Kind = PlatformKind.Planned }
         };
 
         private readonly HttpClient _httpClient;
@@ -570,82 +805,136 @@ namespace Aura.Services
             _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
         }
 
+        // ---- registry queries: the one lookup + the lists everything else reads -------------
+        private static PlatformSpec? FindPlatform(string? platformName)
+        {
+            if (string.IsNullOrEmpty(platformName))
+            {
+                return null;
+            }
+
+            foreach (var spec in PlatformRegistry)
+            {
+                if (spec.Name.Equals(platformName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return spec;
+                }
+            }
+
+            return null;
+        }
+
+        // ordinal-ignore-case so the derived lists keep ONE deterministic order (it reproduces
+        // the hand-maintained picker order exactly, and a name's case can never split a list)
+        private static IReadOnlyList<string> Sorted(IEnumerable<string> names)
+        {
+            return names.OrderBy(name => name, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        // a public source - the only kind that routes through GetWallpapersAsync
         public static bool IsSupportedPlatform(string platformName)
         {
-            return SupportedPlatforms.Contains(platformName ?? string.Empty);
+            return FindPlatform(platformName)?.Kind == PlatformKind.Public;
+        }
+
+        // built (own service or public fetcher) - what the picker needs to tell apart a real
+        // destination from a not-implemented-yet row
+        public static bool IsImplementedPlatform(string? platformName)
+        {
+            var spec = FindPlatform(platformName);
+            return spec != null && spec.Kind != PlatformKind.Planned;
+        }
+
+        // the picker's grid: every row, planned ones included
+        public static IReadOnlyList<string> GetPickerPlatformNames()
+        {
+            return Sorted(PlatformRegistry.Select(spec => spec.Name));
+        }
+
+        // the Set-slideshow platform boxes, the scope-menu base and the not-implemented
+        // dialog's "Available now" line: everything with a working destination
+        public static IReadOnlyList<string> GetImplementedPlatformNames()
+        {
+            return Sorted(PlatformRegistry.Where(spec => spec.Kind != PlatformKind.Planned).Select(spec => spec.Name));
         }
 
         public static IReadOnlyList<string> GetSupportedPlatformNames()
         {
-            return SupportedPlatforms.OrderBy(platform => platform).ToList();
+            return Sorted(PlatformRegistry.Where(spec => spec.Kind == PlatformKind.Public).Select(spec => spec.Name));
         }
 
-        // taxonomy-less sites stay FULLY supported in the platform picker, but they
-        // are REJECTED from every category surface - the Categories page's scope menu
-        // + merged cards today, the slideshow category checklist when it lands. a
-        // category list built from them would be fake entries ("Daily"/"Minimal" are
-        // fetcher modes, not taxonomy). one dynamic list, consulted by the consumer:
-        // add a platform name here to reject it from the category universe without
-        // touching any page code (user decision 2026-10-09; bing/simpledesktops
-        // proven zero taxonomy in automata-private/<site>/AGENTS.md). wallhaven
-        // joined 2026-10-10 (user verdict: its general/anime/people checkboxes are
-        // a content-type filter on search, not a category taxonomy) and pixiv the
-        // same day (user verdict: its unbounded user-generated tag search has no
-        // curated taxonomy - the 3 shipped tags are hand-picked queries), and
-        // cara on 2026-10-11 (user verdict: feed-only surface - /explore is a
-        // single SSR feed, /trending/* are sort tabs, every /collections,
-        // /tags/*, /hashtags route 404s and the hashtags are plain-text UGC;
-        // curl-proven, see automata-private/cara.app/AGENTS.md), and wallpaper
-        // engine the same day (user verdict: steam workshop's requiredtags
-        // axis is a filter over one flat upload pool, not a browsable
-        // taxonomy - the declared tag vocabulary is upload plumbing), and
-        // artgram on 2026-10-12 (user verdict: the livewire gallery is one
-        // flat feed with only a sortBy switch - trending/latest/oldest are
-        // sorts, not taxonomy; automata-private/www.artgram.co/AGENTS.md) -
-        // their modes stay factual GetModes chips on their OWN grids, like
-        // bing/SD's Daily/Minimal.
-        public static readonly string[] CategoryExcludedPlatforms =
+        // the Categories scope menu: implemented AND category-capable (a rejected scope would
+        // always render an empty grid)
+        public static IReadOnlyList<string> GetCategoryPlatformNames()
         {
-            Wallhaven,
-            Pixiv,
-            Cara,
-            WallpaperEngine,
-            Artgram,
-            Bing,
-            SimpleDesktops,
-        };
+            return Sorted(PlatformRegistry
+                .Where(spec => spec.Kind != PlatformKind.Planned && spec.CategoryCapable)
+                .Select(spec => spec.Name));
+        }
+
+        // the platforms whose category INDEX is fetched live: they feed BuildMerged as an index
+        // source, and their index-load errors are shown while their scope is on screen
+        public static IReadOnlyList<string> GetLiveIndexPlatformNames()
+        {
+            return Sorted(PlatformRegistry
+                .Where(spec => spec.Kind != PlatformKind.Planned && spec.LiveIndex)
+                .Select(spec => spec.Name));
+        }
+
+        public static bool HasLiveIndex(string? platformName)
+        {
+            return FindPlatform(platformName)?.LiveIndex == true;
+        }
+
+        // solo = this platform's thumbnail fills need the 1-wide gate (see the row's flag)
+        public static bool NeedsSoloThumbGate(string? platformName)
+        {
+            return FindPlatform(platformName)?.SoloThumbGate == true;
+        }
+
+        // ---- category rejection ------------------------------------------------------------
+        // rejected sites stay FULLY supported in the picker + the Set dialog, but they are
+        // REJECTED from every category surface - a category list built from them would be
+        // fake entries ("Daily"/"Minimal" are fetcher modes, not taxonomy). the verdict is a
+        // PER-ROW flag in the registry (an implemented row with CategoryCapable = false, the
+        // date + reason sitting on that row): flipping one flag is the whole change, this
+        // array is only its public shape, and GetModes is deliberately NOT filtered so each
+        // platform's own grid chips stay factual (the bing/SD Daily/Minimal precedent).
+        // consumers: the Categories scope menu, BuildMerged, the Set dialog's basis collapse,
+        // the checklist universe and the slideshow's LOUD categoryless skip. verdict dates
+        // live on the rows above (bing + simple desktops 2026-10-09, wallhaven + pixiv
+        // 2026-10-10, cara + wallpaper engine 2026-10-11, artgram 2026-10-12); per-site
+        // evidence: automata-private/<site>/AGENTS.md.
+        public static readonly string[] CategoryExcludedPlatforms = PlatformRegistry
+            .Where(spec => spec.Kind != PlatformKind.Planned && !spec.CategoryCapable)
+            .Select(spec => spec.Name)
+            .ToArray();
 
         public static bool IsCategoryExcluded(string? platformName)
         {
-            return platformName != null && Array.IndexOf(CategoryExcludedPlatforms, platformName) >= 0;
+            if (platformName == null)
+            {
+                return false;
+            }
+
+            foreach (var name in CategoryExcludedPlatforms)
+            {
+                if (name.Equals(platformName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public static IReadOnlyList<string> GetModes(string platformName)
         {
-            return platformName switch
-            {
-                // wallhaven categories = the API's 3-bit mask (general/anime/people), see automata wallhaven.cc/AGENTS.md
-                Wallhaven => new[] { "General", "Anime", "People" },
-                // pexels categories = the site's own discover/wallpapers terms, live-loaded (see the pexels block above)
-                Pexels => PexelsDiscoverTerms.Select(term => term.Term).ToArray(),
-                Pixabay => PixabayCollections.Select(collection => collection.Name).ToArray(),
-                WallpaperHub => WallpaperHubCollections.Select(collection => collection.Title).ToArray(),
-                // bing/simpledesktops have no taxonomy at all - one honest entry each (their
-                // AGENTS.md). these entries only drive the platform's OWN grid chips/default
-                // mode; the Categories page rejects both platforms via
-                // CategoryExcludedPlatforms, so they never become category cards.
-                Bing => new[] { "Daily" },
-                SimpleDesktops => new[] { "Minimal" },
-                DesktopNexus => DesktopNexusCategories.Select(category => category.Title).ToArray(),
-                DigitalBlasphemy => DigitalBlasphemyModes.Select(category => category.Title).ToArray(),
-                Hdwallpapers => HdwallpapersModes.Select(category => category.Title).ToArray(),
-                Pixiv => PixivTags,
-                Cara => new[] { "Explore" },
-                WallpaperCave => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
-                WallpaperEngine => WallpaperEngineModes,
-                Artgram => ArtgramModes,
-                _ => Array.Empty<string>()
-            };
+            // straight from the platform's registry row: a null Modes (Local/Planned, which
+            // list their categories in their own service) and an unknown name both give the
+            // caller an empty list, exactly as the old switch's default arm did
+            var modes = FindPlatform(platformName)?.Modes;
+            return modes == null ? Array.Empty<string>() : modes();
         }
 
         public static string GetDefaultMode(string platformName)
@@ -656,24 +945,8 @@ namespace Aura.Services
 
         public static string GetPlatformDescription(string platformName)
         {
-            return platformName switch
-            {
-                Wallhaven => "Wallhaven's public JSON search, split into General / Anime / People categories.",
-                Bing => "Recent daily Bing homepage wallpapers from Microsoft's public archive endpoint.",
-                SimpleDesktops => "Minimal, distraction-free wallpapers from Simple Desktops.",
-                WallpaperHub => "Windows, Surface, Office, Xbox, and event collections from WallpaperHub.",
-                Pexels => "The site's own discover/wallpapers search terms, live-loaded. Add a Pexels API key in Settings.",
-                Pixabay => "Pixabay's curated collections, live from pixabay.com/collections (no key needed).",
-                DesktopNexus => "15 category galleries plus All from Desktop Nexus's public browse pages.",
-                DigitalBlasphemy => "Brian's wallpapers plus a free set on Digital Blasphemy (640x480 preview cap - originals are membership-only).",
-                Hdwallpapers => "Latest feed plus 25 category listings from HDwallpapers.net.",
-                Pixiv => "Safe-for-work illustrations from Pixiv's public search (restrict=safe, no key).",
-                Cara => "Explore feed from the Cara art community's server-rendered page.",
-                WallpaperCave => "Curated albums from Wallpaper Cave (single-shot album pages).",
-                WallpaperEngine => "Wallpaper Engine's Steam Workshop browse pages with public preview images.",
-                Artgram => "Trending, latest, and oldest gallery feeds from the Artgram art community (50 cards per page).",
-                _ => "Browse wallpapers from this source."
-            };
+            var description = FindPlatform(platformName)?.Description;
+            return string.IsNullOrEmpty(description) ? "Browse wallpapers from this source." : description;
         }
 
         public async Task<List<WallpaperItem>> GetWallpapersAsync(
@@ -684,24 +957,16 @@ namespace Aura.Services
         {
             page = Math.Max(page, 1);
 
-            var wallpapers = platformName switch
+            // the row's own fetcher - a Planned or Local row has none (Local routes through
+            // its own service + page), so routing it through this service fails LOUD here
+            // instead of silently fetching the wrong site
+            var fetch = FindPlatform(platformName)?.Fetch;
+            if (fetch == null)
             {
-                Wallhaven => await GetWallhavenWallpapersAsync(page, mode, cancellationToken),
-                Bing => await GetBingWallpapersAsync(page, cancellationToken),
-                SimpleDesktops => await GetSimpleDesktopWallpapersAsync(page, cancellationToken),
-                WallpaperHub => await GetWallpaperHubWallpapersAsync(page, mode, cancellationToken),
-                Pexels => await GetPexelsWallpapersAsync(page, mode, cancellationToken),
-                Pixabay => await GetPixabayWallpapersAsync(page, mode, cancellationToken),
-                DesktopNexus => await GetDesktopNexusWallpapersAsync(page, mode, cancellationToken),
-                DigitalBlasphemy => await GetDigitalBlasphemyWallpapersAsync(page, mode, cancellationToken),
-                Hdwallpapers => await GetHdwallpapersWallpapersAsync(page, mode, cancellationToken),
-                Pixiv => await GetPixivWallpapersAsync(page, mode, cancellationToken),
-                Cara => await GetCaraWallpapersAsync(page, mode, cancellationToken),
-                WallpaperCave => await GetWallpaperCaveWallpapersAsync(page, mode, cancellationToken),
-                WallpaperEngine => await GetWallpaperEngineWallpapersAsync(page, mode, cancellationToken),
-                Artgram => await GetArtgramWallpapersAsync(page, mode, cancellationToken),
-                _ => throw new NotSupportedException($"{platformName} is not implemented yet.")
-            };
+                throw new NotSupportedException($"{platformName} is not implemented yet.");
+            }
+
+            var wallpapers = await fetch(this, page, mode, cancellationToken);
 
             // the mode IS the category the caller asked for (term, collection,
             // mode) - tag items so history rows can show a category sticker

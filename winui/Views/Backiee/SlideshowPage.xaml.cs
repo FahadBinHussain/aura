@@ -652,10 +652,10 @@ namespace Aura.Views.Backiee
             // 9-row vertical stack ate ~230px and pushed the basis picker + category
             // list below the fold (the user had to scroll just to reach them).
             // the list = EVERY implemented platform (17), not the old hard-coded 9
-            // from before platforms 10-17 were ported (2026-10-08) - single source
-            // of truth, the same way CategoriesPage builds its scope list. under the
-            // Category basis ApplyBasisVisibility collapses the category-rejected
-            // ones, so Latest offers all 17 and Category offers only the capable 10.
+            // single source of truth, the same way CategoriesPage builds its scope list: every
+            // implemented platform (local + public) = one registry row, nothing to add here
+            // when a platform lands. under the Category basis ApplyBasisVisibility collapses
+            // the category-rejected ones, so Latest offers all 17 and Category the capable 10.
             var platformLabel = new TextBlock
             {
                 Text = "Select Platforms",
@@ -664,9 +664,7 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(platformLabel);
 
-            var platformNames = new[] { "Backiee", "AlphaCoders", "ArtStation" }
-                .Concat(PublicWallpaperService.GetSupportedPlatformNames())
-                .ToArray();
+            var platformNames = PublicWallpaperService.GetImplementedPlatformNames().ToArray();
             var platformChecks = platformNames
                 .Select(name => new CheckBox
                 {

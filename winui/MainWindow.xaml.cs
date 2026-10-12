@@ -671,7 +671,9 @@ namespace Aura
                     switch (navItemTag)
                     {
                         case "Home":
-                            if (LastSelectedPlatform == "Alpha Coders")
+                            // "AlphaCoders" is the platform registry's canonical name (the
+                            // picker used to write the display spelling "Alpha Coders" here)
+                            if (LastSelectedPlatform == "AlphaCoders")
                                 ContentFrame.Navigate(typeof(Views.AlphaCoders.AlphaCodersGridPage));
                             else if (LastSelectedPlatform == "ArtStation")
                                 ContentFrame.Navigate(typeof(Views.ArtStation.ArtStationGridPage));

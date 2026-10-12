@@ -1636,3 +1636,95 @@ Wallpaper Engine) could never be selected for a slideshow at all.
   9 platform checkboxes" line (it is 17 now), and its "pixiv/cara/wallpaper
   engine/artgram were never in this dialog" (they are now - hidden under
   Category like the other rejected sites).
+
+### one platform registry replaces every platform list (2026-10-12)
+
+user ask: "cant we do a list or some shit, so in future adding to that list auto does
+shit? we dont have general code?" - the app had ONE real list (the
+`SupportedPlatforms` set) plus hardcoded echoes of it in 6 places: the picker's
+26-name array, the `new[] { "Backiee", "AlphaCoders", "ArtStation" }` trio
+duplicated in the Set dialog AND `CategoryPlatforms`, the
+`GetModes`/`GetPlatformDescription`/`GetWallpapersAsync` switches, the Categories
+error-visibility 6-name list, and its thumb-gate ternary. all of that is gone:
+`PublicWallpaperService` now holds THE platform registry - one `PlatformSpec` row
+per site - and every platform surface derives from it.
+
+- row = `Name` + `Kind` (`Planned` | `Local` | `Public`) + `CategoryCapable` +
+  `LiveIndex` + `SoloThumbGate` + `Description` + `Modes` + `Fetch`. the category
+  audit verdict moved ONTO the row (its date + reason in the row comment), so
+  flipping `CategoryCapable` is now the whole rejection change;
+  `CategoryExcludedPlatforms` is DERIVED from the rows (kept public, so the
+  comments and AGENTS notes that name it stay true).
+- derived APIs, all sorted ordinal-ignore-case (which reproduces the old hand
+  picker order exactly, and a name's case can never split a list):
+  `GetPickerPlatformNames()` = 26, `GetImplementedPlatformNames()` = 17,
+  `GetSupportedPlatformNames()` = 14 (public only - same contract as before),
+  `GetCategoryPlatformNames()` = 10, `GetLiveIndexPlatformNames()` = 6, plus
+  `IsImplementedPlatform` / `HasLiveIndex` / `NeedsSoloThumbGate`.
+- consumers rewired: the picker grid + its not-implemented dialog
+  (`GetPickerPlatformNames` / `IsImplementedPlatform`, so the "Available now"
+  line can never go stale), the Set dialog's boxes + save loop
+  (`GetImplementedPlatformNames`), `CategoryPlatforms`
+  (`GetCategoryPlatformNames`), BOTH Categories error-visibility conditions
+  (`_scopePlatform == null || HasLiveIndex(_scopePlatform)`), the thumbnail gate
+  (`NeedsSoloThumbGate`), and `GetModes` / `GetPlatformDescription` /
+  `GetWallpapersAsync` (row lookups; the public fetcher's
+  `NotSupportedException` message is byte-identical, and the mode-label stamp on
+  fetched items is untouched).
+- **"Alpha Coders" is now `AlphaCoders` everywhere** (symmetry): the picker
+  spelled the name with a space while the dialog checkbox, the scope menu,
+  settings and history all used the canonical `AlphaCoders`, and `MainWindow`'s
+  Home-button nav compared the display spelling. the picker reads the registry's
+  canonical name now; `LastSelectedPlatform` is in-memory only (nothing
+  persisted), so no migration. page-title prose keeps the site's own brand
+  spelling ("Alpha Coders Wallpaper ..." item titles from the site itself).
+- a Local row's `Fetch` stays NULL on purpose (Backiee/AlphaCoders/ArtStation own
+  their services + pages), so routing one through the public fetcher still fails
+  LOUD with the same `NotSupportedException`; and the picker gained a LOUD
+  fallback dialog for a Local row whose page is not wired into its 4-branch nav
+  yet - never a dead click, never a silent no-op.
+- the two 1-wide thumb gates (`AlphaCodersThumbGate` static non-thread-safe
+  scrape cache + `PixabayThumbGate` Cloudflare rate limit) merged into ONE
+  `SoloThumbGate`: each only ever needed "no other fill runs while mine does",
+  both still overlap the shared 4-wide gate, and the registry flag says which
+  platforms are solo. slightly less parallel (alpha and pixabay fills no longer
+  overlap each other), zero correctness change.
+- counts unchanged by construction (nothing in this pass touches what a site
+  serves): 17 selectable under Latest, 10 capable under Category, scope menu 10,
+  checklist universe 296, Global 293.
+- **to add a platform now: ONE registry row** (+ its private fetcher; and only
+  for a Local platform, a page branch in the picker + `SlideshowService`). planned
+  sites are rows too (`Planned`, 7 WAF-walled + 2 credential sites), so the
+  picker list can never drift from what is built, and the not-implemented dialog
+  always names the real current set.
+- supersessions: the 2026-10-08 section's "single source of truth =
+  `GetSupportedPlatformNames()` ... no hardcoded platform lists remain" (the
+  registry is the single source now, and the picker list WAS still hardcoded
+  then), the 17-platform section's "the boxes are built dynamically over
+  `new[] { ... }.Concat(...)`", the taxonomy section's "add a platform name here
+  to reject it" (a row's `CategoryCapable = false` is the extension point), and
+  the thumbnail-fix section's `AlphaCodersThumbGate`/`PixabayThumbGate` pairs.
+- probe: `C:\tmp\aura-platformrejection.ps1` (stays in C:\tmp). THREE of its
+  expectations were stale ARITHMETIC against the user's drifting config, all
+  fixed in the probe (not the app): (1) it ticked a fixed `new8` subset, which
+  used to total 17 because the old 9-platform config already carried the
+  rejected trio - their config no longer does (the Category-save drop
+  self-healed it), so it topped out at 14 and the `17 platforms` assert
+  timed out while the log showed `Selected platforms: ...14 names` and a
+  clean `Loaded 922 wallpapers from 14 platform(s)`; it now ticks ALL of
+  `$all17` (`Set-Checked` is idempotent), so the probe no longer cares what
+  was already ticked. (2) the final restored-status assert hardcoded
+  `9 platforms - Category: All categories (Refresh: 1 Minutes)` - it now
+  DERIVES count/basis/categories/interval from the backup file it is putting
+  back (and I first derived it WITHOUT the `Refresh: ` prefix, which cost one
+  run: the real shape is `{n} platforms - {basis}: {cats} (Refresh: {interval})`).
+  (3) the legacy-skip assert grepped for `category basis skip - ` unconditionally
+  - that line only fires when the SAVED config still carries a rejected
+  platform, and theirs has none anymore; the probe now derives it from the
+  backup and asserts the ABSENCE of skip lines instead (0 of 10 rejected =
+  correct, 0 skip lines = correct).
+  lesson: never assert a platform count, a status string, or a log line the
+  user can change; the shapes (`{n} platforms - {basis}...`, the drop line,
+  `category basis skip - `) are stable, the values are not.
+  picker note: any future picker probe must look for `AlphaCoders`, not the
+  old display spelling `Alpha Coders`.

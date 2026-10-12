@@ -25,17 +25,13 @@ namespace Aura.Views.Backiee
         private const string CategoriesUrl = "https://backiee.com/categories";
         private const string DefaultAccentHex = "#FF8C00";
 
-        // every platform the app implements - this array IS the scope menu. public sources derive
-        // from PublicWallpaperService so a newly ported platform can never be forgotten here (the
-        // scope menu, the merged cards and the not-implemented dialog all read that one list).
-        // taxonomy-less sites (PublicWallpaperService.CategoryExcludedPlatforms) are REJECTED
-        // from it - their scope would always render an empty grid.
+        // every platform the app implements AND that has real categories - this array IS the
+        // scope menu, derived from the one platform registry in PublicWallpaperService (its
+        // CategoryCapable flag drops taxonomy-less sites: their scope would always render an
+        // empty grid). adding a platform = one registry row, nothing to edit here.
         // per-site reversal evidence: automata-private/<site>/AGENTS.md
         private static readonly string[] CategoryPlatforms =
-            new[] { "Backiee", "AlphaCoders", "ArtStation" }
-                .Concat(PublicWallpaperService.GetSupportedPlatformNames())
-                .Where(name => !PublicWallpaperService.IsCategoryExcluded(name))
-                .ToArray();
+            PublicWallpaperService.GetCategoryPlatformNames().ToArray();
 
         private static readonly BitmapImage PlaceholderImage =
             new BitmapImage(new Uri("ms-appx:///Assets/placeholder-wallpaper-1000.png"));
@@ -45,14 +41,13 @@ namespace Aura.Views.Backiee
         // the session so re-opening Categories is instant; the gate bounds the ~90-fetch fan-out.
         private static readonly ConcurrentDictionary<string, BitmapImage> CategoryThumbCache = new();
         private static readonly SemaphoreSlim CategoryThumbGate = new(4);
-        // AlphaCoders only: its service keeps the scrape cache in STATIC fields that are
-        // not thread-safe, so its fills run strictly one at a time (the grid page's proven
-        // mode) - concurrent fills raced the shared list and returned empty cards.
-        // alpha's static scrape cache needs 1-wide; pixabay's Cloudflare rate-limits rapid
-        // fetches (a 4-wide fill tripped challenge 403s on 3/61 cards, live 2026-10-08) -
-        // its collection pages get their own 1-wide gate for natural pacing.
-        private static readonly SemaphoreSlim AlphaCodersThumbGate = new(1);
-        private static readonly SemaphoreSlim PixabayThumbGate = new(1);
+        // the 1-wide gate for every platform the registry marks SoloThumbGate: AlphaCoders'
+        // service keeps its scrape cache in STATIC, non thread-safe fields (concurrent fills
+        // raced the shared list and returned empty cards), and pixabay's Cloudflare rate-limits
+        // rapid collection fetches (a 4-wide fill tripped challenge 403s on 3/61 cards, live
+        // 2026-10-08). one shared 1-wide gate serves both: each only needs "no other fill runs
+        // while mine does", and both still overlap the shared 4-wide gate.
+        private static readonly SemaphoreSlim SoloThumbGate = new(1);
 
         // one category as it exists on a single platform (what a drill-down needs)
         public sealed class CategorySourceRef
@@ -399,7 +394,7 @@ namespace Aura.Views.Backiee
 
                 // the same scope rule ApplyScope uses, applied in place: rebuilding the item
                 // list here would wipe the user's scroll position mid-fill
-                if (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation" || _scopePlatform == "Pexels")
+                if (_scopePlatform == null || PublicWallpaperService.HasLiveIndex(_scopePlatform))
                 {
                     ErrorTextBlock.Text = _sourceError;
                     ErrorTextBlock.Visibility = Visibility.Visible;
@@ -423,11 +418,9 @@ namespace Aura.Views.Backiee
                 return (source.Platform, true, string.Empty);
             }
 
-            // pick the gate: AlphaCoders must run alone (static scrape cache), everything
-            // else got fresh service instances and shares the bounded 4-wide gate
-            var gate = source.Platform == "AlphaCoders" ? AlphaCodersThumbGate
-                : source.Platform == "Pixabay" ? PixabayThumbGate
-                : CategoryThumbGate;
+            // pick the gate from the registry: a SoloThumbGate platform (static scrape cache /
+            // rate-limited host) runs alone, everything else shares the bounded 4-wide gate
+            var gate = PublicWallpaperService.NeedsSoloThumbGate(source.Platform) ? SoloThumbGate : CategoryThumbGate;
             await gate.WaitAsync();
             try
             {
@@ -535,12 +528,12 @@ namespace Aura.Views.Backiee
                 Add("ArtStation", $"channel:{id}", name, DefaultAccentHex);
             }
             // every other implemented platform contributes its GetModes() entries as categories
-            // (pixabay docs list, pexels query modes, wallhaven bitmask, wallpaperhub collections,
-            //  key = the mode the fetcher consumes). the public list derives from
-            // PublicWallpaperService: adding a platform to its SupportedPlatforms set is ALL it
-            // takes to appear here. the dynamic rejection list filters at the source - a
-            // taxonomy-less site contributes no fake cards here (its GetModes entries still
-            // drive its own grid page chips).
+            // (the live indexes above, plus desktopnexus galleries, digital blasphemy's 15
+            // galleries, hdwallpapers listings, wallpaper cave albums - key = the mode the
+            // fetcher consumes). both the list and the rejection filter derive from the
+            // PublicWallpaperService platform registry: adding a registry row is ALL it takes
+            // to appear here, and a taxonomy-less site (CategoryCapable = false) contributes
+            // no fake cards (its GetModes entries still drive its own grid page chips).
             foreach (var platform in PublicWallpaperService.GetSupportedPlatformNames())
             {
                 if (PublicWallpaperService.IsCategoryExcluded(platform))
@@ -573,7 +566,7 @@ namespace Aura.Views.Backiee
             ScopeButtonTextBlock.Text = _scopePlatform == null ? "Global" : $"Local · {_scopePlatform}";
 
             // show the source error only while it affects what is on screen
-            if (_sourceError != null && (_scopePlatform == null || _scopePlatform == "Backiee" || _scopePlatform == "AlphaCoders" || _scopePlatform == "Pixabay" || _scopePlatform == "WallpaperHub" || _scopePlatform == "ArtStation" || _scopePlatform == "Pexels"))
+            if (_sourceError != null && (_scopePlatform == null || PublicWallpaperService.HasLiveIndex(_scopePlatform)))
             {
                 ErrorTextBlock.Text = _sourceError;
                 ErrorTextBlock.Visibility = Visibility.Visible;
@@ -675,7 +668,7 @@ namespace Aura.Views.Backiee
                     break;
                 default:
                     // every PublicWallpaperService source shares one drill page; routing derives
-                    // from SupportedPlatforms so a newly ported platform needs no list edit here
+                    // from the platform registry, so a newly ported platform needs no edit here
                     if (PublicWallpaperService.IsSupportedPlatform(source.Platform))
                     {
                         Frame.Navigate(typeof(PublicWallpaperGridPage), new PublicGridNavigationParameter(source.Platform, source.Key));

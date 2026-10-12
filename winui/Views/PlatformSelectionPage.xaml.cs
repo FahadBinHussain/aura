@@ -18,36 +18,10 @@ namespace Aura.Views
         {
             this.InitializeComponent();
 
-            // Initialize platforms list
-            List<string> platforms = new List<string>
-            {
-                "Alpha Coders",
-                "ArtFol",
-                "Artgram",
-                "ArtStation",
-                "Backiee",
-                "Behance",
-                "Bing Wallpaper Archive",
-                "Cara",
-                "CGSociety",
-                "CharacterDesignReferences",
-                "DesktopNexus",
-                "DeviantArt",
-                "Digital Blasphemy",
-                "Dribbble",
-                "HDwallpapers",
-                "NewGrounds",
-                "Peakpx",
-                "Pexels",
-                "Pixabay",
-                "Pixiv",
-                "Simple Desktops",
-                "Unsplash",
-                "Wallhaven",
-                "Wallpaper Cave",
-                "Wallpaper Engine",
-                "WallpaperHub"
-            };
+            // every site the app knows about, straight from the platform registry: one row per
+            // site there means nothing to add here when a site lands (planned ones route to
+            // the not-implemented dialog, built ones to their own page)
+            IReadOnlyList<string> platforms = PublicWallpaperService.GetPickerPlatformNames();
 
             // Set the ItemsSource for the ItemsRepeater
             PlatformsRepeater.ItemsSource = platforms;
@@ -64,11 +38,10 @@ namespace Aura.Views
                 selectedPlatform = button.DataContext?.ToString();
             }
 
-            // Special handling for implemented platforms
-            if (selectedPlatform == "Backiee" ||
-                selectedPlatform == "Alpha Coders" ||
-                selectedPlatform == "ArtStation" ||
-                PublicWallpaperService.IsSupportedPlatform(selectedPlatform))
+            // Built platforms go to their own page; planned rows show the not-implemented
+            // dialog. implemented-ness derives from the platform registry - the three local
+            // pages below are view routing, the only per-platform part left.
+            if (PublicWallpaperService.IsImplementedPlatform(selectedPlatform))
             {
                 // Get the main window and navigate
                 if (MainWindow.Instance != null)
@@ -77,7 +50,7 @@ namespace Aura.Views
                     MainWindow.LastSelectedPlatform = selectedPlatform;
 
                     // Navigate to the appropriate page
-                    if (selectedPlatform == "Alpha Coders")
+                    if (selectedPlatform == "AlphaCoders")
                     {
                         // Navigate to Alpha Coders grid page
                         MainWindow.Instance.NavigationFrame.Navigate(typeof(AlphaCodersGridPage));
@@ -95,6 +68,12 @@ namespace Aura.Views
                     else if (PublicWallpaperService.IsSupportedPlatform(selectedPlatform))
                     {
                         MainWindow.Instance.NavigationFrame.Navigate(typeof(PublicWallpaperGridPage), selectedPlatform);
+                    }
+                    else
+                    {
+                        // a Local row without its page wired up here (a port that forgot this
+                        // switch) - say so loudly instead of leaving a dead click
+                        ShowNotImplementedMessage($"{selectedPlatform} is built, but its page is not wired into the picker yet. Pick another platform: {string.Join(", ", PublicWallpaperService.GetImplementedPlatformNames())}.");
                     }
                 }
             }
@@ -149,16 +128,16 @@ namespace Aura.Views
             }
         }
 
-        private async void ShowNotImplementedMessage()
+        // the not-implemented dialog: a planned row gets the standard text, and a built
+        // platform with no picker destination passes its own (never a silent dead click).
+        // the "available now" list derives from the platform registry, so it can never go
+        // stale as platforms land.
+        private async void ShowNotImplementedMessage(string? message = null)
         {
-            // derived from the services - the list can never go stale as platforms land
-            var available = new List<string> { "Alpha Coders", "ArtStation", "Backiee" };
-            available.AddRange(PublicWallpaperService.GetSupportedPlatformNames());
-
             ContentDialog dialog = new ContentDialog
             {
                 Title = "Platform Not Available",
-                Content = $"The {selectedPlatform} platform is not implemented yet. Available now: {string.Join(", ", available)}.",
+                Content = message ?? $"The {selectedPlatform} platform is not implemented yet. Available now: {string.Join(", ", PublicWallpaperService.GetImplementedPlatformNames())}.",
                 CloseButtonText = "OK",
                 XamlRoot = this.XamlRoot
             };
