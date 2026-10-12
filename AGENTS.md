@@ -1421,3 +1421,37 @@ category surface:
   alphacoders, pixabay, wallpaperhub, artstation, pexels, desktopnexus,
   hdwallpapers, digital blasphemy, wallpaper cave), 7 no (bing, simple
   desktops, wallhaven, pixiv, cara, wallpaper engine, artgram).**
+
+### digital blasphemy 14-gallery port (2026-10-12)
+
+user greenlit the port after the audit (digital blasphemy = accepted, its
+gallery index is real taxonomy). `DigitalBlasphemyModes` grew from 2 entries
+to **15**: Wallpapers (the all-feed) + the 14 gallery tags from
+https://digitalblasphemy.com/wallpaper-galleries/ (Abstracts, Autumn,
+Christmas, Day Scenes, Free, Halloween, Interiors, Night Scenes, Other
+Holidays, Pickle Jar, Planetscapes, Spring, Underwater, Winter). the tuple
+gained a `bool SinglePage` (title, path, singlePage): the 5 tags without a
+/page/2/ (Free, Christmas, Halloween, Other Holidays, Underwater - curl
+404 on page 2) return the honest empty end-of-feed list past page 1; the
+other 9 paginate like the wallpapers category (page 1 vs 2 ids verified
+disjoint, 54/54 parsed on abstracts). the old `free`-only special case in
+`GetDigitalBlasphemyWallpapersAsync` is replaced by the flag. fetch/parse/
+thumb contract unchanged (640x480 CDN cap, membership originals stay
+uncaptured). counts: 10 of the 13 NEW names add single-source cards
+(Halloween/Spring/Winter merge into existing pixabay/pexels cards), so
+Global **283 -> 293**. probe updated (floor 293, spot list += Abstracts +
+Planetscapes + Night Scenes + Pickle Jar, new section 4b drills the
+`Planetscapes` canary: title `Digital Blasphemy`, bar clean). verified
+menuless 2026-10-12: cards=293 exact, all 12 rejected names still gone, 14
+spot names present (4 new gallery cards), alpha `Vehicle` drill 15 items,
+Planetscapes drill **18 items**, bar clean, rebuild 293, watch stable
+(DesktopNexus 403 line = the known pre-existing live-site block). vision
+(zengate): real planetscapes artwork (Caelum Moon day/night, ringed gas
+giants), page title `Digital Blasphemy`, zero banners. two probe fixes from
+this run: (1) the 4b card search needs a TIME budget with heartbeats (each
+UIA call takes 7-12s during the rebuild peg - the 24x250ms loop got 1-2
+real tries and false-failed), (2) public grids title via `TitleTextBlock`,
+not the backiee/alpha-only `PageTitleTextBlock` (probe now falls back).
+known limit unchanged: gallery items carry no per-item category (mode name
+is fetch context), and the slideshow's DB path is untouched (the user's 9
+platforms do not include Digital Blasphemy).

@@ -409,12 +409,28 @@ namespace Aura.Services
             ("Video Games", "videogames"),
         };
 
-        // digital blasphemy: woo listing paths; the free tag ships everything on ONE page
+        // digital blasphemy: woo listing paths; galleries live on
+        // /wallpaper-galleries/ (14 product-tag pages, ported 2026-10-12).
+        // single-page tags 404 past /page/1/ (curl-verified) -> honest
+        // end-of-feed empty list instead of a 404 fetch
         // (automata-private/digitalblasphemy.com/AGENTS.md)
-        private static readonly (string Title, string Path)[] DigitalBlasphemyModes =
+        private static readonly (string Title, string Path, bool SinglePage)[] DigitalBlasphemyModes =
         {
-            ("Wallpapers", "product-category/wallpapers"),
-            ("Free", "product-tag/free"),
+            ("Wallpapers", "product-category/wallpapers", false),
+            ("Abstracts", "product-tag/abstracts", false),
+            ("Autumn", "product-tag/autumn", false),
+            ("Christmas", "product-tag/christmas", true),
+            ("Day Scenes", "product-tag/day-scenes", false),
+            ("Free", "product-tag/free", true),
+            ("Halloween", "product-tag/halloween", true),
+            ("Interiors", "product-tag/interiors", false),
+            ("Night Scenes", "product-tag/night-scenes", false),
+            ("Other Holidays", "product-tag/other-holidays", true),
+            ("Pickle Jar", "product-tag/pickle-jar", false),
+            ("Planetscapes", "product-tag/planetscapes", false),
+            ("Spring", "product-tag/spring", false),
+            ("Underwater", "product-tag/underwater", true),
+            ("Winter", "product-tag/winter", false),
         };
 
         // hdwallpapers: nav slug catalog (verified 2026-10-08; "Latest" = plain feed)
@@ -1160,13 +1176,14 @@ namespace Aura.Services
         // (automata-private/digitalblasphemy.com/AGENTS.md)
         private async Task<List<WallpaperItem>> GetDigitalBlasphemyWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
-            var path = DigitalBlasphemyModes
-                .FirstOrDefault(entry => entry.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
-                .Path ?? "product-category/wallpapers";
+            var entry = DigitalBlasphemyModes
+                .FirstOrDefault(e => e.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase));
+            var path = entry.Path ?? "product-category/wallpapers";
 
-            if (page > 1 && path == "product-tag/free")
+            if (page > 1 && entry.SinglePage)
             {
-                // the free tag ships all 21 products on one page - there is no /page/N/
+                // single-page gallery tags (free/christmas/halloween/other-holidays/
+                // underwater) - there is no /page/N/ (curl: 404)
                 return new List<WallpaperItem>();
             }
 
