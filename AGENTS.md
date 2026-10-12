@@ -1507,3 +1507,44 @@ state, twice over).
 - death-hunt data point: one more silent exit=0 death at ~12:35 with NO probe
   walkers (idle between ticks, log ends clean, registry last-write stale) -
   still parked.
+
+### pixabay history pill via detail-page tags (2026-10-12)
+
+user ask: "when i selected all cats, it should still show what cat that item
+belong to" (+ misconception corrected: pixabay is NOT rejected from the category
+list - the audit ACCEPTED it, 63 curated collections; the rejected 7 are bing,
+simple desktops, wallhaven, pixiv, cara, wallpaper engine, artgram).
+
+- payload truth dug live (curl) for every pill-less platform's latest feed:
+  wallpaperhub feed entities are bing-daily mirrors (`label = "Bing Wallpaper"`,
+  `collectionsWallpaperAppearsIn` empty on 20/20, `tags` the constant
+  "photography"), pexels API photos carry no category field, artstation
+  `projects.json?sorting=latest` has no channel per hit - honest absence stands
+  for all three. backiee (ThemeCat) + alpha (scrape key) always pill'd. only
+  pixabay was fixable: its search JSON-LD is title+url only, but every item's
+  OWN detail page ships the site's full tag list in its ImageObject JSON-LD
+  `keywords` ("Sheep, Cartoon, Meadow, ..." - verified across 3 items).
+- fix: `PublicWallpaperService.GetPixabayItemCategoryAsync(itemUrl)` fetches
+  that detail page through the SAME sanctioned transport (curl + Sec-Fetch pair)
+  and returns the FIRST comma-separated tag; string form first, schema.org array
+  form second, empty/parse miss = THROWN (loud reason upstream). slideshow side:
+  `SlideshowService.EnrichPixabayCategoryAsync` awaits it before AddEntry at
+  BOTH apply arms (desktop + lock), 1 fetch per applied wallpaper (60s apart -
+  far under Cloudflare's ~4-rapid limit); lookup failure = a
+  `pixabay item category lookup failed` log line + honest empty pill, never a
+  failed apply.
+- **guard trap (first verify run cost 14 min of silent no-ops)**: the public
+  loader stamps a MODE label (`latest`) onto every item in
+  `GetWallpapersAsync`'s wrapper, so an `IsNullOrWhiteSpace(Category)` guard
+  skipped EVERY pixabay item and nothing logged. the guard now asks
+  `WallpaperHistoryService.NormalizeCategory` - the one choke point that maps
+  mode labels -> "" and real values -> canonical - which went `private` ->
+  `internal` for it. a collection tick (`Halloween`) keeps its tick; a mode
+  label gets replaced by the tag.
+- verified live 2026-10-12 (local flat build, 1-min ticker): 3/3 pixabay
+  applies enriched 2-3s after set (`Autumn`, `Blue`, `Seamless`), all 3 history
+  rows carry the pill, backiee/alpha pills unchanged (`Car`/`Fantasy`/`Food`/
+  `4K Wallpapers`), artstation rows still honest-empty, 60s cadence held.
+- supersessions: the history-pill section's "known-vs-unknown today" line -
+  pixabay now pills under Latest + All-categories; wallpaperhub/pexels/
+  artstation absence stands (payload proofs above).

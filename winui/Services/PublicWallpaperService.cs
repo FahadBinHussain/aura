@@ -151,6 +151,47 @@ namespace Aura.Services
             return html;
         }
 
+        // All-categories/Latest pill enrichment (2026-10-12): the pixabay latest
+        // search's JSON-LD carries title+url only (NO per-item category - verified
+        // 2026-10-12), but every item's OWN detail page ships the site's full tag
+        // list in its ImageObject JSON-LD `keywords` field ("Sheep, Cartoon,
+        // Meadow, ..." - verified live across 3 items). one fetch per APPLIED
+        // wallpaper (1/min - far under Cloudflare's ~4-rapid limit) yields the
+        // FIRST tag = the item's own category for the history pill. same sanctioned
+        // transport as every other pixabay HTML fetch (curl + the Sec-Fetch pair);
+        // a challenge or parse miss THROWS so the caller can log the reason -
+        // never a silent pretend.
+        public async Task<string> GetPixabayItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("pixabay item url is empty - cannot look up its tags", nameof(itemUrl));
+            }
+
+            var html = await GetPixabayHtmlAsync(itemUrl, cancellationToken);
+
+            // string form first, then the schema.org array form
+            var keywords = Regex.Match(html, "\"keywords\":\\s*\"(?<v>[^\"]+)\"").Groups["v"].Value;
+            if (string.IsNullOrEmpty(keywords))
+            {
+                keywords = Regex.Match(html, "\"keywords\":\\s*\\[\\s*\"(?<v>[^\"]+)\"").Groups["v"].Value;
+            }
+
+            if (string.IsNullOrEmpty(keywords))
+            {
+                throw new InvalidOperationException(
+                    $"no keywords field in the JSON-LD of {itemUrl} - pixabay's detail markup may have changed");
+            }
+
+            var firstTag = keywords.Split(',')[0].Trim();
+            if (string.IsNullOrEmpty(firstTag))
+            {
+                throw new InvalidOperationException($"empty first tag in the keywords field of {itemUrl}");
+            }
+
+            return firstTag;
+        }
+
         // pexels categories = the site's own Wallpapers discover index
         // (https://www.pexels.com/discover/wallpapers/ - the __NEXT_DATA__
         // props.pageProps.topics[] array: 9 topics of search-term pills, each

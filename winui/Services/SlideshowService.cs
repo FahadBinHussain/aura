@@ -800,6 +800,45 @@ namespace Aura.Services
             }
         }
 
+        // All-categories/Latest pill enrichment (2026-10-12): pixabay's latest feed
+        // carries no per-item category (its search JSON-LD is title+url only), so
+        // every pixabay history row stayed pill-less while backiee rows pill'd their
+        // ThemeCat. the item's own detail page DOES carry pixabay's tag list - look
+        // it up ONCE per applied wallpaper (1 fetch per tick, 60s apart) and tag the
+        // item with its FIRST tag before AddEntry. items that already carry a
+        // category (collection ticks) and non-pixabay platforms are untouched; a
+        // lookup failure is logged and the pill stays honestly empty (the wallpaper
+        // itself already applied - never fail the apply over a cosmetic tag).
+        private async Task EnrichPixabayCategoryAsync(WallpaperItem wallpaper)
+        {
+            if (!string.Equals(wallpaper.Platform, "Pixabay", StringComparison.OrdinalIgnoreCase)
+                || string.IsNullOrWhiteSpace(wallpaper.SourceUrl))
+            {
+                return;
+            }
+
+            // the public loader stamps a MODE label ("latest" - fetch context) onto
+            // every item, so an IsNullOrWhiteSpace check would skip EVERY pixabay
+            // item. NormalizeCategory is the one choke point that tells that label
+            // from a REAL category - a collection tick ("Halloween") must keep its
+            // tick, a mode label gets replaced by the item's own first tag.
+            if (!string.IsNullOrEmpty(WallpaperHistoryService.NormalizeCategory(wallpaper.Platform, wallpaper.Category)))
+            {
+                return;
+            }
+
+            try
+            {
+                var category = await new PublicWallpaperService().GetPixabayItemCategoryAsync(wallpaper.SourceUrl);
+                wallpaper.Category = category;
+                LogInfo($"pixabay item category: {category} ({wallpaper.Title})");
+            }
+            catch (Exception ex)
+            {
+                LogInfo($"pixabay item category lookup failed - {wallpaper.Title}: {ex.Message}");
+            }
+        }
+
         private async Task SetDesktopWallpaper(WallpaperItem wallpaper)
         {
             try
@@ -907,6 +946,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
+                    await EnrichPixabayCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event
@@ -1207,6 +1247,7 @@ namespace Aura.Services
                 if (success)
                 {
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
+                    await EnrichPixabayCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
                     
                     // Store the current wallpaper URL and raise event

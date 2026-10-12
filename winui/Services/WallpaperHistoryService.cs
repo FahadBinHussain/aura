@@ -147,7 +147,10 @@ namespace Aura.Services
         // see the AddEntry pill contract above: mode labels are fetch context
         // (never pills), a real source value canonicalizes through the loaded
         // category universe and survives verbatim when it was never loaded.
-        private static string NormalizeCategory(string platform, string value)
+        // internal: SlideshowService's pixabay pill enrichment reuses this to tell a
+        // mode label (fetch context - skip) from a REAL category (keep - one choke
+        // point owns the contract)
+        internal static string NormalizeCategory(string platform, string value)
         {
             if (string.IsNullOrWhiteSpace(value) ||
                 value.Equals("latest", StringComparison.OrdinalIgnoreCase) ||
