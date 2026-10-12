@@ -65,6 +65,15 @@ namespace Aura.Services
         // Current wallpaper URLs for display
         private string _currentDesktopWallpaperUrl = "";
         private string _currentLockScreenWallpaperUrl = "";
+
+        // Current wallpaper LOCAL file paths for the page preview: the preview
+        // paints the file that was already downloaded to set the wallpaper
+        // (on disk, already proven decodable by Windows). Re-fetching the
+        // remote URL used to leave the preview card WHITE for the whole
+        // download and permanently white when the host refused the OS image
+        // stack - a silent blank state.
+        private string _currentDesktopWallpaperFile = "";
+        private string _currentLockScreenWallpaperFile = "";
         
         // Events for wallpaper changes
         public event EventHandler<string>? DesktopWallpaperChanged;
@@ -902,6 +911,7 @@ namespace Aura.Services
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = imageUrl;
+                    _currentDesktopWallpaperFile = wallpaperFile.Path;
                     DesktopWallpaperChanged?.Invoke(this, imageUrl);
                     SetDesktopApplyError(null);
                 }
@@ -1026,6 +1036,7 @@ namespace Aura.Services
                     
                     // Store the current wallpaper URL and raise event
                     _currentDesktopWallpaperUrl = originalUrl;
+                    _currentDesktopWallpaperFile = wallpaperFile.Path;
                     DesktopWallpaperChanged?.Invoke(this, originalUrl);
                     SetDesktopApplyError(null);
                 }
@@ -1200,6 +1211,7 @@ namespace Aura.Services
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = imageUrl;
+                    _currentLockScreenWallpaperFile = wallpaperFile.Path;
                     LockScreenWallpaperChanged?.Invoke(this, imageUrl);
                     SetLockScreenApplyError(null);
                 }
@@ -1310,6 +1322,7 @@ namespace Aura.Services
                     
                     // Store the current wallpaper URL and raise event
                     _currentLockScreenWallpaperUrl = originalUrl;
+                    _currentLockScreenWallpaperFile = wallpaperFile.Path;
                     LockScreenWallpaperChanged?.Invoke(this, originalUrl);
                     SetLockScreenApplyError(null);
                 }
@@ -1377,6 +1390,18 @@ namespace Aura.Services
         public string GetCurrentLockScreenWallpaperUrl()
         {
             return _currentLockScreenWallpaperUrl;
+        }
+
+        // Local file of the wallpaper that was applied last ("" until the
+        // first apply of this process) - the page preview loads THIS.
+        public string GetCurrentDesktopWallpaperFile()
+        {
+            return _currentDesktopWallpaperFile;
+        }
+
+        public string GetCurrentLockScreenWallpaperFile()
+        {
+            return _currentLockScreenWallpaperFile;
         }
         
         public WallpaperItem? GetCurrentDesktopWallpaperItem()

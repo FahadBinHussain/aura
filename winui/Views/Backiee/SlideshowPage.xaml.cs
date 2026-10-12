@@ -215,13 +215,29 @@ namespace Aura.Views.Backiee
         {
             try
             {
-                if (string.IsNullOrEmpty(imageUrl)) return;
-                
-                var bitmap = new BitmapImage(new Uri(imageUrl));
+                // Paint the ALREADY-DOWNLOADED local file (written when the
+                // wallpaper was applied). A remote BitmapImage fetch left the
+                // preview card WHITE for the whole download, and permanently
+                // white when the host refused the OS image stack (a silent
+                // blank state) - the local file is instant and a host can't
+                // block it.
+                string file = SlideshowService.Instance.GetCurrentDesktopWallpaperFile();
+                if (string.IsNullOrEmpty(file) || !System.IO.File.Exists(file))
+                {
+                    SetDesktopPreviewError(string.IsNullOrEmpty(file)
+                        ? "Preview file not available: no wallpaper file has been applied yet."
+                        : $"Preview file is missing on disk: {file}");
+                    return;
+                }
+
+                var bitmap = new BitmapImage(new Uri(file));
                 DesktopSlideshowImage.Source = bitmap;
+                SetDesktopPreviewError(null);
+                LogInfo($"desktop preview loaded from local file: {file}");
             }
             catch (Exception ex)
             {
+                SetDesktopPreviewError($"Preview could not load: {ex.Message}");
             }
         }
 
@@ -229,14 +245,50 @@ namespace Aura.Views.Backiee
         {
             try
             {
-                if (string.IsNullOrEmpty(imageUrl)) return;
-                
-                var bitmap = new BitmapImage(new Uri(imageUrl));
+                // Same local-file contract as the desktop preview above.
+                string file = SlideshowService.Instance.GetCurrentLockScreenWallpaperFile();
+                if (string.IsNullOrEmpty(file) || !System.IO.File.Exists(file))
+                {
+                    SetLockScreenPreviewError(string.IsNullOrEmpty(file)
+                        ? "Preview file not available: no lock screen file has been applied yet."
+                        : $"Preview file is missing on disk: {file}");
+                    return;
+                }
+
+                var bitmap = new BitmapImage(new Uri(file));
                 LockScreenSlideshowImage.Source = bitmap;
+                SetLockScreenPreviewError(null);
             }
             catch (Exception ex)
             {
+                SetLockScreenPreviewError($"Preview could not load: {ex.Message}");
             }
+        }
+
+        private void SetDesktopPreviewError(string? message)
+        {
+            try
+            {
+                DesktopPreviewErrorText.Text = message ?? "";
+                DesktopPreviewErrorText.Visibility = string.IsNullOrEmpty(message)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+                if (!string.IsNullOrEmpty(message)) LogInfo($"desktop preview: {message}");
+            }
+            catch { }
+        }
+
+        private void SetLockScreenPreviewError(string? message)
+        {
+            try
+            {
+                LockScreenPreviewErrorText.Text = message ?? "";
+                LockScreenPreviewErrorText.Visibility = string.IsNullOrEmpty(message)
+                    ? Visibility.Collapsed
+                    : Visibility.Visible;
+                if (!string.IsNullOrEmpty(message)) LogInfo($"lock screen preview: {message}");
+            }
+            catch { }
         }
 
         private void LogInfo(string message)

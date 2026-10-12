@@ -1455,3 +1455,55 @@ not the backiee/alpha-only `PageTitleTextBlock` (probe now falls back).
 known limit unchanged: gallery items carry no per-item category (mode name
 is fetch context), and the slideshow's DB path is untouched (the user's 9
 platforms do not include Digital Blasphemy).
+
+### slideshow preview paints the applied local file (2026-10-12)
+
+user report: "when i reopen aura after closing, the slideshow preview is
+blank" (white card). root cause: the preview set
+`BitmapImage(new Uri(REMOTE url))` = a fresh OS-stack fetch of the wallpaper's
+FULL-SIZE remote image; setting Source swaps out the XAML placeholder for an
+empty loading bitmap instantly, so the card renders WHITE for the whole
+download (longest right after reopen - restore + first apply + preview fetch
+all contend), and stays PERMANENTLY white when the host refuses the WinRT
+image stack - the `catch` was empty, so no error ever surfaced (silent blank
+state, twice over).
+
+- fix: `SlideshowService` now tracks the applied wallpaper's LOCAL file at
+  all 4 apply arms (`_currentDesktopWallpaperFile`/
+  `_currentLockScreenWallpaperFile` = `wallpaperFile.Path`, + getters next to
+  the url ones) and the page preview loads THAT file - it is already on disk
+  (the app just wrote it to set the wallpaper) and already proven decodable
+  by Windows, so the paint is instant and a host can never block it. the
+  remote-url fetch in `SlideshowPage.LoadDesktopWallpaper`/
+  `LoadLockScreenWallpaper` is GONE (the url getters stay - the empty-url
+  check still gates "has anything been applied yet").
+- loud contract: a missing/failed preview file now shows a red
+  `DesktopPreviewErrorText` / `LockScreenPreviewErrorText` line under the
+  card (same `SystemFillColorCriticalBrush` style as the grid pages'
+  `ErrorTextBlock`) + a log line, and the placeholder stays visible - never a
+  white card, never silent.
+- verified menuless 2026-10-12 (probes stay in C:\tmp): pre-apply = placeholder
+  + `Starting slideshow...` + no error line; +1.4s after each apply the photo
+  is ALREADY painted with the log line `desktop preview loaded from local
+  file: <path>` (a remote full-size fetch cannot finish that fast); ticker
+  tick swaps cleanly; moving the current file away + re-entering the page
+  shows the red `Preview file is missing on disk: <path>` verbatim (vision:
+  placeholder + red line) and the next apply clears it. root-cause evidence
+  for the report itself: 10 menuless captures across hosts/tickings never
+  blanked on today's build - the white window is a TIMING state (download in
+  flight), which the local file eliminates outright.
+- **build gotcha found while verifying (cost 3 false probe runs)**:
+  `dotnet build winui\Aura.csproj -p:Platform=x64` lands in
+  `bin\x64\Debug\win-x64\` - the flat `bin\Debug\Aura.exe` the probes launch
+  stays STALE (it kept the pre-fix 8:58 build all morning, so the fixcheck
+  "success" was the OLD remote path winning a warm-CDN race and the loud-path
+  check false-failed). build `winui\Aura.csproj` with NO `-p:Platform` for
+  the flat output, and assert `bin\Debug\Aura.exe` LastWriteTime is fresh
+  before trusting any probe run (refines the death-hunt section's build note).
+- probe note: the loud-path check needs the file move to land with a ~50s
+  runway (the 1-min ticker landing mid-renav writes a fresh file and hides
+  the line), and the current file must be read from `wallpaper_history.json`
+  (cache-hit ticks skip the log's `Wallpaper saved to:` line).
+- death-hunt data point: one more silent exit=0 death at ~12:35 with NO probe
+  walkers (idle between ticks, log ends clean, registry last-write stale) -
+  still parked.

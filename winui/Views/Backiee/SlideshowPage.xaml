@@ -83,6 +83,15 @@
                         </StackPanel>
                     </Grid>
 
+                    <!-- Loud preview failure line: never a silently blank card -->
+                    <TextBlock x:Name="DesktopPreviewErrorText"
+                               HorizontalAlignment="Center"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Visibility="Collapsed"/>
+
                     <!-- Status Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
                             CornerRadius="12"
@@ -172,6 +181,15 @@
                             </Button>
                         </StackPanel>
                     </Grid>
+
+                    <!-- Loud preview failure line: never a silently blank card -->
+                    <TextBlock x:Name="LockScreenPreviewErrorText"
+                               HorizontalAlignment="Center"
+                               Foreground="{ThemeResource SystemFillColorCriticalBrush}"
+                               FontSize="13"
+                               TextWrapping="Wrap"
+                               TextAlignment="Center"
+                               Visibility="Collapsed"/>
 
                     <!-- Status Card -->
                     <Border Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
