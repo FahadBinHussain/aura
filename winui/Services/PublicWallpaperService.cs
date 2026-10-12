@@ -541,15 +541,19 @@ namespace Aura.Services
         // curl-proven, see automata-private/cara.app/AGENTS.md), and wallpaper
         // engine the same day (user verdict: steam workshop's requiredtags
         // axis is a filter over one flat upload pool, not a browsable
-        // taxonomy - the declared tag vocabulary is upload plumbing) - their
-        // modes stay factual GetModes chips on their OWN grids, like bing/SD's
-        // Daily/Minimal.
+        // taxonomy - the declared tag vocabulary is upload plumbing), and
+        // artgram on 2026-10-12 (user verdict: the livewire gallery is one
+        // flat feed with only a sortBy switch - trending/latest/oldest are
+        // sorts, not taxonomy; automata-private/www.artgram.co/AGENTS.md) -
+        // their modes stay factual GetModes chips on their OWN grids, like
+        // bing/SD's Daily/Minimal.
         public static readonly string[] CategoryExcludedPlatforms =
         {
             Wallhaven,
             Pixiv,
             Cara,
             WallpaperEngine,
+            Artgram,
             Bing,
             SimpleDesktops,
         };

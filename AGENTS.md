@@ -1386,3 +1386,38 @@ surface, same doctrine as bing/SD/wallhaven/pixiv/cara:
   block (see the pixiv section), surfaced loudly per the contract. settings
   restored exact + app relaunched visible on Categories.
 - supersessions: the cara section's scope-menu count (12 -> 11).
+
+### artgram category-rejected (2026-10-12) - audit complete
+
+user verdict on audit #17 (final): artgram's livewire gallery is ONE flat feed
+with only a `sortBy` switch - trending/latest/oldest are SORTS, not a
+taxonomy (same class as cara's /trending/* tabs) - rejected from every
+category surface:
+
+- `CategoryExcludedPlatforms` = {Wallhaven, Pixiv, Cara, WallpaperEngine,
+  Artgram, Bing, SimpleDesktops}. artgram was never in the slideshow
+  checklist universe (no `AddPlatform` line), so the universe stays **255
+  names**; only the Categories page changed: scope menu 11 -> 10, and 2 mode
+  cards left the merged grid. `GetModes(Artgram)` still returns its 3 modes
+  on purpose (the bing/SD `Daily`/`Minimal` precedent), and artgram is not
+  in the user's 9-platform slideshow config (loud-skip count stays 3).
+- counts: Global **285 -> 283**: `Trending` + `Oldest` were artgram-
+  exclusive once wallpaper engine left (source grep + live-index curl
+  checks across artstation/wallpaperhub/pixabay/pexels/alpha/backiee found
+  zero exact-name owners); `Latest` survives on hdwallpapers.
+- probe updated (`C:\tmp\aura-categoryexclusion.ps1`): floor 285 -> 283 with
+  the arithmetic in the comment, rejected list += `Trending` `Oldest`,
+  spot list swaps `Oldest`+`Trending` for `Latest` (hdwallpapers-owned).
+- verified menuless 2026-10-12: cards=283 exact, all 12 rejected names gone,
+  10 spot names present, alpha `Vehicle` drill 15 items + title + bar clean,
+  back rebuilds 283 with scope `Global`, watch stable. the watch caught one
+  loud line - `WallpaperHub category thumbnails: 2/17 failed - 404` -
+  curl-verified live-site drift: wallpaperhub's own CDN 404s the first-thumb
+  cache files of collections `2019` (6401) and `idek` (6638); surfaced
+  loudly per the contract, unrelated to this change. settings restored
+  exact + app relaunched visible on Categories.
+- supersessions: the wallpaper-engine section's scope-menu count (11 -> 10).
+- **site-category audit complete: 17/17 judged - 10 yes (backiee,
+  alphacoders, pixabay, wallpaperhub, artstation, pexels, desktopnexus,
+  hdwallpapers, digital blasphemy, wallpaper cave), 7 no (bing, simple
+  desktops, wallhaven, pixiv, cara, wallpaper engine, artgram).**
