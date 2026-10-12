@@ -1591,3 +1591,48 @@ amber skip lines).
   -Raw` is an invalid combination; (3) the restored-state loud-skip assert must
   POLL (skip lines land only after the startup load). flat-build rule applies
   (no `-p:Platform`, assert `bin\Debug\Aura.exe` freshness).
+
+### slideshow dialog lists all 17 platforms, Category shows the capable 10 (2026-10-12)
+
+user ask: "wtf? latest should be 17, no?" - the Set-slideshow dialog's Select
+Platforms checklist was 9 hard-coded checkboxes from before platforms 10-17
+were ported (2026-10-08), so 8 implemented platforms (Artgram, Cara,
+DesktopNexus, Digital Blasphemy, HDwallpapers, Pixiv, Wallpaper Cave,
+Wallpaper Engine) could never be selected for a slideshow at all.
+
+- dialog: the boxes are built dynamically over
+  `new[] { "Backiee", "AlphaCoders", "ArtStation" }.
+  Concat(PublicWallpaperService.GetSupportedPlatformNames())` = all 17 (the
+  same single-source pattern CategoriesPage's CategoryPlatforms uses), and
+  the save block loops the array instead of carrying 9 hard-coded ifs. tick
+  state reads case-insensitively against the saved list. under the Category
+  basis ApplyBasisVisibility still collapses the category-rejected 7, so
+  Latest offers all 17 and Category offers the capable 10.
+- checklist universe grew for the 4 newly-selectable capable platforms:
+  SlideshowCategoryCatalog's LoadAsync also merges every non-excluded
+  supported platform's OWN GetModes list now (all static - desktopnexus
+  subdomain galleries, digital blasphemy's 15 galleries, hdwallpapers
+  listings, wallpaper cave curated albums) behind a ContainsKey guard so the
+  6 live-index platforms keep their fetched lists authoritative. ZERO new
+  fetches. universe names: 255 -> 296.
+- loaders needed no change (already fully dynamic: LoadLatestFeedAsync +
+  LoadCategoryTickAsync route every supported platform, and ResolveKey's
+  default case matches GetModes entries - which the static lists now feed).
+- verified menuless 2026-10-12 (probe `C:\tmp\aura-platformrejection.ps1`
+  v2): full PASS - Category view = 10 present / all 7 rejected absent,
+  Latest view = all 17 present, the 8 new boxes ticked -> Set stores 17
+  platforms basis Latest, status `17 platforms - Latest Wallpapers (Refresh:
+  1 Minutes)`, load `Loaded 869 wallpapers from 17 platform(s) (1 failed)`
+  (the 1 failure = the KNOWN DesktopNexus site-wide 403, loud per contract),
+  reopen -> Category -> Set drops all 7 rejected (log line names each) and
+  stores the 10 capable with status `10 platforms - Category: All categories
+  (Refresh: 1 Minutes)`, checklist Ready with the new names (universe 296,
+  DB `Planetscapes`/`Night Scenes` spot-checked), then byte-exact settings
+  restore + relaunch back to `9 platforms - Category: All categories
+  (Refresh: 1 Minutes)` with the legacy loud skip lines still firing. vision
+  (zengate): the captured dialog = 17 boxes all ticked, Latest selected, no
+  error banners.
+- supersessions: the platform-rejection section's "the dialog builds exactly
+  9 platform checkboxes" line (it is 17 now), and its "pixiv/cara/wallpaper
+  engine/artgram were never in this dialog" (they are now - hidden under
+  Category like the other rejected sites).

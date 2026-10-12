@@ -373,6 +373,22 @@ namespace Aura.Services
             // is a category taxonomy (category-rejected 2026-10-10, same doctrine
             // as bing/simple desktops)
 
+            // every other category-capable public platform contributes its OWN
+            // GetModes list - all static (desktopnexus subdomain galleries,
+            // digital blasphemy's 14 galleries, hdwallpapers listings, wallpaper
+            // cave curated albums; the audit accepted all four 2026-10-11/12), so
+            // these join with ZERO fetches and the 6 live index loads above stay
+            // the only network. rejected platforms are skipped (same doctrine:
+            // they never join), and the live-index platforms are already keyed
+            // here so their fetched lists stay authoritative over GetModes.
+            foreach (var platform in PublicWallpaperService.GetSupportedPlatformNames())
+            {
+                if (!PublicWallpaperService.IsCategoryExcluded(platform) && !_platformNames.ContainsKey(platform))
+                {
+                    AddPlatform(platform, PublicWallpaperService.GetModes(platform));
+                }
+            }
+
             var names = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var list in _platformNames.Values)
             {

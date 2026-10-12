@@ -650,7 +650,12 @@ namespace Aura.Views.Backiee
 
             // Platform selection with checkboxes - wrapped into rows of 4: the old
             // 9-row vertical stack ate ~230px and pushed the basis picker + category
-            // list below the fold (the user had to scroll just to reach them)
+            // list below the fold (the user had to scroll just to reach them).
+            // the list = EVERY implemented platform (17), not the old hard-coded 9
+            // from before platforms 10-17 were ported (2026-10-08) - single source
+            // of truth, the same way CategoriesPage builds its scope list. under the
+            // Category basis ApplyBasisVisibility collapses the category-rejected
+            // ones, so Latest offers all 17 and Category offers only the capable 10.
             var platformLabel = new TextBlock
             {
                 Text = "Select Platforms",
@@ -659,66 +664,16 @@ namespace Aura.Views.Backiee
             };
             contentPanel.Children.Add(platformLabel);
 
-            var platformCheckBoxBackiee = new CheckBox
-            {
-                Content = "Backiee",
-                IsChecked = currentPlatforms.Contains("Backiee")
-            };
-
-            var platformCheckBoxAlphaCoders = new CheckBox
-            {
-                Content = "AlphaCoders",
-                IsChecked = currentPlatforms.Contains("AlphaCoders")
-            };
-
-            var platformCheckBoxArtStation = new CheckBox
-            {
-                Content = "ArtStation",
-                IsChecked = currentPlatforms.Contains("ArtStation")
-            };
-
-            var platformCheckBoxWallhaven = new CheckBox
-            {
-                Content = "Wallhaven",
-                IsChecked = currentPlatforms.Contains("Wallhaven")
-            };
-
-            var platformCheckBoxBing = new CheckBox
-            {
-                Content = "Bing Wallpaper Archive",
-                IsChecked = currentPlatforms.Contains("Bing Wallpaper Archive")
-            };
-
-            var platformCheckBoxSimpleDesktops = new CheckBox
-            {
-                Content = "Simple Desktops",
-                IsChecked = currentPlatforms.Contains("Simple Desktops")
-            };
-
-            var platformCheckBoxWallpaperHub = new CheckBox
-            {
-                Content = "WallpaperHub",
-                IsChecked = currentPlatforms.Contains("WallpaperHub")
-            };
-
-            var platformCheckBoxPexels = new CheckBox
-            {
-                Content = "Pexels",
-                IsChecked = currentPlatforms.Contains("Pexels")
-            };
-
-            var platformCheckBoxPixabay = new CheckBox
-            {
-                Content = "Pixabay",
-                IsChecked = currentPlatforms.Contains("Pixabay")
-            };
-
-            var platformChecks = new[]
-            {
-                platformCheckBoxBackiee, platformCheckBoxAlphaCoders, platformCheckBoxArtStation,
-                platformCheckBoxWallhaven, platformCheckBoxBing, platformCheckBoxSimpleDesktops,
-                platformCheckBoxWallpaperHub, platformCheckBoxPexels, platformCheckBoxPixabay
-            };
+            var platformNames = new[] { "Backiee", "AlphaCoders", "ArtStation" }
+                .Concat(PublicWallpaperService.GetSupportedPlatformNames())
+                .ToArray();
+            var platformChecks = platformNames
+                .Select(name => new CheckBox
+                {
+                    Content = name,
+                    IsChecked = currentPlatforms.Any(p => string.Equals(p, name, StringComparison.OrdinalIgnoreCase))
+                })
+                .ToArray();
             for (int rowStart = 0; rowStart < platformChecks.Length; rowStart += 4)
             {
                 var row = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 20 };
@@ -961,26 +916,13 @@ namespace Aura.Views.Backiee
 
             if (result == ContentDialogResult.Primary)
             {
-                // Collect selected platforms
+                // Collect selected platforms (the dynamic 17-box list)
                 var selectedPlatforms = new List<string>();
-                if (platformCheckBoxBackiee.IsChecked == true)
-                    selectedPlatforms.Add("Backiee");
-                if (platformCheckBoxAlphaCoders.IsChecked == true)
-                    selectedPlatforms.Add("AlphaCoders");
-                if (platformCheckBoxArtStation.IsChecked == true)
-                    selectedPlatforms.Add("ArtStation");
-                if (platformCheckBoxWallhaven.IsChecked == true)
-                    selectedPlatforms.Add("Wallhaven");
-                if (platformCheckBoxBing.IsChecked == true)
-                    selectedPlatforms.Add("Bing Wallpaper Archive");
-                if (platformCheckBoxSimpleDesktops.IsChecked == true)
-                    selectedPlatforms.Add("Simple Desktops");
-                if (platformCheckBoxWallpaperHub.IsChecked == true)
-                    selectedPlatforms.Add("WallpaperHub");
-                if (platformCheckBoxPexels.IsChecked == true)
-                    selectedPlatforms.Add("Pexels");
-                if (platformCheckBoxPixabay.IsChecked == true)
-                    selectedPlatforms.Add("Pixabay");
+                for (int i = 0; i < platformChecks.Length; i++)
+                {
+                    if (platformChecks[i].IsChecked == true)
+                        selectedPlatforms.Add(platformNames[i]);
+                }
 
                 // a Category save cannot carry rejected sites (their boxes are
                 // collapsed-but-ticked right now; on the saved list they would
