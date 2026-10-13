@@ -42,6 +42,10 @@ namespace Aura
         private bool isHandlingResize = false;
         private SizeInt32 lastAppliedSize;
 
+        // System tray: close hides the window to the tray, Exit lives in the tray menu
+        private TrayIconService? _tray;
+        private bool _reallyExiting;
+
         // Static reference to main window instance for navigation
         public static MainWindow Instance { get; private set; }
 
@@ -149,6 +153,10 @@ namespace Aura
             // Register for window resizing event
             m_appWindow.Changed += AppWindow_Changed;
 
+            // System-tray icon: closing the window hides it to the tray while the app
+            // (and the slideshow) keeps running - the tray menu holds Open Aura / Exit
+            InitializeTray();
+
             // Restore window position and size if available
             RestoreWindowPositionAndSize();
 
@@ -219,8 +227,81 @@ namespace Aura
 
         private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
         {
-            // Save window position and size when closing
+            // Save window position and size when closing (also on every hide-to-tray)
             SaveWindowPositionAndSize();
+
+            if (_reallyExiting)
+            {
+                // real exit requested (tray Exit / hot reload button) - let it close
+                return;
+            }
+
+            if (_tray == null)
+            {
+                // LOUD degraded state: the tray never started (startup dialog + log line
+                // named the reason), so hiding would strand the window with no way back
+                LogInfo("no tray icon available - closing EXITS the app (reason was shown at startup)");
+                return;
+            }
+
+            // close = hide to tray, the app keeps running
+            args.Cancel = true;
+            m_appWindow.Hide();
+            LogInfo("window closed - hidden to tray, app keeps running (reopen or exit from the tray icon)");
+        }
+
+        /// <summary>
+        /// Called from the tray icon (left click) and from a second launch of Aura.exe.
+        /// </summary>
+        public void ShowFromTray()
+        {
+            if (m_appWindow == null) return;
+            m_appWindow.Show();
+            if (m_appWindow.Presenter is OverlappedPresenter presenter && presenter.State == OverlappedPresenterState.Minimized)
+            {
+                presenter.Restore();
+            }
+            Activate();
+            LogInfo("window shown from tray");
+        }
+
+        /// <summary>
+        /// The one real-exit path: saves window position, drops the tray icon, exits.
+        /// Used by the tray menu's Exit and the dev hot-reload button.
+        /// </summary>
+        private void ExitApplication()
+        {
+            if (_reallyExiting || Environment.HasShutdownStarted) return;
+            _reallyExiting = true;
+
+            LogInfo("exiting (real exit)");
+            SaveWindowPositionAndSize();
+            _tray?.Dispose();
+            _tray = null;
+            Microsoft.UI.Xaml.Application.Current.Exit();
+        }
+
+        private void InitializeTray()
+        {
+            try
+            {
+                _tray = new TrayIconService();
+                _tray.OpenRequested += ShowFromTray;
+                _tray.ExitRequested += ExitApplication;
+                LogInfo("tray ready - close hides to tray, Exit is in the tray menu");
+            }
+            catch (Exception ex)
+            {
+                _tray = null;
+                LogInfo($"tray icon failed to start: {ex.Message}");
+                TrayIconService.ShowStartupFailure(ex.Message);
+            }
+        }
+
+        private void LogInfo(string message)
+        {
+            try { ((App)Application.Current).LogInfo($"[MainWindow] {message}"); }
+            catch { }
         }
 
         private void SaveWindowPositionAndSize()
@@ -1082,9 +1163,9 @@ namespace Aura
             if (sender is Button btn)
                 btn.IsEnabled = false;
 
-            // Simply exit — dev.bat will auto-rebuild and relaunch.
-            // Run winui\dev.bat in your terminal instead of dotnet run.
-            Microsoft.UI.Xaml.Application.Current.Exit();
+            // Real exit (position saved, tray icon dropped) - dev.bat will auto-rebuild
+            // and relaunch. Run winui\dev.bat in your terminal instead of dotnet run.
+            ExitApplication();
         }
     }
 }

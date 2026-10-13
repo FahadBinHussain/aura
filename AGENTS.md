@@ -1781,3 +1781,107 @@ orange pill (pixabay's detail-page resolver had shipped earlier the same day).
 - supersessions: the pixabay pill section's "wallpaperhub/pexels/artstation absence stands" line
   (all three have a real source now), and the history-pill section's "pixabay/pexels/artstation/
   wallpaperhub never do" line.
+
+
+### close-to-tray + single-instance + hidden-icon detection (2026-10-13)
+
+user ask: closing the window should hide to tray (app + slideshow keep running), quit lives
+only in the tray menu, and a second launch reopens the running instance instead of spawning
+a second one.
+
+- **close = hide**: `MainWindow.AppWindow_Closing` always saves coords, then
+  `args.Cancel = true` + `m_appWindow.Hide()` unless `_reallyExiting` or `_tray == null`
+  (tray failed at startup = closing EXITS, with the loud log line - never a window with no
+  way back). the log line: `window closed - hidden to tray, app keeps running (reopen or
+  exit from the tray icon)`. shared `ExitApplication()` = `_reallyExiting` + save coords +
+  dispose tray + `Application.Current.Exit()`; used by tray-menu Exit AND the dev
+  HotReloadButton (the probe's exit-path check drives HotReloadButton since clicking the
+  tray menu needs real input).
+- **tray = raw `Shell_NotifyIcon` P/Invoke** (zero NuGet deps), `winui/Services/
+  TrayIconService.cs`. icon always registered from startup; left click opens, right click =
+  Open Aura / Exit menu, tooltip `Aura`. `NIM_ADD` failure = MessageBoxW + log + `_tray =
+  null` (so the closing handler exits instead of hiding). a hidden message-only host window
+  owns the callbacks.
+- **single-instance**: mutex `Aura_SingleInstance` + `EventWaitHandle` `Aura_ShowWindow`;
+  second instance signals + `FindWindowW(null,"Aura")` foreground handoff, then exits 0.
+  both are named objects with a `Local\`-less plain name - process-local vs global didn't
+  matter here (same session). `App.OnShowSignal` marshals to the UI thread and calls
+  `BringRunningWindowForward`.
+- **verification** (`C:\tmp\aura-trayclose.ps1`, stays in C:\tmp, menuless - UIA + window
+  messages only, zero synthetic input, focus restored at the end): 20/20 FULL PASS on the
+  2026-10-13 build - close hides, slideshow logs while hidden, second/third launch signal +
+  exit 0 + single process remains, re-close hides again, exit-path exits code 0, settings
+  sha unchanged.
+- **PWsh gotchas hit while wiring the probe**: `Get-Process Aura.MainWindowHandle` can pick
+  the debug console window instead of the real one - resolve the main window by walking
+  UIA text, not by the first handle; PS coerces `$null` to `''` when building a P/Invoke
+  argument list, so `FindWindowW($null, "Aura")` silently becomes `FindWindowW("", "Aura")`
+  - pass `[IntPtr]::Zero`/an explicit null; nested C# classes in `Add-Type` need the
+  `[Outer+Inner]` PS type literal; the `-f` format operator wants a comma-array RHS; and
+  `Add-Type` cannot emit exes in pwsh 7 - probe exes get built with the dotnet SDK.
+
+#### the paint gate: NIM_ADD success does NOT mean you can see the icon (2026-10-13)
+
+**the whole point of close-to-tray is the tray icon, and on this Win11 26100 box a newly
+registered tray icon is never painted on screen.** exhaustive evidence, all with a real
+screen grab (never trust capture-tool output for this):
+
+- `Shell_NotifyIconGetRect` returns a valid phantom slot (one slot LEFT of the painted
+  `ToolbarWindow32` "User Promoted Notification Area" strip, e.g. 1538 vs 1562..1782) and
+  `NIM_ADD`/`NIM_DELETE`/`NIM_MODIFY` all return TRUE - while the pixels over that slot are
+  flat taskbar. multiple phantom icons share the same rect (uid=7 and uid=55 both 1538).
+  a never-before-seen exe name behaves identically (fresh `AuraTrayProbe1.exe`), so it is
+  not per-app history.
+- **no programmatic promotion works** (each tested S_OK / TRUE yet `IsPromoted` never got
+  written and nothing painted): `ITrayNotifyWin8::SetPreference` across gist-56 layout +
+  pad, cbSize-first, 4B/8B interleaved-after-hwnd, 4B-after-pref, 8B-after-tip (L2-L6),
+  with raw `current\pwsh.exe` and resolved `7.6.2\pwsh.exe` identities; `RegisterCallback`
+  (INotificationCB) delivers ZERO events even for foreign-process adds (the ysc3839 gist
+  callback-promote pattern is dead here); `NIF_INFO` balloons return TRUE but render
+  nothing (verified by window enumeration + text sweep + corner pixel sampling); direct
+  registry `IsPromoted=1` pre-add AND post-persist + re-add; `EnableAutoTray` is already
+  0 globally; `NIM_SETVERSION`, chevron, TBSTATE - no-ops. the UPA toolbar DOES gain our
+  button (btns 9->10, its rect grows to include the slot, TBSTATE=0x00 like every other) -
+  explorer filters by promotion internally, so toolbar membership/TBSTATE is not the gate.
+  **Settings > Taskbar > Other system tray icons is the only lever, and it is a user
+  action.** shipped the feature anyway with the loud detection below (rule: no silent
+  invisible-icon degradation).
+- **`NIM_GET`'s `dwStateMask=0xFFFFFFFF` -> `dwState & NIS_HIDDEN` reports 0** for the
+  known-hidden icon - the documented hidden flag is a no-op on this build, same as
+  everything else. `Registry NotifyIconSettings` entries persist only
+  `UID/InitialTooltip/ExecutablePath` at icon delete; painted apps show `IsPromoted=1`,
+  ours never gets one.
+- **detector = pixels, calibrated same-run** (that's what ships in `TrayIconService.
+  CheckVisibility`, ~2s after NIM_ADD): inset (+4px all sides) luminance stddev + range of
+  our GetRect slot against the flattest of two same-size taskbar patches 80/160px to its
+  LEFT. calibration numbers on this box: unpainted slot **sd 0.85, range 4**, taskbar
+  patches sd 0.89-0.93, painted strip icons **sd 21-37, range 164-212**. shipped rule:
+  `painted = sd >= 6 && range >= 20 && sd >= bgSd * 1.5`; every verdict (and its raw
+  numbers) goes to app.log. the +4 inset is load-bearing: a FULL 24x40 grab includes the
+  taskbar's 1px edge line and reads sd~16 for a perfectly flat slot, which would fake a
+  "painted" hit.
+- **two traps that produced false verdicts before the shipped rule existed**: (1) an
+  absolute BRIGHTNESS threshold against a baseline (#E9E9E9 flat taskbar) faked "painted"
+  - taskbar brightness drifts with wallpaper/accent (#AA9FA1/#E9E9E9/#A1979A observed), so
+  never use cross-run baselines or fixed brightness cutoffs, only same-run variance; (2)
+  a threshold-vs-baseline probe at the WRONG region (grabbing the edge line, or a region
+  shifted onto a painted neighbor) flips the answer - the baseline must be the same size,
+  same y, and proven uniform first (raw RGB dump, not an ASCII render - taskbar brightness
+  shifts make thresholded renders unreliable).
+- **the loud hint** (fires only when detection says NOT painted, at most once per
+  machine): a native MessageBoxW (the only channel proven to render on this build) with
+  the exact Settings path, logged `tray icon visibility notice: shown, marker written`;
+  marker = `HKCU\SOFTWARE\Aura\TrayIconVisibilityNotice` DWORD 1, written AFTER the user
+  dismisses so an interrupted notice retries next launch. relaunch with the marker set
+  logs `already shown on this machine - not repeating` and shows no dialog. the recovery
+  path exists regardless of the icon: relaunching Aura signals the running instance, so a
+  hidden icon is degraded UX, never an unreachable app.
+- **probe hygiene**: clear `TrayIconVisibilityNotice` only when you intend to test the
+  dialog; menuless runs need the marker set or the dialog steals focus mid-probe. clean up
+  `HKCU\Control Panel\NotifyIconSettings` pwsh entries your probe created (the app's own
+  icon entries stay - they are its identity). `C:\tmp\tray-nidget.ps1` (NIS_HIDDEN),
+  `C:\tmp\tray-viscal.ps1` (pixel calibration), `C:\tmp\tray-balloon.ps1` /
+  `tray-balwin.ps1` / `tray-baldeep.ps1` (balloon-dead proofs) stay in C:\tmp.
+- the tray-menu **Exit click** is still a manual user handoff (menuless probes cannot
+  click it) - the probe verifies the same code path through HotReloadButton's
+  `ExitApplication()`.
