@@ -1921,3 +1921,64 @@ screen grab (never trust capture-tool output for this):
 - the tray-menu **Exit click** is still a manual user handoff (menuless probes cannot
   click it) - the probe verifies the same code path through HotReloadButton's
   `ExitApplication()`.
+
+### ROOT CAUSE FOUND: the system tray was 100% full - the icon goes to OVERFLOW (2026-10-14)
+
+**the icon is not broken, not unpaintable, and there is no app-side bug. it is full.
+explorer was putting it behind the "Show Hidden Icons" chevron.** all of the earlier
+levers (IsPromoted, IconSnapshot, AUMID, install dir, SetPreference, NIF_GUID) were
+aimed at a problem that does not exist. evidence:
+
+- **the tray on this build is entirely XAML - there is NO classic toolbar.** a full
+  explorer window inventory found **zero `ToolbarWindow32` windows anywhere on the
+  desktop**. `Shell_TrayWnd` paints through a child
+  `Windows.UI.Composition.DesktopWindowContentBridge` at `0,1032 1920x48`. so every
+  earlier TB_GETBUTTON/TBSTATE/upa-toolbar measurement was reading a window that no
+  longer owns any pixels - the shell's classic tray path is gone on 26100 and only
+  `Taskbar.View.dll`'s XAML SystemTray draws. (the AGENTS lines above claiming "the UPA
+  toolbar DOES gain our button" are SUPERSEDED: there is no such toolbar now.)
+- **`TrayNotifyWnd` is an EMPTY geometry placeholder.** it has zero child windows and
+  zero UIA content. its rect is just the tray's allocation (`1438,1032 482x48` at rest).
+  **UIA trap: bind to `Shell_TrayWnd`, never `TrayNotifyWnd`** - `FromHandle(TrayNotifyWnd)`
+  returns a valid element with no children, so a walk silently yields an empty tree and
+  reads like "nothing is rendered".
+- **the tray was exactly full at rest.** 8 user notify icons x 32px = 256px
+  (`1438..1662`: OBS Studio, Flameshot, Steam, Ditto, Proton VPN, Directory Opus,
+  Microphone Muted, Internet Download Manager) + 7 system icons filling `1662..1920`
+  (mic-in-use, Network, Volume, Power, Clock 74px, Notifications, Show Desktop) =
+  **482px = the exact tray width. zero spare pixels.**
+- **the A/B is clean.** registering one new icon (`C:\tmp\trayw.exe A`, add=True):
+  - `TrayNotifyWnd` grows **+32px on the LEFT**: `1438,1032 482x48` -> `1406,1032 514x48`
+    (the shell reserves geometry for it);
+  - a **`Button "Show Hidden Icons" id="SystemTrayIcon" 1406,1032 32x48`** appears - the
+    chevron - at exactly the reserved slot;
+  - our icon is **ABSENT from the `NotifyItemIcon` list** (still exactly 8 entries).
+  delete the icon -> tray back to `1438/482` and the chevron is gone.
+  so a new icon lands in the OVERFLOW, not the main tray, purely because there is no room.
+- **this finally explains the mysterious "glyph"** the pixel detector measured (66-72 ink
+  px, icon-independent, static, present only when a new icon registered): it was the
+  **chevron's caret rendered at our slot**. and it explains the flat-vs-glyph correlation
+  - `IsPromoted=1` pulls the icon out of overflow, so no overflow -> no chevron -> flat
+  slot. the correlation was never causation, just "is the chevron showing".
+- `Shell_NotifyIconGetRect` returns **`E_INVALIDARG` (0x80070057)** for an overflow icon
+  on this build, even though its `NIM_ADD` returned TRUE and `TrayNotifyWnd` grew. so a
+  GetRect failure now means "in overflow / not in the visible model", not "not registered".
+- registry state agrees: `HKCU\Control Panel\NotifyIconSettings` keys + `UIOrderList`
+  (224 bytes = **28 little-endian uint64**, a plain list of the key hashes - trivially
+  decodable, and our key `13867971803829221526` is present at index 14) already carry our
+  icon. ingestion was never the problem. every entry with `IconSnapshot` bytes painted;
+  the only 3 with 0 bytes are Aura + 2 explorer placeholders.
+
+**what actually has to happen (user action, cannot be done from code):** free a main-tray
+slot - click the `^` "Show Hidden Icons" chevron and drag Aura into the tray, or set one of
+the 8 running apps' icons to hidden so Aura's fits. there is **no app-side API** that
+forces a paint (the research report's §4 conclusion holds), and this is not a 26100 bug -
+it is correct overflow behaviour on a full tray.
+
+**shipped-code consequence (open):** `TrayIconService.CheckVisibility`'s pixel-stddev
+detector is measuring **the chevron**, not our icon, and its `sd >= bgSd * 1.5` term also
+fails under a busy wallpaper. it should be replaced with a UIA read over `Shell_TrayWnd`:
+count `NotifyItemIcon` entries and test for a `Show Hidden Icons` button - that reports the
+REAL reason (overflow / tray full) instead of a pixel guess. see
+`C:\tmp\trayuia.ps1` (tree dump) and `C:\tmp\traymeasure.ps1` (live A/B), both stay in
+C:\tmp. full sourced background: `TRAY-PAINT-RESEARCH.md` (public-safe, no identifiers).
