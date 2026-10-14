@@ -66,6 +66,9 @@ namespace Aura.Services
         private static WndProcDelegate? s_hostProc;
         private static TrayIconService? s_current;
 
+        // registered once per process; 0 = registration failed (guarded at the compare site)
+        private static readonly uint TaskbarCreatedMessage = RegisterWindowMessageW("TaskbarCreated");
+
         public TrayIconService()
         {
             s_hostProc ??= HostWndProc;
@@ -129,6 +132,27 @@ namespace Aura.Services
             _iconAdded = true;
         }
 
+        /// <summary>
+        /// explorer restarts (crash, update, manual kill) broadcast TaskbarCreated and drop
+        /// every registered tray icon. re-add ours so the icon comes back without an app
+        /// restart - NIM_ADD is idempotent against the fresh shell. loud on failure.
+        /// </summary>
+        private void ReAddIconAfterExplorerRestart()
+        {
+            if (_disposed) return;
+            var nid = BuildData();
+            if (Shell_NotifyIconW(NimAdd, ref nid))
+            {
+                _iconAdded = true;
+                LogInfo("tray icon re-added after explorer restart");
+            }
+            else
+            {
+                int err = Marshal.GetLastWin32Error();
+                LogInfo($"tray icon re-add after explorer restart failed (win32 {err})");
+            }
+        }
+
         private NotifyIconData BuildData()
         {
             return new NotifyIconData
@@ -148,10 +172,24 @@ namespace Aura.Services
         private static IntPtr HostWndProc(IntPtr hWnd, uint msg, IntPtr wParam, IntPtr lParam)
         {
             var self = s_current;
-            if (self != null &&
-                (msg == WmLButtonUp || msg == WmLButtonDblClk || msg == WmRButtonUp))
+            if (self != null)
             {
-                return self.HandleMessage(msg);
+                // the shell delivers uCallbackMessage as msg and the actual mouse button
+                // (WM_LBUTTONUP / WM_LBUTTONDBLCLK / WM_RBUTTONUP / ...) in lParam. we must
+                // dispatch on lParam - comparing msg against the mouse constants never
+                // matches (msg is always CallbackMessage=0x8001), so every tray click used
+                // to fall through to DefWindowProc and the icon was dead: left-click did
+                // nothing, right-click never opened the Exit menu.
+                if (msg == CallbackMessage)
+                    return self.HandleMessage((uint)(lParam.ToInt32() & 0xFFFF));
+
+                // explorer restarts broadcast TaskbarCreated and drop every registered
+                // icon; re-add ours so the tray survives without an app restart.
+                if (TaskbarCreatedMessage != 0 && msg == TaskbarCreatedMessage)
+                {
+                    self.ReAddIconAfterExplorerRestart();
+                    return IntPtr.Zero;
+                }
             }
             return DefWindowProcW(hWnd, msg, wParam, lParam);
         }
@@ -536,6 +574,9 @@ namespace Aura.Services
 
         [DllImport("user32.dll", CharSet = CharSet.Unicode, SetLastError = true, EntryPoint = "LoadImageW")]
         private static extern IntPtr LoadImageW(IntPtr hInst, string name, uint type, int cx, int cy, uint fuLoad);
+
+        [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+        private static extern uint RegisterWindowMessageW(string lpString);
 
         [DllImport("user32.dll")]
         private static extern bool DestroyIcon(IntPtr hIcon);
