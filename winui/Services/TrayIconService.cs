@@ -482,13 +482,19 @@ namespace Aura.Services
             public uint uID;
             public uint uFlags;
             public uint uCallbackMessage;
+            // hIcon comes BEFORE szTip - that is the real NOTIFYICONDATAW order, proven
+            // against the SDK header shellapi.h: cbSize, hWnd, uID, uFlags,
+            // uCallbackMessage, hIcon, szTip[128], dwState, dwStateMask, szInfo[256],
+            // uTimeout/uVersion, szInfoTitle[64], dwInfoFlags, guidItem, hBalloonIcon.
+            // an earlier edit put szTip first on the wrong belief that hIcon follows it.
+            // the struct SIZE is the same either way (976 bytes on x64), so NIM_ADD kept
+            // returning TRUE and reserving a real tray slot - but the shell then read
+            // szTip from the offset holding our zeroed tail (=> empty tooltip) and hIcon
+            // from the offset holding the UTF-16 tail of "Aura" (=> invalid handle).
+            // that is exactly why the icon registered a genuine slot yet painted NOTHING.
+            public IntPtr hIcon;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 128)]
             public string szTip;
-            // hIcon MUST live here: in NOTIFYICONDATAW it comes right after szTip and
-            // before dwState. Skipping it shifts every later field and leaves the shell
-            // reading a NULL icon handle - NIM_ADD still succeeds and reserves a slot,
-            // so the icon is registered but paints NOTHING (verified by capture).
-            public IntPtr hIcon;
             public uint dwState;
             public uint dwStateMask;
             [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)]
