@@ -1843,9 +1843,25 @@ screen grab (never trust capture-tool output for this):
   0 globally; `NIM_SETVERSION`, chevron, TBSTATE - no-ops. the UPA toolbar DOES gain our
   button (btns 9->10, its rect grows to include the slot, TBSTATE=0x00 like every other) -
   explorer filters by promotion internally, so toolbar membership/TBSTATE is not the gate.
-  **Settings > Taskbar > Other system tray icons is the only lever, and it is a user
-  action.** shipped the feature anyway with the loud detection below (rule: no silent
-  invisible-icon degradation).
+  **Settings > Taskbar > Other system tray icons does NOT actually paint the icon on this
+  build** (tested end-to-end 2026-10-14). the deadlock is real: the Settings list only shows
+  entries carrying an `IconSnapshot`, and the shell only writes one for an icon it has
+  already painted - so a from-scratch hidden icon has no row to toggle. fabricating the row
+  (seeding a real `IconSnapshot` PNG + `InitialTooltip` into the shell-created
+  `NotifyIconSettings` entry) DOES make the row appear and the toggle DOES write
+  `IsPromoted=1`, but the icon still never renders. all of these give the same flat slot
+  (inset sd <2): fresh `NIM_ADD` after `IsPromoted=1`, a live Off->On toggle, and a real
+  (non-blank) snapshot (a blank one is rejected the same way). the app's `NIM_ADD` is
+  itself standard (`NIF_MESSAGE|NIF_ICON|NIF_TIP`, valid `hIcon`, `uID=1`, `szTip`) - this
+  is not an app-side bug. conclusion: the Settings toggle only writes the same passive
+  registry marker that a direct `IsPromoted=1` write does - `IsPromoted` is downstream of
+  painting, not an upstream trigger - so "Settings is the lever" is disproven for a
+  never-painted icon. the entry reverts cleanly to baseline (`UID/InitialTooltip/
+  ExecutablePath`, no `IconSnapshot`/`IsPromoted`); a non-functional `IsPromoted=1` is left
+  out on purpose (dead promotion state = same sin as dead promotion code). an
+  explorer.exe restart would also be futile: the app's own restarts already do a fresh
+  `NIM_ADD` that re-reads `IsPromoted=1`, and every one came back flat. shipped the feature
+  anyway with the loud detection below (rule: no silent invisible-icon degradation).
 - **`NIM_GET`'s `dwStateMask=0xFFFFFFFF` -> `dwState & NIS_HIDDEN` reports 0** for the
   known-hidden icon - the documented hidden flag is a no-op on this build, same as
   everything else. `Registry NotifyIconSettings` entries persist only
