@@ -1982,3 +1982,81 @@ count `NotifyItemIcon` entries and test for a `Show Hidden Icons` button - that 
 REAL reason (overflow / tray full) instead of a pixel guess. see
 `C:\tmp\trayuia.ps1` (tree dump) and `C:\tmp\traymeasure.ps1` (live A/B), both stay in
 C:\tmp. full sourced background: `TRAY-PAINT-RESEARCH.md` (public-safe, no identifiers).
+
+
+### REAL ROOT CAUSE: `NOTIFYICONDATAW` had `hIcon` and `szTip` swapped (2026-10-14, commit `9e36d98`)
+
+**the icon was never unpaintable - our own struct was wrong, and the transposition is
+invisible to every check that only looks at sizes or return codes.**
+
+- `winui/Services/TrayIconService.cs` `NotifyIconData` declared `szTip` BEFORE `hIcon`.
+  the real order, verified against
+  `C:\Program Files (x86)\Windows Kits\10\Include\10.0.18362.0\um\shellapi.h` lines
+  1034-1061, is `cbSize, hWnd, uID, uFlags, uCallbackMessage, hIcon, szTip[128],
+  dwState, dwStateMask, szInfo[256], uTimeout/uVersion, szInfoTitle[64], dwInfoFlags,
+  guidItem, hBalloonIcon`. a comment in the code asserted the opposite - that `hIcon`
+  "comes right after szTip" - and that comment WAS the bug. never trust a layout
+  comment over the SDK header.
+- **the struct SIZE is identical either way (976 bytes on x64), measured with
+  `Marshal.SizeOf` over both field orders.** so `cbSize` was right, `NIM_ADD` returned
+  TRUE, a real tray slot was reserved, and no error path could ever fire. that is the
+  whole reason this survived so long: it is structurally impossible to detect from a
+  return code.
+- measured field offsets (`Marshal.OffsetOf`), fixed vs shipped: `hIcon` **32 vs 288**,
+  `szTip` **40 vs 28**, `dwState` 296 both (the pair re-pads to the same end). so the
+  shell read `hIcon` at offset 32 - which held byte 4+ of our UTF-16 `"Aura"`, i.e.
+  `'r','a',0,0,...` = an invalid handle - and read `szTip` at offset 40, which held our
+  zeroed tail = an **empty string**.
+- **the tell nobody connected:** our tray entry had a **blank UIA `Name` while every
+  other icon's `Name` was its tooltip**, even though `InitialTooltip='Aura'` was sitting
+  healthy in `HKCU\Control Panel\NotifyIconSettings`. an empty tooltip the app never
+  sent is direct evidence the shell read the wrong offset - it should have been treated
+  as a struct-layout smell from the first dump.
+
+**verified live** (installed build, OBS closed so the tray had a free slot): slot
+`1435,1032 32x48` went from an empty gap to the Aura swirl in a screen capture, the
+visibility detector moved `sd 1.24` (flat) -> `sd 37.64, range 164` (PAINTED, inside
+the 21-37 painted band), and the tray automation name went `<BLANK NAME>` -> `Aura`.
+the slot was proven to be ours first with a kill/restart A/B: kill Aura = 13 slots and
+the gap disappears, restart = 14 slots and the gap returns. a `LoadImageW` + `DrawIconEx`
+probe also proved the `hIcon` itself was always good (808/1024 pixels with non-zero
+alpha), so the icon file was never in question.
+
+**supersessions.** the "system tray was 100% full" section above stays TRUE as an
+observation: its `trayw.exe` A/B really did show `TrayNotifyWnd` growing +32px and the
+`Show Hidden Icons` chevron appearing, and a genuinely full tray is why
+`Shell_NotifyIconGetRect` can return `E_INVALIDARG`. but its CONCLUSION must never be
+relied on again:
+
+- "there is no app-side bug" / "the app's `NIM_ADD` is itself standard ... this is not
+  an app-side bug" - WRONG. this WAS the app-side bug, and it is the only one that
+  mattered.
+- "this build does not paint NEWLY-registered tray icons at all (the promotion->paint
+  link is broken), so only icons with pre-existing paint history render" - WRONG. the
+  very first correctly-structured `NIM_ADD` painted immediately, with no promotion, no
+  install-location change and no explorer restart.
+- the paint-gate section's entire dead-lever list (`IsPromoted`, `SetPreference`,
+  `NIF_GUID`, AUMID, install dir, `NIM_SETVERSION`, balloon, the icon file) - every one
+  of those was aimed at the wrong problem. none could ever fix a transposed struct
+  field, which is why they all came back flat and made the shell look broken.
+- `IconSnapshot` seeding did NOT cause the fix: a seeded snapshot was present in both
+  the failing and the passing run, so it is irrelevant to the paint. the shell maintains
+  its own snapshot once the icon actually paints.
+- the "tray full -> overflow" diagnosis and this fix are not in conflict: the tray WAS
+  full at the time (OBS occupied a slot), so Aura could sit in the main tray with a
+  reserved slot and STILL paint nothing. capacity decided WHERE the slot went; the
+  struct decided whether anything rendered in it.
+
+**never reintroduce the transposition**: `hIcon` goes directly after
+`uCallbackMessage` and before `szTip`. if any field is ever added, copy the header -
+the in-file comment and memory have both been wrong here already.
+
+**still open (shipped-code cleanup):** `TrayIconService.CheckVisibility`'s loud notice
+text still tells the user to go to `Settings > Taskbar > Other system tray icons`. that
+guidance is now known WRONG - the Settings row never painted this icon (see the
+dead-lever tests), and the real cause was the struct. the pixel-stddev detector
+happened to give the right verdict here (37.64 sits well inside the painted band), but
+it still measures whatever happens to sit over its slot (it previously measured the
+chevron), so it should still be replaced with a `Shell_TrayWnd` UIA read - count
+`NotifyItemIcon` entries and test for a `Show Hidden Icons` button - and the notice must
+be reworded to state the real reason whenever it does fire.
