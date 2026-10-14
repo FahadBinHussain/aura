@@ -25,6 +25,12 @@ namespace Aura
         public static Microsoft.UI.Dispatching.DispatcherQueue? MainDispatcherQueue { get; private set; }
 
 #if DEBUG
+        // the debug console that opens beside the app. OFF for now - flip this to true
+        // to bring it back. nothing is lost while it is off: LogInfo and LogException
+        // always write app.log FIRST, and the Console mirror further down is only a
+        // duplicate of that same text, so the file log is unaffected either way.
+        private const bool ShowDebugConsole = false;
+
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
 #endif
@@ -32,8 +38,8 @@ namespace Aura
         public App()
         {
 #if DEBUG
-            // Allocate console for debug logging
-            AllocConsole();
+            if (ShowDebugConsole)
+                AllocConsole();
 #endif
             this.InitializeComponent();
 
