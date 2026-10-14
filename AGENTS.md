@@ -1864,6 +1864,24 @@ screen grab (never trust capture-tool output for this):
   explorer.exe restart would also be futile: the app's own restarts already do a fresh
   `NIM_ADD` that re-reads `IsPromoted=1`, and every one came back flat. shipped the feature
   anyway with the loud detection below (rule: no silent invisible-icon degradation).
+- **the installed/identity levers are dead too (tested 2026-10-14)**: the last free
+  hypotheses were "the shell only paints apps it recognises as installed/identified" - all
+  flat (same inset sd <2 from `CheckVisibility`): a Start Menu `Aura.lnk` relaunched through
+  it, a real per-user install at `%LOCALAPPDATA%\Programs\Aura` (the exact dir
+  Discord/ChatGPT/NordVPN paint from), and a preset `IsPromoted=1` written BEFORE the fresh
+  `NIM_ADD` (promotion visible at registration time, not a post-hoc toggle). a custom
+  `AppUserModelID` was NOT run separately - it is the same registration-time-identity class
+  as that preset test (which failed) and unpackaged exes already carry a default AUMID, so a
+  separate COM-interop run would only risk a silent false negative. the icon FILE is ruled
+  out too: `Assets\logo.ico` is a well-formed 5-entry (16/32/48/64/128, 32bpp, PNG) ico and
+  its 32x32 entry renders the real Aura swirl (alpha 0-255, non-blank), so
+  `LoadImageW(LR_DEFAULTSIZE)` hands the shell a paintable `hIcon` - the refusal is not icon
+  quality. coherent read: this build does not paint NEWLY-registered tray icons at all (the
+  promotion->paint link is broken), so only icons with pre-existing paint history render and
+  a never-painted app cannot bootstrap that history - which is why every lever fails
+  identically. all test artifacts reversed same day: install copy, Start Menu `.lnk`, and
+  the orphaned `NotifyIconSettings` entry (with its non-functional `IsPromoted=1`) removed;
+  the `bin\Debug` entry is back to baseline `UID/InitialTooltip/ExecutablePath`.
 - **`NIM_GET`'s `dwStateMask=0xFFFFFFFF` -> `dwState & NIS_HIDDEN` reports 0** for the
   known-hidden icon - the documented hidden flag is a no-op on this build, same as
   everything else. `Registry NotifyIconSettings` entries persist only
