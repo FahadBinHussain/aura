@@ -35,6 +35,44 @@ namespace Aura.Services
         private const string AlphaCoders = "AlphaCoders";
         private const string ArtStation = "ArtStation";
 
+        // "Bing Editions" = bingwallpaper.anerg.com, a THIRD-PARTY Bing archive - not
+        // Microsoft's own feed, which is the "Bing Wallpaper Archive" row above. the name
+        // has to stay distinct from that one in the picker (names are all the picker
+        // shows), so it uses the site's own wording for its country list ("Bing editions").
+        // what it adds over the official feed: 11 country editions and a monthly archive
+        // back to 2011-10, plus 3840x2160 originals on a public CDN (the official feed
+        // tops out at 1920x1080). plain .NET passes everywhere - no curl, no key.
+        // (automata-private/bingwallpaper.anerg.com/AGENTS.md)
+        private const string BingEditions = "Bing Editions";
+        private const string BingEditionsBaseUrl = "https://bingwallpaper.anerg.com";
+        private const string BingEditionsFirstMonth = "201110";
+
+        // label -> (edition page, archive code). the site's root page IS the United States
+        // edition (/us 301s to /) but its detail and month paths still use the "us" code,
+        // so both halves are carried. the site's own default edition stays first (it is
+        // what the platform's grid opens on), the rest are alphabetical.
+        private static readonly (string Label, string PagePath, string Code)[] BingEditionsList =
+        {
+            ("United States", "/", "us"),
+            ("Australia", "/au", "au"),
+            ("Canada", "/ca", "ca"),
+            ("China", "/cn", "cn"),
+            ("France", "/fr", "fr"),
+            ("Germany", "/de", "de"),
+            ("Italy", "/it", "it"),
+            ("Japan", "/jp", "jp"),
+            ("New Zealand", "/nz", "nz"),
+            ("Spain", "/es", "es"),
+            ("United Kingdom", "/uk", "uk")
+        };
+
+        // the newest month an edition carries is read off its own edition page (the first
+        // <h2 id="month-YYYYMM"> section) and cached per edition, because page 1 always
+        // lands there first and every later page walks the archive back from that month
+        private static readonly object BingEditionsMonthLock = new object();
+        private static readonly Dictionary<string, string> BingEditionsNewestMonth =
+            new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+
         // pixabay categories = the site's curated Collections index
         // (https://pixabay.com/collections/ - 2 pages: pagi=1 = 40 + pagi=2 = 23 = 63
         // collections; TRAP: ?pagi>=3 silently WRAPS to page 1, so the index loader
@@ -748,6 +786,18 @@ namespace Aura.Services
             },
             new PlatformSpec
             {
+                Name = BingEditions,
+                Kind = PlatformKind.Public,
+                // pending user audit (2026-10-16): the site's only axes are the country
+                // edition and the month - a region and a time range, no content taxonomy,
+                // the same shape that got bing/simple desktops/wallhaven rejected
+                CategoryCapable = false,
+                Description = "11 country editions of Bing's daily wallpaper with a monthly archive back to 2011, originals in 3840x2160 (bingwallpaper.anerg.com).",
+                Modes = () => BingEditionsList.Select(edition => edition.Label).ToArray(),
+                Fetch = (svc, page, mode, ct) => svc.GetBingEditionsWallpapersAsync(page, mode, ct)
+            },
+            new PlatformSpec
+            {
                 Name = SimpleDesktops,
                 Kind = PlatformKind.Public,
                 // rejected 2026-10-09: proven zero taxonomy
@@ -1236,6 +1286,222 @@ namespace Aura.Services
             }
 
             return wallpapers;
+        }
+
+        // ---- Bing Editions (bingwallpaper.anerg.com) -------------------------------------
+        // paging: page 1 = the edition page itself, which carries the two newest months
+        // (~46 cards); page N >= 2 = the month N steps back from the newest, so the pair
+        // page 1 already showed is skipped and infinite scroll never repeats an item.
+        // an empty list (a month before the archive starts, or a month the edition does
+        // not carry) is the honest end of the feed.
+        private async Task<List<WallpaperItem>> GetBingEditionsWallpapersAsync(
+            int page,
+            string mode,
+            CancellationToken cancellationToken)
+        {
+            // "latest" (or empty) = the slideshow's Latest basis and the All-categories
+            // fast path. this site has no cross-edition feed, so those mean the site's
+            // own default edition: the ROOT page's United States listing (the first
+            // table row, also the platform grid's default chip).
+            if (string.IsNullOrWhiteSpace(mode) ||
+                string.Equals(mode, "latest", StringComparison.OrdinalIgnoreCase))
+            {
+                mode = BingEditionsList[0].Label;
+            }
+
+            var edition = BingEditionsList.FirstOrDefault(item =>
+                string.Equals(item.Label, mode, StringComparison.OrdinalIgnoreCase));
+            if (string.IsNullOrEmpty(edition.Label))
+            {
+                // a mode this platform does not have = LOUD, never a silently empty grid
+                throw new InvalidOperationException($"Bing Editions has no edition named '{mode}'.");
+            }
+
+            if (page <= 1)
+            {
+                var editionHtml = await _httpClient.GetStringAsync(
+                    BingEditionsBaseUrl + edition.PagePath, cancellationToken);
+                RememberBingEditionsNewestMonth(edition.Code, editionHtml);
+                return ParseBingEditionsCards(editionHtml);
+            }
+
+            var newest = await GetBingEditionsNewestMonthAsync(edition, cancellationToken);
+            var month = ShiftBingEditionsMonth(newest, -page);
+            if (string.CompareOrdinal(month, BingEditionsFirstMonth) < 0)
+            {
+                return new List<WallpaperItem>();
+            }
+
+            using var response = await _httpClient.GetAsync(
+                $"{BingEditionsBaseUrl}/archive/{edition.Code}/{month}", cancellationToken);
+            if (response.StatusCode == HttpStatusCode.NotFound)
+            {
+                return new List<WallpaperItem>();
+            }
+
+            response.EnsureSuccessStatusCode();
+            return ParseBingEditionsCards(await response.Content.ReadAsStringAsync(cancellationToken));
+        }
+
+        private static List<string> ParseBingEditionsMonths(string html)
+        {
+            var months = new List<string>();
+            foreach (Match match in Regex.Matches(html, "<h2 id=\"month-(?<month>\\d{6})\"", RegexOptions.IgnoreCase))
+            {
+                var month = match.Groups["month"].Value;
+                if (!months.Contains(month))
+                {
+                    months.Add(month);
+                }
+            }
+            return months;
+        }
+
+        private static void RememberBingEditionsNewestMonth(string code, string html)
+        {
+            var months = ParseBingEditionsMonths(html);
+            if (months.Count == 0)
+            {
+                // card parsing and month parsing read the same page - a page without month
+                // sections means paging is broken, and that has to be loud rather than
+                // quietly stopping at page 1
+                throw new InvalidOperationException("Bing Editions returned no month sections - the page shape changed.");
+            }
+
+            lock (BingEditionsMonthLock)
+            {
+                BingEditionsNewestMonth[code] = months[0];
+            }
+        }
+
+        private async Task<string> GetBingEditionsNewestMonthAsync(
+            (string Label, string PagePath, string Code) edition,
+            CancellationToken cancellationToken)
+        {
+            lock (BingEditionsMonthLock)
+            {
+                if (BingEditionsNewestMonth.TryGetValue(edition.Code, out var cached))
+                {
+                    return cached;
+                }
+            }
+
+            // page 1 was skipped (a deep-linked month, or a fresh service instance) - read
+            // the edition page once to learn which month is newest
+            var html = await _httpClient.GetStringAsync(BingEditionsBaseUrl + edition.PagePath, cancellationToken);
+            RememberBingEditionsNewestMonth(edition.Code, html);
+
+            lock (BingEditionsMonthLock)
+            {
+                return BingEditionsNewestMonth[edition.Code];
+            }
+        }
+
+        /// <summary>
+        /// YYYYMM shifted by <paramref name="months"/> (negative walks back). the archive is
+        /// contiguous month by month, so a page index maps straight onto a month.
+        /// </summary>
+        private static string ShiftBingEditionsMonth(string month, int months)
+        {
+            var year = int.Parse(month.Substring(0, 4));
+            var index = int.Parse(month.Substring(4, 2)) - 1 + months;
+            year += index / 12;
+            index %= 12;
+            if (index < 0)
+            {
+                index += 12;
+                year--;
+            }
+            return year.ToString("D4") + (index + 1).ToString("D2");
+        }
+
+        private List<WallpaperItem> ParseBingEditionsCards(string html)
+        {
+            var wallpapers = new List<WallpaperItem>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            // card = <a class="wallpaper-card" href="/detail/<code>/<slug>"> with the
+            // imgproxy thumbnail and the caption (the site's only per-item text)
+            var matches = Regex.Matches(
+                html,
+                "<a class=\"wallpaper-card\" href=\"(?<href>[^\"]+)\"[^>]*>\\s*<div class=\"wallpaper-media\">\\s*" +
+                "<img\\s+src=\"(?<thumb>[^\"]+)\"(?<img>.*?)</div>\\s*<span class=\"wallpaper-caption\"[^>]*>(?<caption>.*?)</span>",
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            foreach (Match match in matches)
+            {
+                var href = WebUtility.HtmlDecode(match.Groups["href"].Value);
+                var thumbnail = WebUtility.HtmlDecode(match.Groups["thumb"].Value);
+                var caption = WebUtility.HtmlDecode(
+                    Regex.Replace(match.Groups["caption"].Value, "<[^>]+>", string.Empty)).Trim();
+                var slug = href.TrimEnd('/').Split('/').Last();
+
+                if (string.IsNullOrWhiteSpace(thumbnail) || string.IsNullOrWhiteSpace(slug) || !seen.Add(slug))
+                {
+                    continue;
+                }
+
+                wallpapers.Add(new WallpaperItem
+                {
+                    Id = slug,
+                    Title = string.IsNullOrWhiteSpace(caption) ? slug : caption,
+                    Description = caption,
+                    ImageUrl = thumbnail,
+                    FullPhotoUrl = DecodeBingEditionsOrigin(thumbnail),
+                    SourceUrl = MakeAbsoluteUrl(BingEditionsBaseUrl, href),
+                    Likes = string.Empty,
+                    Downloads = string.Empty,
+                    // the site's own biggest download is w:3840 and the originals measure
+                    // 3840x2160 - the feed itself carries no size, so this is the honest cap
+                    Resolution = "3840x2160",
+                    QualityTag = "4K",
+                    IsAI = false
+                });
+            }
+
+            return wallpapers;
+        }
+
+        /// <summary>
+        /// The thumbnail is an imgproxy url whose base64 tail IS the original's public url
+        /// (3840x2160, no signature needed): /w:600/&lt;base64 of the original&gt;.jpg. That
+        /// makes the full-size image free - no detail-page request, no per-width signature.
+        /// </summary>
+        private static string DecodeBingEditionsOrigin(string thumbnailUrl)
+        {
+            var match = Regex.Match(
+                thumbnailUrl, "/w:\\d+/(?<chunks>.+?)\\.(?:jpg|jpeg|png|webp)$", RegexOptions.IgnoreCase);
+
+            var base64 = match.Success
+                ? match.Groups["chunks"].Value.Replace("/", string.Empty).Replace('-', '+').Replace('_', '/')
+                : string.Empty;
+            if (base64.Length % 4 == 2)
+            {
+                base64 += "==";
+            }
+            else if (base64.Length % 4 == 3)
+            {
+                base64 += "=";
+            }
+
+            try
+            {
+                var origin = base64.Length == 0
+                    ? string.Empty
+                    : System.Text.Encoding.UTF8.GetString(Convert.FromBase64String(base64));
+                if (origin.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+                {
+                    return origin;
+                }
+            }
+            catch (FormatException)
+            {
+                // falls through to the throw below: a shape change must be loud, never a
+                // silently downgraded item that quietly serves its thumbnail as the original
+            }
+
+            throw new InvalidOperationException(
+                $"Bing Editions thumbnail is not a decodable imgproxy url: {thumbnailUrl}");
         }
 
         private async Task<List<WallpaperItem>> GetSimpleDesktopWallpapersAsync(int page, CancellationToken cancellationToken)

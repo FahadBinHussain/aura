@@ -2094,3 +2094,52 @@ Aura now comes up silently in the tray instead of showing its window on every la
   `Loaded 402 wallpapers from 10 platform(s)`, foreground untouched; second launch ->
   `window shown from tray` (visible) -> WM_CLOSE -> `window closed - hidden to tray`,
   still 1 process, foreground restored. probe `C:\tmp\aurareopen.ps1` (stays in C:\tmp).
+
+## 18th platform: Bing Editions, reversed + ported (2026-10-16)
+
+user ask: add `https://bingwallpaper.anerg.com/fr#archive` as a source. reversed and
+ported the same day - evidence + curl/parse recipes live in
+`automata-private/bingwallpaper.anerg.com/AGENTS.md`, and the reusable playbook for
+any future site is now `NEW-SITE-WORKFLOW.md` in this repo. platform **18** in the
+registry; the name is `Bing Editions` on purpose - `Bing Wallpaper Archive` is
+Microsoft's own feed and both rows show in the picker, so the site's own wording
+("Bing editions") was used for this one.
+
+- **modes = the 11 country editions**, `United States` first (the site root; `/us`
+  301s to `/`) then alphabetical: Australia, Canada, China, France, Germany, Italy,
+  Japan, New Zealand, Spain, United Kingdom.
+- **paging**: page 1 = the edition page itself (its 2 newest months, ~46 items);
+  page N >= 2 = month `newest - N` (contiguous, never repeats page 1); a 404 month
+  or one before `201110` = honest end of feed. the newest month is read off the
+  edition page's first `<h2 id="month-YYYYMM">` section (the left nav is NOT
+  reliable) and cached per edition.
+- **full-size = the origin decoded from the thumbnail**: imgproxy thumbnails carry
+  the original's URL in base64 chunks in their path (`/w:<n>/<b64 chunks>.jpg` ->
+  `https://img.nanxiongnandi.com/<YYYYMM>/<Name>.jpg`, 3840x2160). imgproxy signs
+  per-URL, so swapping the width = 403; an undecodable tail THROWS, never a silent
+  thumbnail downgrade.
+- **transport**: plain .NET `HttpClient`, no curl/key. `GetModes` /
+  `GetPlatformDescription` / `GetWallpapersAsync` are registry-derived - the whole
+  port is one registry row + the private fetcher.
+- **`latest` maps to the default edition**: the slideshow's Latest basis and the
+  All-categories fast path fetch public platforms with mode `latest`, and the site
+  has no cross-edition feed - so empty/`latest` resolves to the root page's United
+  States edition. any other unknown mode still throws loud.
+- `CategoryCapable = false` (pending the user's category audit; the site's only axes
+  are country edition + month). counts by construction: `GetImplementedPlatformNames`
+  17 -> 18, `GetSupportedPlatformNames` 14 -> 15, picker 26 -> 27; scope menu stays
+  10, Global stays 293, checklist universe stays 296 (the row collapses under
+  Category like every rejected site).
+- **back-navigation keeps the selected mode for ALL public grids**:
+  `PublicWallpaperGridPage` is not navigation-cached, so every back built a fresh
+  instance that snapped to the platform's FIRST mode (visible chip reset - caught on
+  the France edition during this port). fixed generically: a static
+  `LastModeByPlatform` dictionary - `OnNavigatedTo` restores the remembered mode
+  (a deep-linked mode wins and gets recorded), chip clicks record.
+- verified menuless + vision 2026-10-16 (probe `C:\tmp\aura-bingeditions.ps1`):
+  picker shows both Bing rows, 11 chips with `United States` first, France reload
+  clean, the page-2 walk proved real Aug-2026 content distinct from page 1, detail
+  page res `3840x2160` + View on Web + bar clean, back kept the France chip, log
+  hygiene clean, settings restored + relaunched. slideshow leg (file-only probe
+  `C:\tmp\aura-bingeditions-slideshow.ps1`): `Loaded 45 wallpapers from 1
+  platform(s)`, settings restored byte-exact.

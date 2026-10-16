@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
@@ -21,6 +22,11 @@ namespace Aura.Views.PublicSources
         private int _currentPage = 1;
         private bool _isLoading;
         private bool _hasMoreWallpapers = true;
+
+        // this page is not navigation-cached, so a back-navigation builds a FRESH instance:
+        // remember the mode chosen per platform, otherwise every back from a detail page
+        // snapped the grid back to the platform's FIRST mode (visible reset on the chips)
+        private static readonly Dictionary<string, string> LastModeByPlatform = new(StringComparer.OrdinalIgnoreCase);
 
         public PublicWallpaperGridPage()
         {
@@ -58,7 +64,15 @@ namespace Aura.Views.PublicSources
             }
             else if (_wallpapers.Count == 0)
             {
-                _currentMode = PublicWallpaperService.GetDefaultMode(_platformName);
+                _currentMode = LastModeByPlatform.TryGetValue(_platformName, out var remembered)
+                    ? remembered
+                    : PublicWallpaperService.GetDefaultMode(_platformName);
+            }
+
+            if (!string.IsNullOrEmpty(_currentMode))
+            {
+                // covers the deep-linked-category path too (a chip click records its own mode)
+                LastModeByPlatform[_platformName] = _currentMode;
             }
 
             TitleTextBlock.Text = _platformName;
@@ -90,6 +104,7 @@ namespace Aura.Views.PublicSources
             }
 
             _currentMode = mode;
+            LastModeByPlatform[_platformName] = mode;
             UpdateModeButtonStyles();
             await ReloadAsync();
         }
