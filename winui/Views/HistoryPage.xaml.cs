@@ -104,7 +104,7 @@ namespace Aura.Views
                 ? Microsoft.UI.Colors.SteelBlue
                 : Microsoft.UI.Colors.SeaGreen));
 
-            var site = DeriveSite(entry);
+            var site = WallpaperHistoryService.DeriveSite(entry);
             if (!string.IsNullOrEmpty(site) && site != entry.Source)
             {
                 badgeRow.Children.Add(MakeBadge(site, Microsoft.UI.Colors.MediumPurple));
@@ -192,19 +192,8 @@ namespace Aura.Views
                 }
             };
 
-        // where the wallpaper came from: the entry's own field (new rows),
-        // then the navigation snapshot (backfilled rows), then a Source that
-        // is already a site name (public-source rows store the site there)
-        private static string DeriveSite(HistoryEntry entry)
-        {
-            if (!string.IsNullOrWhiteSpace(entry.Platform)) return entry.Platform;
-            if (!string.IsNullOrWhiteSpace(entry.Navigation?.Platform)) return entry.Navigation.Platform;
-            var page = entry.Navigation?.Page ?? "";
-            if (page is "Backiee" or "AlphaCoders" or "ArtStation") return page;
-            if (!string.IsNullOrWhiteSpace(entry.Source)
-                && entry.Source != "Manual" && entry.Source != "Slideshow") return entry.Source;
-            return "";
-        }
+        // site derivation lives in WallpaperHistoryService.DeriveSite now - the
+        // pill here and the click-time navigation rebuild read the same chain
 
         // Button subclass: ProtectedCursor is a protected member, so only the
         // deriving type can set the hand cursor.
@@ -219,20 +208,34 @@ namespace Aura.Views
         private void HistoryEntry_Click(object sender, RoutedEventArgs e)
         {
             var entry = (sender as Button)?.Tag as HistoryEntry;
-            if (entry?.Navigation?.Wallpaper == null || string.IsNullOrEmpty(entry.Navigation.Page))
+            if (entry == null)
+            {
+                return;
+            }
+
+            // stored snapshot first; rows saved without one (slideshow-set rows
+            // + pre-feature rows) rebuild it here from the live slideshow batch
+            // or the row's own applied local file - see RebuildNavigation
+            var navigation = entry.Navigation?.Wallpaper != null && !string.IsNullOrEmpty(entry.Navigation.Page)
+                ? entry.Navigation
+                : WallpaperHistoryService.RebuildNavigation(
+                    entry,
+                    SlideshowService.Instance.DesktopBatch,
+                    SlideshowService.Instance.LockScreenBatch);
+
+            if (navigation?.Wallpaper == null || string.IsNullOrEmpty(navigation.Page))
             {
                 ShowStatus(
-                    "No detail page is stored for this entry — it was set by the Slideshow or saved before click-through. " +
-                    "Set the wallpaper again from its source page to make it clickable.",
+                    "No wallpaper data is stored for this entry - nothing to open.",
                     InfoBarSeverity.Error);
                 return;
             }
 
-            var item = entry.Navigation.Wallpaper.ToWallpaperItem();
-            bool navigated = entry.Navigation.Page switch
+            var item = navigation.Wallpaper.ToWallpaperItem();
+            bool navigated = navigation.Page switch
             {
                 "Public" => Frame.Navigate(typeof(PublicSources.PublicWallpaperDetailPage),
-                    new PublicWallpaperNavigationParameter(entry.Navigation.Platform, item)),
+                    new PublicWallpaperNavigationParameter(navigation.Platform, item)),
                 "Backiee" => Frame.Navigate(typeof(Backiee.WallpaperDetailPage), item),
                 "AlphaCoders" => Frame.Navigate(typeof(AlphaCoders.WallpaperDetailPage), item),
                 "ArtStation" => Frame.Navigate(typeof(ArtStation.ArtStationDetailPage), item),
@@ -246,9 +249,9 @@ namespace Aura.Views
             else
             {
                 ShowStatus(
-                    entry.Navigation.Page is "Public" or "Backiee" or "AlphaCoders" or "ArtStation"
+                    navigation.Page is "Public" or "Backiee" or "AlphaCoders" or "ArtStation"
                         ? $"Could not open the detail page for \"{entry.Title}\"."
-                        : $"Unknown detail page '{entry.Navigation.Page}' stored for \"{entry.Title}\".",
+                        : $"Unknown detail page '{navigation.Page}' stored for \"{entry.Title}\".",
                     InfoBarSeverity.Error);
             }
         }

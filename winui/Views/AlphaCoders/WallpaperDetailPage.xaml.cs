@@ -550,6 +550,70 @@ namespace Aura.Views.AlphaCoders
             LockScreen
         }
 
+        // the remote alpha path: big-thumb scrape for the extension, then the
+        // initiate download for the original bytes. kept out of the set flow so
+        // history rows that carry the applied local file can skip it entirely.
+        private async Task<StorageFile> DownloadAlphaCodersOriginalAsync(StorageFolder wallpapersFolder)
+        {
+            // Get the big thumb URL to extract extension
+            var scraperService = new Aura.Services.AlphaCodersScraperService();
+            var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(_currentWallpaper.Id, _currentWallpaper.ImageUrl);
+
+            if (string.IsNullOrEmpty(bigThumbUrl))
+            {
+                throw new Exception("Could not get image information for this wallpaper.");
+            }
+
+            // Extract extension from big thumb URL
+            var bigThumbUri = new Uri(bigThumbUrl);
+            var bigThumbPath = bigThumbUri.AbsolutePath;
+            var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
+
+            // Build original URL with same extension
+            var imageId = _currentWallpaper.Id;
+            var uri = new Uri(_currentWallpaper.ImageUrl);
+            var domainParts = uri.Host.Split('.');
+            var domainShort = domainParts[0];
+
+            var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
+
+            // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
+            string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
+            string stableFileName = $"wallpaper-{_currentWallpaper.Id}.{fileExtension}";
+            string stableFilePath2 = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
+
+            StorageFile wallpaperFile;
+            if (System.IO.File.Exists(stableFilePath2))
+            {
+                // Reuse existing file
+                wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
+            }
+            else
+            {
+                byte[] imageBytes;
+                try
+                {
+                    imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
+                }
+                catch (Exception ex)
+                {
+                    throw new Exception($"Failed to download original image. Error: {ex.Message}");
+                }
+
+                wallpaperFile = await wallpapersFolder.CreateFileAsync(
+                    stableFileName,
+                    CreationCollisionOption.ReplaceExisting);
+
+                using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
+                {
+                    await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
+                    await stream.FlushAsync();
+                }
+            }
+
+            return wallpaperFile;
+        }
+
         private async Task SetWallpaperAsync(WallpaperType wallpaperType)
         {
             if (_currentWallpaper == null)
@@ -594,62 +658,17 @@ namespace Aura.Views.AlphaCoders
                     var picturesFolder = KnownFolders.PicturesLibrary;
                     var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", CreationCollisionOption.OpenIfExists);
 
-                    // Get the big thumb URL to extract extension
-                    var scraperService = new Aura.Services.AlphaCodersScraperService();
-                    var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(_currentWallpaper.Id, _currentWallpaper.ImageUrl);
-
-                    if (string.IsNullOrEmpty(bigThumbUrl))
-                    {
-                        throw new Exception("Could not get image information for this wallpaper.");
-                    }
-
-                    // Extract extension from big thumb URL
-                    var bigThumbUri = new Uri(bigThumbUrl);
-                    var bigThumbPath = bigThumbUri.AbsolutePath;
-                    var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
-
-
-                    // Build original URL with same extension
-                    var imageId = _currentWallpaper.Id;
-                    var uri = new Uri(_currentWallpaper.ImageUrl);
-                    var domainParts = uri.Host.Split('.');
-                    var domainShort = domainParts[0];
-
-                    var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
-
-
-                    byte[] imageBytes;
-                    // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
-                    string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
-                    string stableFileName = $"wallpaper-{_currentWallpaper.Id}.{fileExtension}";
-                    string stableFilePath2 = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
-
+                    // a history row can hand us the applied LOCAL file (the slideshow
+                    // set the wallpaper from it) - it IS the wallpaper, so reuse it
+                    // instead of re-scraping/re-downloading the original
                     StorageFile wallpaperFile;
-                    if (System.IO.File.Exists(stableFilePath2))
+                    if (File.Exists(_currentWallpaper.FullPhotoUrl))
                     {
-                        // Reuse existing file
-                        wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
+                        wallpaperFile = await StorageFile.GetFileFromPathAsync(_currentWallpaper.FullPhotoUrl);
                     }
                     else
                     {
-                        try
-                        {
-                            imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                        }
-                        catch (Exception ex)
-                        {
-                            throw new Exception($"Failed to download original image. Error: {ex.Message}");
-                        }
-
-                        wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                            stableFileName,
-                            CreationCollisionOption.ReplaceExisting);
-
-                        using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
-                        {
-                            await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                            await stream.FlushAsync();
-                        }
+                        wallpaperFile = await DownloadAlphaCodersOriginalAsync(wallpapersFolder);
                     }
 
                     savedFilePath = wallpaperFile.Path;
@@ -818,9 +837,12 @@ namespace Aura.Views.AlphaCoders
                     // Create a subfolder for our app if it doesn't exist
                     var appFolder = await downloadsFolder.CreateFolderAsync("Aura", CreationCollisionOption.OpenIfExists);
 
-                    // Get the correct extension from the big thumb URL (will be set below)
+                    // a history row can hand us the applied LOCAL file (the slideshow
+                    // set the wallpaper from it) - copy it straight; the scraper /
+                    // initiate-download path is for remote alpha items
+                    string? localSource = File.Exists(_currentWallpaper.FullPhotoUrl) ? _currentWallpaper.FullPhotoUrl : null;
                     var scraperService = new Aura.Services.AlphaCodersScraperService();
-                    var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(_currentWallpaper.Id, _currentWallpaper.ImageUrl);
+                    var bigThumbUrl = localSource ?? await scraperService.GetBigImageUrlForWallpaperAsync(_currentWallpaper.Id, _currentWallpaper.ImageUrl);
 
                     if (string.IsNullOrEmpty(bigThumbUrl))
                     {
@@ -851,13 +873,20 @@ namespace Aura.Views.AlphaCoders
 
 
                     byte[] imageBytes;
-                    try
+                    if (localSource != null)
                     {
-                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
+                        imageBytes = await File.ReadAllBytesAsync(localSource);
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        throw new Exception($"Failed to download original image. Error: {ex.Message}");
+                        try
+                        {
+                            imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
+                        }
+                        catch (Exception ex)
+                        {
+                            throw new Exception($"Failed to download original image. Error: {ex.Message}");
+                        }
                     }
                     using (var stream = await downloadFile.OpenStreamForWriteAsync())
                     {

@@ -271,6 +271,14 @@ namespace Aura.Services
 
         public async Task<byte[]> GetImageBytesAsync(string imageUrl, CancellationToken cancellationToken = default)
         {
+            // history rows can hand us the applied LOCAL file (the slideshow set
+            // the wallpaper from exactly this file) - read it directly instead
+            // of http-fetching what is really a path
+            if (System.IO.File.Exists(imageUrl))
+            {
+                return await System.IO.File.ReadAllBytesAsync(imageUrl, cancellationToken);
+            }
+
             return await _httpClient.GetByteArrayAsync(imageUrl, cancellationToken);
         }
 

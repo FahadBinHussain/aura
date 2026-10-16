@@ -2145,3 +2145,60 @@ Microsoft's own feed and both rows show in the picker, so the site's own wording
   hygiene clean, settings restored + relaunched. slideshow leg (file-only probe
   `C:\tmp\aura-bingeditions-slideshow.ps1`): `Loaded 45 wallpapers from 1
   platform(s)`, settings restored byte-exact.
+
+### every wallpaper-history row opens its detail page (2026-10-16)
+
+user ask: "make it work so that, i can click anything and it will open the detail
+page" - slideshow-set rows (the whole 200-row corpus) used to show a loud
+"No detail page is stored for this entry ..." bar instead. supersedes the
+2026-10-09 history-rows section's null-Navigation loud message (that exact text
+is gone) and the artgram section's "the slideshow never opens detail pages"
+known-limit line.
+
+- **write side** (`WallpaperHistoryService.AddEntry`): the stored navigation
+  snapshot's page now derives from the item's own platform when no page arg is
+  passed (`DerivePageForPlatform`): `Backiee`/`AlphaCoders`/`ArtStation` keep
+  their names, every public platform -> `"Public"`, unknown + no image -> no
+  navigation. every row created from now on is self-sufficient.
+- **click side** (`HistoryPage` -> `WallpaperHistoryService.RebuildNavigation`,
+  stateless - no write-back to the history file): a row without a stored
+  snapshot is rebuilt at click time. two sources, best first:
+  1. the live slideshow batch - the row's local file id
+     (`wallpaper-<id>.<ext>` / `lockscreen-<id>.<ext>`) matched against
+     `SlideshowService.Instance.DesktopBatch`/`LockScreenBatch` on id +
+     platform + TITLE, giving the real item with remote urls;
+  2. the row itself - title/site from the row, image = the applied local file
+     (already on disk, proven decodable), `SourceUrl` rebuilt only where the id
+     can carry it (alphacoders `big.php?i=<id>`, backiee canonical-slug 301).
+     public rows get no SourceUrl - their View on Web fails LOUD, never a
+     fake url.
+- local files are canonical for rebuilt rows: all four page families' byte
+  fetchers (`PublicWallpaperService.GetImageBytesAsync`,
+  `ArtStationService.GetImageBytesAsync`, backiee + alpha detail downloads)
+  read a local path directly - the same file the slideshow applied, never a
+  "fallback engine".
+- the only remaining loud path = a row with no image data at all:
+  `No wallpaper data is stored for this entry - nothing to open.`
+- **digital blasphemy id collision (caught live while verifying)**: DB ids
+  were the FIRST digit run in the item href, and slugs end in version digits
+  (`opalinehollow2`, `autumnwood2k262`, `catalyst2`) - so distinct wallpapers
+  shared ids "1"/"2" and the rebuilt click opened the wrong item (`Morning
+  Mist (Winter) [2025]` instead of `Opaline Hollow (Sunset) [2026]`). two
+  fixes: the DB fetcher now uses the SLUG as the id (stable + unique - future
+  local files are `wallpaper-<slug>.jpg`), and the batch match verifies the
+  candidate's title against the row's (mismatch = fall through to the
+  row's own local-file rebuild, never open the wrong wallpaper). old rows
+  keep their old numeric files - they take path 2, correct by construction.
+- verified menuless 2026-10-16 (`C:\tmp\aura-historyclickall.ps1`, stays in
+  C:\tmp): 6/6 diverse rows (Backiee, AlphaCoders, ArtStation, Wallpaper Cave,
+  Pixabay, Digital Blasphemy) each opened THEIR OWN detail page - title exact,
+  page marker present, bar clean, back OK - app log had zero loud-row lines.
+  write side re-verified live on the published build: fresh rows carry
+  `Navigation.Page` = `Public`/`ArtStation` per platform, first apply minted a
+  slug-named local file (`wallpaper-threelittlebirds1.jpg`).
+- probe gotchas: pause the user's 1-min ticker (12h + Latest) or every UIA
+  call takes ~8s; the startup slideshow apply races the history list rebuild -
+  settle on the `Loaded N wallpapers` log line + 3 consecutive stable
+  history-file checks before clicking; assert titles by poll (transient
+  `FindText` misses mid-transition); `$null = Func $x` swallows the function's
+  whole success stream (per-row logs vanished - call bare).

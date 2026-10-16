@@ -492,7 +492,7 @@ namespace Aura.Views.Backiee
                     var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", CreationCollisionOption.OpenIfExists);
 
                     // Download the image
-                    var imageBytes = await BackieeNetworkClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
+                    var imageBytes = await GetImageBytesAsync(_currentWallpaper.FullPhotoUrl);
 
                     // Create a file in Pictures folder
                     var wallpaperFile = await wallpapersFolder.CreateFileAsync(
@@ -678,7 +678,7 @@ namespace Aura.Views.Backiee
                     var downloadFile = await appFolder.CreateFileAsync(fileName, CreationCollisionOption.GenerateUniqueName);
 
                     // Download directly to the file
-                    var imageBytes = await BackieeNetworkClient.GetByteArrayAsync(_currentWallpaper.FullPhotoUrl);
+                    var imageBytes = await GetImageBytesAsync(_currentWallpaper.FullPhotoUrl);
                     using (var stream = await downloadFile.OpenStreamForWriteAsync())
                     {
                         await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
@@ -702,6 +702,15 @@ namespace Aura.Views.Backiee
             {
                 await ShowErrorDialogAsync($"An error occurred: {ex.Message}");
             }
+        }
+
+        // history rows can hand us the applied LOCAL file (the slideshow set the
+        // wallpaper from it) - read it directly instead of http-fetching a path
+        private static async Task<byte[]> GetImageBytesAsync(string urlOrPath)
+        {
+            return File.Exists(urlOrPath)
+                ? await File.ReadAllBytesAsync(urlOrPath)
+                : await BackieeNetworkClient.GetByteArrayAsync(urlOrPath);
         }
 
         // Helper to try to get current window via reflection

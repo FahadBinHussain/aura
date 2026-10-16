@@ -123,14 +123,10 @@ namespace Aura.Services
                 // (fresh Latest-basis install - no list exists, and the source
                 // value is still the honest answer).
                 Category = NormalizeCategory(effectivePlatform, !string.IsNullOrEmpty(category) ? category : wallpaper?.Category ?? ""),
-                Navigation = wallpaper == null || string.IsNullOrEmpty(page)
-                    ? null
-                    : new HistoryNavigation
-                    {
-                        Page = page,
-                        Platform = platform ?? "",
-                        Wallpaper = HistoryWallpaper.FromWallpaperItem(wallpaper)
-                    }
+                // click-through target: the detail page that set this wallpaper,
+                // or (slideshow rows) the page derived from the item's platform -
+                // see BuildNavigation; null only when no page is derivable
+                Navigation = BuildNavigation(effectivePlatform, wallpaper, page)
             };
 
             // Insert at top (newest first)
@@ -142,6 +138,59 @@ namespace Aura.Services
 
             SaveToDisk();
             HistoryChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        // a row is clickable when both its item snapshot and the detail page that
+        // opens it are known. detail pages pass their page explicitly; slideshow
+        // rows pass none, so it derives from the item's own platform - every
+        // implemented platform maps to exactly one detail page, which is what
+        // makes slideshow rows clickable too. null = no page could be derived.
+        private static HistoryNavigation? BuildNavigation(string effectivePlatform, WallpaperItem? wallpaper, string page)
+        {
+            if (wallpaper == null)
+            {
+                return null;
+            }
+
+            var effectivePage = !string.IsNullOrEmpty(page) ? page : DerivePageForPlatform(effectivePlatform);
+            if (string.IsNullOrEmpty(effectivePage))
+            {
+                return null;
+            }
+
+            return new HistoryNavigation
+            {
+                Page = effectivePage,
+                Platform = effectivePlatform,
+                Wallpaper = HistoryWallpaper.FromWallpaperItem(wallpaper)
+            };
+        }
+
+        // Local platforms open their own detail pages; every public platform
+        // opens the shared public detail page. "" = unknown platform, no page.
+        internal static string DerivePageForPlatform(string platform)
+        {
+            if (platform is "Backiee" or "AlphaCoders" or "ArtStation")
+            {
+                return platform;
+            }
+
+            return PublicWallpaperService.IsSupportedPlatform(platform) ? "Public" : "";
+        }
+
+        // where a row came from: its own field (new rows), the navigation snapshot
+        // (backfilled rows), a page name that IS a site (Local pages), then a Source
+        // that is already a site name (public-source rows store the site there).
+        // one owner: the history pill + the click-time rebuild both read this.
+        public static string DeriveSite(HistoryEntry entry)
+        {
+            if (!string.IsNullOrWhiteSpace(entry.Platform)) return entry.Platform;
+            if (!string.IsNullOrWhiteSpace(entry.Navigation?.Platform)) return entry.Navigation.Platform;
+            var page = entry.Navigation?.Page ?? "";
+            if (page is "Backiee" or "AlphaCoders" or "ArtStation") return page;
+            if (!string.IsNullOrWhiteSpace(entry.Source)
+                && entry.Source != "Manual" && entry.Source != "Slideshow") return entry.Source;
+            return "";
         }
 
         // see the AddEntry pill contract above: mode labels are fetch context
@@ -273,6 +322,85 @@ namespace Aura.Services
             }
 
             if (changed) SaveToDisk();
+        }
+
+        // click-time navigation rebuild for rows saved without a snapshot
+        // (slideshow-set rows + pre-feature rows). two sources, best first:
+        // 1. the live slideshow batch - matching the row's local file id (plus
+        //    platform: numeric ids collide across sites) yields the item's real
+        //    remote urls, exactly like a fresh row,
+        // 2. the row itself - slideshow rows store the APPLIED local file as
+        //    their image and that file IS the wallpaper, so the detail page
+        //    opens from it (local pages rebuild their source link from the id).
+        // null = nothing renderable (no platform and no image) - caller fails loud.
+        public static HistoryNavigation? RebuildNavigation(
+            HistoryEntry entry,
+            IReadOnlyList<WallpaperItem> desktopBatch,
+            IReadOnlyList<WallpaperItem> lockScreenBatch)
+        {
+            var platform = DeriveSite(entry);
+            var id = ExtractStoredId(entry.ImageUrl);
+
+            if (!string.IsNullOrEmpty(id))
+            {
+                var batch = entry.WallpaperType == "Lock Screen" ? lockScreenBatch : desktopBatch;
+                var entryTitle = entry.Title?.Trim() ?? string.Empty;
+                var match = batch.FirstOrDefault(candidate =>
+                    candidate.Id == id &&
+                    (string.IsNullOrEmpty(platform)
+                        || string.Equals(candidate.Platform, platform, StringComparison.OrdinalIgnoreCase)) &&
+                    // an id can collide across items (digital blasphemy used to
+                    // issue shared numeric ids) - the title is the second half
+                    // of the identity, so a mismatched match falls through to
+                    // the row's own local-file rebuild instead of opening the
+                    // wrong wallpaper (caught live 2026-10-16)
+                    (entryTitle.Length == 0
+                        || string.Equals((candidate.Title ?? string.Empty).Trim(), entryTitle, StringComparison.OrdinalIgnoreCase)));
+                if (match != null)
+                {
+                    var matchPlatform = string.IsNullOrEmpty(match.Platform) ? platform : match.Platform;
+                    var matchPage = DerivePageForPlatform(matchPlatform);
+                    if (!string.IsNullOrEmpty(matchPage))
+                    {
+                        return new HistoryNavigation
+                        {
+                            Page = matchPage,
+                            Platform = matchPlatform,
+                            Wallpaper = HistoryWallpaper.FromWallpaperItem(match)
+                        };
+                    }
+                }
+            }
+
+            if (string.IsNullOrWhiteSpace(entry.ImageUrl))
+            {
+                return null;
+            }
+
+            var page = DerivePageForPlatform(platform);
+            if (string.IsNullOrEmpty(page))
+            {
+                page = "Public"; // unknown source: the generic detail page still opens the image
+            }
+
+            return new HistoryNavigation
+            {
+                Page = page,
+                Platform = platform,
+                Wallpaper = new HistoryWallpaper
+                {
+                    Id = id ?? "",
+                    Title = entry.Title ?? "",
+                    ImageUrl = entry.ImageUrl,
+                    FullPhotoUrl = entry.ImageUrl,
+                    SourceUrl = platform == "AlphaCoders" && !string.IsNullOrEmpty(id)
+                        ? $"https://wall.alphacoders.com/big.php?i={id}"
+                        : "",
+                    Platform = platform,
+                    Likes = "",
+                    Downloads = ""
+                }
+            };
         }
 
         // local slideshow files are named wallpaper-<id>.<ext> /

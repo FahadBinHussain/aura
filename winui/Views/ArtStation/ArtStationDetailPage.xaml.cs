@@ -46,8 +46,12 @@ namespace Aura.Views.ArtStation
 
             try
             {
+                // a history row can hand us the applied LOCAL file (the slideshow
+                // set the wallpaper from it) - that file IS the wallpaper, so skip
+                // the remote refetch, which needs a permalink the row may not store
                 if (string.IsNullOrWhiteSpace(_currentArtwork.FullPhotoUrl) ||
-                    _currentArtwork.FullPhotoUrl == _currentArtwork.ImageUrl)
+                    (_currentArtwork.FullPhotoUrl == _currentArtwork.ImageUrl &&
+                     !File.Exists(_currentArtwork.FullPhotoUrl)))
                 {
                     _currentArtwork = await _artStationService.GetProjectDetailsAsync(_currentArtwork);
                 }

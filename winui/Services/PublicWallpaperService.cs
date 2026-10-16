@@ -1173,6 +1173,14 @@ namespace Aura.Services
 
         public async Task<byte[]> GetImageBytesAsync(string imageUrl, CancellationToken cancellationToken = default)
         {
+            // history rows can hand us the applied LOCAL file (the slideshow set
+            // the wallpaper from exactly this file) - read it directly instead
+            // of http-fetching what is really a path
+            if (System.IO.File.Exists(imageUrl))
+            {
+                return await System.IO.File.ReadAllBytesAsync(imageUrl, cancellationToken);
+            }
+
             return await _httpClient.GetByteArrayAsync(imageUrl, cancellationToken);
         }
 
@@ -1940,7 +1948,12 @@ namespace Aura.Services
 
                 wallpapers.Add(new WallpaperItem
                 {
-                    Id = Regex.Match(href, "\\d+").Success ? Regex.Match(href, "\\d+").Value : href,
+                    // the slug is the stable per-item id - the digit run inside
+                    // slugs like "opalinehollow2"/"autumnwood2k262" is a version
+                    // and collides across items (the old first-digit id made
+                    // distinct wallpapers share id "2"; caught live 2026-10-16
+                    // when a history row opened the wrong item)
+                    Id = href.TrimEnd('/').Split('/').Last(),
                     Title = title,
                     Description = "Digital Blasphemy wallpaper",
                     ImageUrl = thumb,
