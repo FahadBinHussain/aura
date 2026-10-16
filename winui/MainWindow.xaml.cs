@@ -266,6 +266,30 @@ namespace Aura
         }
 
         /// <summary>
+        /// Startup path when App.StartHiddenToTray is on: WinUI creates this window
+        /// visible, so hide it right after construction - the same state a close leaves
+        /// it in. The tray icon, navigation and slideshow restore already happened in the
+        /// constructor, so everything keeps running. Mirror of ShowFromTray.
+        /// </summary>
+        public void HideToTrayAtStartup()
+        {
+            if (m_appWindow == null) return;
+
+            if (_tray == null)
+            {
+                // nothing to hide behind (closing would EXIT the app), so start with the
+                // window up rather than leaving an unreachable app - the startup failure
+                // dialog is already on screen explaining why the tray icon is missing.
+                Activate();
+                LogInfo("no tray icon - starting with the window shown instead of hidden");
+                return;
+            }
+
+            m_appWindow.Hide();
+            LogInfo("started hidden in the tray - no window shown (reopen from the tray icon, or launch Aura.exe again)");
+        }
+
+        /// <summary>
         /// The one real-exit path: saves window position, drops the tray icon, exits.
         /// Used by the tray menu's Exit and the dev hot-reload button.
         /// </summary>

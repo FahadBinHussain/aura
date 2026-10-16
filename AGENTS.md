@@ -2060,3 +2060,37 @@ it still measures whatever happens to sit over its slot (it previously measured 
 chevron), so it should still be replaced with a `Shell_TrayWnd` UIA read - count
 `NotifyItemIcon` entries and test for a `Show Hidden Icons` button - and the notice must
 be reworded to state the real reason whenever it does fire.
+
+
+### start hidden in the tray (2026-10-16)
+
+user ask: "when startup, aura window is opening. i just want it keep running in tray" -
+Aura now comes up silently in the tray instead of showing its window on every launch.
+
+- one-line switch = `App.StartHiddenToTray` (a `static readonly bool`, default true, in
+  `winui/App.xaml.cs`): true = build MainWindow then `HideToTrayAtStartup()`, false =
+  the old `Activate()`. `MainWindow.HideToTrayAtStartup()` is the mirror of
+  `ShowFromTray`.
+- **WinUI 3 quirk: skipping `Window.Activate()` does NOT keep the window hidden.** the
+  HWND is created WS_VISIBLE inside `new MainWindow()` - measured live with no
+  Activate() call: rect (-8,-8)-(1928,1048), IsWindowVisible=True, maximized. so you
+  must call `m_appWindow.Hide()` right after construction - in the same tick, before
+  OnLaunched returns, so nothing is ever composited and there is no flash.
+- the `_tray == null` guard is load-bearing: when InitializeTray failed, closing EXITS
+  the app, so hiding at startup would strand an invisible app with no way back.
+  `HideToTrayAtStartup` therefore starts with the window SHOWN in that case (the
+  startup failure dialog is already on screen explaining why).
+- reopen paths: tray left click (`OpenRequested -> ShowFromTray`) and a second launch
+  (`EventWaitHandle Aura_ShowWindow -> OnShowSignal -> ShowFromTray`; the second
+  process's `BringRunningWindowForward` polls IsWindowVisible, so it waits for the
+  hidden window to appear before handing over foreground). close still hides, never
+  exits.
+- **`static readonly`, not `const`, for these feature flags**: `if (falseConst) X;` and
+  the unreachable else of `if (trueConst)` both raise CS0162; a `static readonly bool`
+  keeps the branch reachable and the flip still one line. (this also fixed the earlier
+  `ShowDebugConsole` flag, which had shipped a CS0162 warning.)
+- verified live 2026-10-16 on the published build: startup `MainWindowHandle = 0x0` +
+  log `started hidden in the tray - no window shown`, tray `PAINTED - slot sd 19.48`,
+  `Loaded 402 wallpapers from 10 platform(s)`, foreground untouched; second launch ->
+  `window shown from tray` (visible) -> WM_CLOSE -> `window closed - hidden to tray`,
+  still 1 process, foreground restored. probe `C:\tmp\aurareopen.ps1` (stays in C:\tmp).

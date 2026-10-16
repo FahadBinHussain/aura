@@ -21,6 +21,14 @@ namespace Aura
         private const string ShowSignalName = "Aura_ShowWindow";
         private const string MainWindowTitle = "Aura";
 
+        // startup behaviour: true = Aura comes up silently in the tray with NO window
+        // (it still runs - the tray icon, navigation and slideshow restore all happen
+        // in MainWindow's constructor). false = the old behaviour of opening the window
+        // on every launch. either way the app stays reachable: a left click on the tray
+        // icon, or launching Aura.exe again, which hits the single-instance path below
+        // and calls ShowFromTray.
+        private static readonly bool StartHiddenToTray = true;
+
         // App-level dispatcher queue for use by background services
         public static Microsoft.UI.Dispatching.DispatcherQueue? MainDispatcherQueue { get; private set; }
 
@@ -29,7 +37,7 @@ namespace Aura
         // to bring it back. nothing is lost while it is off: LogInfo and LogException
         // always write app.log FIRST, and the Console mirror further down is only a
         // duplicate of that same text, so the file log is unaffected either way.
-        private const bool ShowDebugConsole = false;
+        private static readonly bool ShowDebugConsole = false;
 
         [DllImport("kernel32.dll")]
         private static extern bool AllocConsole();
@@ -71,8 +79,12 @@ namespace Aura
                 _showSignal = new EventWaitHandle(false, EventResetMode.AutoReset, ShowSignalName);
                 ThreadPool.RegisterWaitForSingleObject(_showSignal, OnShowSignal, null, Timeout.Infinite, false);
 
-                m_window = new MainWindow();
-                m_window.Activate();
+                var mainWindow = new MainWindow();
+                m_window = mainWindow;
+                if (StartHiddenToTray)
+                    mainWindow.HideToTrayAtStartup();
+                else
+                    mainWindow.Activate();
 
             }
             catch (Exception ex)
