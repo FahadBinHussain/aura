@@ -59,6 +59,22 @@ nav offers, what each axis really is) and let them rule; a `false` row is reject
 the Categories page scope menu, the merged card grid, and the slideshow category
 checklist, while the platform's OWN grid chips + picker card stay untouched.
 
+**how to present the audit** (standing format, set 2026-10-16):
+
+1. **link the site** - the live URL(s) that were reversed (the landing/edition page, a
+   month or index page, one item page) - so the user can click through and check the
+   axes themselves before ruling.
+2. open with the verdict + the ask: `Judge the category for <Platform> - my verdict:
+   reject (Nth "no" / accept). Evidence below.`
+3. numbered evidence, <= 5 items: each axis the site actually offers and what it really
+   is (region / time / content-type / sort / search query), plus the best "fake
+   alternative" spelled out (e.g. "the 11 country editions as category cards").
+4. say what each ruling changes: accepted = which counts move (scope menu, Global
+   merged cards, checklist universe); rejected = which counts stay.
+5. ship the row `CategoryCapable: false` with a `pending user audit (<date>)` comment
+   BEFORE the ruling - confirming it is then a no-op, and only a surprise "accept"
+   needs the bool flipped + counts re-verified.
+
 ## 3. the fetcher contract
 
 one private method per platform, usually
