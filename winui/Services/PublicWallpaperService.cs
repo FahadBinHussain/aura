@@ -788,9 +788,8 @@ namespace Aura.Services
             {
                 Name = BingEditions,
                 Kind = PlatformKind.Public,
-                // pending user audit (2026-10-16): the site's only axes are the country
-                // edition and the month - a region and a time range, no content taxonomy,
-                // the same shape that got bing/simple desktops/wallhaven rejected
+                // rejected 2026-10-16: country edition + month are the site's only axes -
+                // a region and a time range, no content taxonomy (user verdict)
                 CategoryCapable = false,
                 Description = "11 country editions of Bing's daily wallpaper with a monthly archive back to 2011, originals in 3840x2160 (bingwallpaper.anerg.com).",
                 Modes = () => BingEditionsList.Select(edition => edition.Label).ToArray(),

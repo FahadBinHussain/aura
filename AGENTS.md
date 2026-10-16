@@ -2125,11 +2125,13 @@ Microsoft's own feed and both rows show in the picker, so the site's own wording
   All-categories fast path fetch public platforms with mode `latest`, and the site
   has no cross-edition feed - so empty/`latest` resolves to the root page's United
   States edition. any other unknown mode still throws loud.
-- `CategoryCapable = false` (pending the user's category audit; the site's only axes
-  are country edition + month). counts by construction: `GetImplementedPlatformNames`
-  17 -> 18, `GetSupportedPlatformNames` 14 -> 15, picker 26 -> 27; scope menu stays
-  10, Global stays 293, checklist universe stays 296 (the row collapses under
-  Category like every rejected site).
+- `CategoryCapable = false` - **user verdict 2026-10-16: rejected** (the site's only
+  axes are country edition + month; a region and a time range, no content taxonomy).
+  the site-category audit is now **18/18 judged - 10 yes, 8 no** (supersedes the
+  artgram section's "audit complete: 17/17"). counts by construction:
+  `GetImplementedPlatformNames` 17 -> 18, `GetSupportedPlatformNames` 14 -> 15,
+  picker 26 -> 27; scope menu stays 10, Global stays 293, checklist universe stays
+  296 (the row collapses under Category like every rejected site).
 - **back-navigation keeps the selected mode for ALL public grids**:
   `PublicWallpaperGridPage` is not navigation-cached, so every back built a fresh
   instance that snapped to the platform's FIRST mode (visible chip reset - caught on
