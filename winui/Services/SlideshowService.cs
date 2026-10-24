@@ -469,6 +469,16 @@ namespace Aura.Services
             }
         }
 
+        // "All categories" is a sentinel, not a name: every platform takes the
+        // no-filter latest-feed path, so the merged category universe is never
+        // consulted. callers use this to skip the live index loads entirely -
+        // one flaky index fetch (alphacoders timing out at 100s, pixabay CF 403)
+        // used to abort the whole startup load and leave the slideshow dead
+        // until the user opened the app (2026-10-23).
+        private static bool HasAllCategoriesSentinel(List<string>? categories) =>
+            categories != null &&
+            categories.Any(c => string.Equals(c, SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase));
+
         private async Task<List<string>> LoadWallpapersForDesktop(List<string> platforms, string category, string basis, List<string> categories)
         {
             var failures = new List<string>();
@@ -480,11 +490,19 @@ namespace Aura.Services
                 var allWallpapers = new List<WallpaperItem>();
                 string mode = NormalizePublicMode(category);
 
-                if (basis == "Category")
+                if (basis == "Category" && !HasAllCategoriesSentinel(categories))
                 {
                     // resolution needs the merged name universe - a failed index load
-                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line
+                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line.
+                    // the All-categories sentinel resolves NO name, so it must not wait
+                    // on the live indexes at all: one alphacoders index timeout at boot
+                    // (100s) used to kill the whole startup load and leave the enabled
+                    // slideshow dead until the user opened the app (2026-10-23)
                     await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
+                }
+                else if (basis == "Category")
+                {
+                    LogInfo("category basis: All categories - skipping the live category indexes (no name resolution needed)");
                 }
 
                 foreach (var platform in platforms)
@@ -536,11 +554,17 @@ namespace Aura.Services
                 var allWallpapers = new List<WallpaperItem>();
                 string mode = NormalizePublicMode(category);
 
-                if (basis == "Category")
+                if (basis == "Category" && !HasAllCategoriesSentinel(categories))
                 {
                     // resolution needs the merged name universe - a failed index load
-                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line
+                    // throws LOUD here -> "wallpaper load: ..." -> the empty-batch line.
+                    // the All-categories sentinel needs no names (same rule as the
+                    // desktop loader - never blocked by a slow live index)
                     await SlideshowCategoryCatalog.Instance.GetUniverseAsync();
+                }
+                else if (basis == "Category")
+                {
+                    LogInfo("lock screen category basis: All categories - skipping the live category indexes (no name resolution needed)");
                 }
 
                 foreach (var platform in platforms)
@@ -681,11 +705,16 @@ namespace Aura.Services
             // "All categories" (the dialog's DEFAULT Category state) or every one of
             // this platform's own categories ticked = no filter at all: ONE latest-
             // feed fetch instead of N category fetches (the full universe would
-            // otherwise fire ~270 requests per start)
-            var platformNames = SlideshowCategoryCatalog.Instance.GetPlatformNames(platform);
-            bool allTicked =
-                tickedNames.Any(t => t.Equals(SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase)) ||
-                (platformNames.Count > 0 && platformNames.All(n => tickedNames.Any(t => t.Equals(n, StringComparison.OrdinalIgnoreCase))));
+            // otherwise fire ~270 requests per start). the sentinel is tested FIRST
+            // and on its own: GetPlatformNames throws when the universe was never
+            // loaded, and the sentinel path deliberately skips that load
+            bool allTicked = tickedNames.Any(t => t.Equals(SlideshowCategoryCatalog.AllCategories, StringComparison.OrdinalIgnoreCase));
+            if (!allTicked)
+            {
+                var platformNames = SlideshowCategoryCatalog.Instance.GetPlatformNames(platform);
+                allTicked = platformNames.Count > 0 &&
+                            platformNames.All(n => tickedNames.Any(t => t.Equals(n, StringComparison.OrdinalIgnoreCase)));
+            }
             if (allTicked)
             {
                 var wallpapers = await LoadLatestFeedAsync(platform, "Latest Wallpapers", "latest", batch);

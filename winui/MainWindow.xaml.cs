@@ -1154,15 +1154,16 @@ namespace Aura
 
                 // skip if the Slideshow page already started/restored these -
                 // two parallel starts would race on the same wallpaper lists
-                if (desktopEnabled && desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(desktopCategory)
-                    && !service.DesktopRunning && !service.DesktopStarting)
+                bool desktopAttempted = desktopEnabled && desktopPlatforms.Count > 0 && !string.IsNullOrEmpty(desktopCategory);
+                bool lockAttempted = lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory);
+
+                if (desktopAttempted && !service.DesktopRunning && !service.DesktopStarting)
                 {
                     var interval = SlideshowService.ParseInterval(desktopInterval);
                     await service.StartDesktopSlideshow(desktopPlatforms, desktopCategory, interval, dispatcherQueue, desktopBasis, desktopCategories);
                 }
 
-                if (lockEnabled && lockPlatforms.Count > 0 && !string.IsNullOrEmpty(lockCategory)
-                    && !service.LockScreenRunning && !service.LockScreenStarting)
+                if (lockAttempted && !service.LockScreenRunning && !service.LockScreenStarting)
                 {
                     var interval = SlideshowService.ParseInterval(lockInterval);
                     await service.StartLockScreenSlideshow(lockPlatforms, lockCategory, interval, dispatcherQueue, lockBasis, lockCategories);
@@ -1173,12 +1174,103 @@ namespace Aura
                 // filename holds the wallpaper id) + the configured categories
                 Aura.Services.WallpaperHistoryService.Instance.RecoverSlideshowStickers(
                     service.DesktopBatch, service.LockScreenBatch, desktopCategory, lockCategory);
+
+                // a boot-time start can fail transiently (Windows just logged in and
+                // the network stack is not up yet, a slow feed) - the enabled
+                // slideshow would otherwise stay dead until the user opened the app.
+                // retry in the background, bounded + loud; the first attempt already
+                // logged/kept its reason, and every retry does the same.
+                string settingsStamp = ReadSettingsStamp(settingsPath);
+                if (desktopAttempted && !service.DesktopRunning && !service.DesktopStarting)
+                {
+                    _ = RetrySlideshowStartAsync(service, desktop: true, desktopPlatforms, desktopCategory, desktopBasis,
+                        desktopCategories, desktopInterval, dispatcherQueue, settingsPath, settingsStamp);
+                }
+                if (lockAttempted && !service.LockScreenRunning && !service.LockScreenStarting)
+                {
+                    _ = RetrySlideshowStartAsync(service, desktop: false, lockPlatforms, lockCategory, lockBasis,
+                        lockCategories, lockInterval, dispatcherQueue, settingsPath, settingsStamp);
+                }
             }
             catch (Exception ex)
             {
                 // unreadable settings at startup - LOUD on the Slideshow page, never silent
                 SlideshowService.Instance.ReportRestoreError($"Slideshow restore failed: {ex.Message}");
             }
+        }
+
+        // a slideshow start that came back with 0 wallpapers (typically the boot
+        // network is not ready yet while Windows logs in) must not leave an
+        // ENABLED slideshow dead until the user opens the app. six attempts, 30s
+        // apart; every attempt is the normal louder-contract start (error line +
+        // log), never a silent fallback. it stops the moment the slideshow runs
+        // (this retry, a page Set, or a page restore), and it stops if the
+        // settings file changed at all - a new save owns its own start, so a
+        // retry can never resurrect a stale config.
+        private async System.Threading.Tasks.Task RetrySlideshowStartAsync(
+            SlideshowService service,
+            bool desktop,
+            List<string> platforms,
+            string category,
+            string basis,
+            List<string> categories,
+            string intervalText,
+            Microsoft.UI.Dispatching.DispatcherQueue dispatcherQueue,
+            string settingsPath,
+            string settingsStamp)
+        {
+            const int maxAttempts = 6;
+            string label = desktop ? "desktop" : "lock screen";
+            var interval = SlideshowService.ParseInterval(intervalText);
+
+            for (int attempt = 1; attempt <= maxAttempts; attempt++)
+            {
+                await System.Threading.Tasks.Task.Delay(TimeSpan.FromSeconds(30));
+
+                if (desktop ? (service.DesktopRunning || service.DesktopStarting) : (service.LockScreenRunning || service.LockScreenStarting))
+                {
+                    return;
+                }
+
+                if (ReadSettingsStamp(settingsPath) != settingsStamp)
+                {
+                    LogInfo($"{label} slideshow retry stopped - slideshow settings changed (the new save owns the start)");
+                    return;
+                }
+
+                LogInfo($"{label} slideshow retry {attempt}/{maxAttempts} (the previous attempt loaded 0 wallpapers)");
+                try
+                {
+                    if (desktop)
+                    {
+                        await service.StartDesktopSlideshow(platforms, category, interval, dispatcherQueue, basis, categories);
+                    }
+                    else
+                    {
+                        await service.StartLockScreenSlideshow(platforms, category, interval, dispatcherQueue, basis, categories);
+                    }
+                }
+                catch (Exception ex)
+                {
+                    LogInfo($"{label} slideshow retry {attempt}/{maxAttempts} threw: {ex.Message}");
+                }
+
+                if (desktop ? service.DesktopRunning : service.LockScreenRunning)
+                {
+                    LogInfo($"{label} slideshow started on retry {attempt}/{maxAttempts}");
+                    return;
+                }
+            }
+
+            LogInfo($"{label} slideshow still not running after {maxAttempts} retries - giving up (the Slideshow page shows the reason)");
+        }
+
+        // mtime + length is enough to prove "nobody touched the file"; used to
+        // stop startup retries that would otherwise start a stale config.
+        private static string ReadSettingsStamp(string settingsPath)
+        {
+            var info = new System.IO.FileInfo(settingsPath);
+            return info.Exists ? $"{info.LastWriteTimeUtc.Ticks}/{info.Length}" : "missing";
         }
 
         private void HotReloadButton_Click(object sender, RoutedEventArgs e)

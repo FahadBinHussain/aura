@@ -2202,3 +2202,63 @@ known-limit line.
   history-file checks before clicking; assert titles by poll (transient
   `FindText` misses mid-transition); `$null = Func $x` swallows the function's
   whole success stream (per-row logs vanished - call bare).
+
+### startup slideshow: the All-categories sentinel never waits on the live indexes (2026-10-24)
+
+user report: "aura is starting at startup, but the slideshow is not, even though
+its enabled". the init log (2026-10-23 3:26:03 PM) showed the whole startup load
+die before any wallpaper: `wallpaper load failed: couldn't load alphacoders
+categories: The request was canceled due to the configured HttpClient.Timeout of
+100 seconds elapsing` -> `Desktop slideshow not started: 0 wallpapers loaded -
+wallpaper load: ...`. the slideshow then stayed dead until the user opened the
+window hours later, when a re-run of the page restore happened to load 402
+wallpapers (6:34:37 a second index failure - pixabay CF 403 - then 6:35:05
+success). TWO defects, both fixed:
+
+- **the Category basis loaded all 6 live index sources even when the only tick
+  was the `All categories` sentinel**, which resolves NO name at all. one slow
+  or failing index fetch (100s alphacoders timeout, pixabay CF 403) made
+  `SlideshowCategoryCatalog.LoadAsync` throw (it joins every source error and
+  throws), so the batch was empty and the timer never started. now
+  `HasAllCategoriesSentinel(categories)` gates `GetUniverseAsync()` in BOTH
+  loaders (desktop + lock), and `LoadCategoryBasisForPlatformAsync` tests the
+  sentinel BEFORE `GetPlatformNames` (that call throws when the universe was
+  never loaded - the sentinel path deliberately skips the load now). one new log
+  line records the skip: `category basis: All categories - skipping the live
+  category indexes (no name resolution needed)`. the per-platform latest feeds
+  are still fetched exactly as before (and still fail loudly per platform).
+- **a failed boot start never retried.** `MainWindow.RestoreSlideshowsOnStartupAsync`
+  ran each enabled slideshow once; a transient failure (Windows just logged in,
+  network stack not up yet) left it dead until the user opened the app. now a
+  failed-but-enabled start hands off to `RetrySlideshowStartAsync`: 6 attempts,
+  30s apart, each one the normal loud start (same per-platform failures, same
+  not-started error line + log). it stops the moment the slideshow runs (this
+  retry, a page Set, or a page restore) and stops if the settings file changed
+  at all (`ReadSettingsStamp` = mtime+length) - a new save owns its own start,
+  so a retry can never resurrect a stale config. desktop + lock get the same
+  treatment (symmetry). the first attempt is still awaited inline before the
+  sticker recovery, so startup timing/order is unchanged.
+
+verified 2026-10-24 on the local flat build (`dotnet build winui\Aura.csproj`,
+no `-p:Platform`) with the user's real config (Category / `All categories` /
+1 Hours / 10 platforms):
+
+- stage 1 (`C:\tmp\aura-startupfix.ps1`, debug build): 5/5 PASS - sentinel skip
+  logged at +0s, `Loaded 402 wallpapers from 10 platform(s)` at +9s, wallpaper
+  applied, next change scheduled, ZERO `wallpaper load failed` /
+  `slideshow not started` lines.
+- stage 2 (`C:\tmp\aura-startupretry.ps1`): 5/5 PASS - a deterministic
+  0-wallpaper config (a tick no platform has) logs the normal
+  `Desktop slideshow not started: 0 wallpapers loaded`, then
+  `desktop slideshow retry 1/6` at exactly +30s and `retry 2/6` at +60s; a
+  settings edit (interval 1h -> 2h) stops it with
+  `retry stopped - slideshow settings changed (the new save owns the start)`
+  and no `retry 3/6` follows.
+- published build = hash-identical copy of `winui\bin\Debug` (Aura.exe/Aura.dll/
+  Aura.pri/MainWindow.xbf all MATCH) and relaunched hidden: sentinel skip,
+  `Loaded 402 wallpapers from 10 platform(s)` at +7s, wallpaper applied, next
+  change at 4:22:55 PM, `MainWindowHandle = 0x0`.
+- probes stay in `C:\tmp` (never committed). note: the retry probe's
+  DesktopNexus-only config actually loaded 21 items, so the earlier
+  "desktopnexus.com 403s everything site-wide" note was a temporary live block,
+  not a permanent one - do not assert that 403 in future probes.
