@@ -188,8 +188,8 @@ namespace Aura.Services
             using var document = JsonDocument.Parse(json);
             var root = document.RootElement;
 
-            wallpaper.Title = GetString(root, "title", wallpaper.Title);
-            wallpaper.Description = GetString(root, "description", wallpaper.Description);
+            wallpaper.Title = TextUtilities.CleanTitle(GetString(root, "title", wallpaper.Title));
+            wallpaper.Description = TextUtilities.CleanHtml(GetString(root, "description", wallpaper.Description));
             wallpaper.SourceUrl = GetString(root, "permalink", wallpaper.SourceUrl);
             wallpaper.Likes = GetMetric(root, "likes_count", wallpaper.Likes);
             wallpaper.Downloads = GetMetric(root, "views_count", wallpaper.Downloads);
@@ -293,8 +293,8 @@ namespace Aura.Services
             return new WallpaperItem
             {
                 Id = string.IsNullOrWhiteSpace(hashId) ? numericId : hashId,
-                Title = title,
-                Description = string.IsNullOrWhiteSpace(artistName) ? GetString(projectElement, "description", title) : $"by {artistName}",
+                Title = TextUtilities.CleanTitle(title),
+                Description = string.IsNullOrWhiteSpace(artistName) ? TextUtilities.CleanHtml(GetString(projectElement, "description", title)) : $"by {artistName}",
                 ImageUrl = thumbnailUrl,
                 FullPhotoUrl = thumbnailUrl,
                 SourceUrl = GetString(projectElement, "permalink"),
@@ -323,8 +323,8 @@ namespace Aura.Services
             return new WallpaperItem
             {
                 Id = string.IsNullOrWhiteSpace(hashId) ? numericId : hashId,
-                Title = title,
-                Description = string.IsNullOrWhiteSpace(artistName) ? title : $"by {artistName}",
+                Title = TextUtilities.CleanTitle(title),
+                Description = string.IsNullOrWhiteSpace(artistName) ? TextUtilities.CleanTitle(title) : $"by {artistName}",
                 ImageUrl = thumbnailUrl,
                 FullPhotoUrl = thumbnailUrl,
                 SourceUrl = GetString(projectElement, "url", $"{BaseUrl}/search"),

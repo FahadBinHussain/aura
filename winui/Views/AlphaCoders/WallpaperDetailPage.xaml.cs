@@ -306,7 +306,7 @@ namespace Aura.Views.AlphaCoders
 
 
                 // Set title at the top of the page
-                TitleTextBlock.Text = wallpaper.Title ?? "Error Loading Wallpaper";
+                TitleTextBlock.Text = TextUtilities.CleanTitle(wallpaper.Title ?? "Error Loading Wallpaper");
 
                 // Check if this is an Alpha Coders wallpaper that needs on-demand big thumb fetching
                 if (!string.IsNullOrEmpty(_currentWallpaper.ImageUrl) && _currentWallpaper.ImageUrl.Contains("alphacoders.com"))

@@ -56,6 +56,9 @@ namespace Aura.Views.ArtStation
                     _currentArtwork = await _artStationService.GetProjectDetailsAsync(_currentArtwork);
                 }
 
+                _currentArtwork.Title = TextUtilities.CleanTitle(_currentArtwork.Title);
+                _currentArtwork.Description = TextUtilities.CleanHtml(_currentArtwork.Description);
+
                 TitleTextBlock.Text = _currentArtwork.Title;
                 DescriptionTextBlock.Text = _currentArtwork.Description;
                 LikesTextBlock.Text = _currentArtwork.Likes;

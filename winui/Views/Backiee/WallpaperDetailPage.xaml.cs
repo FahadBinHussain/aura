@@ -209,7 +209,7 @@ namespace Aura.Views.Backiee
                 }
 
                 // Set title at the top of the page
-                TitleTextBlock.Text = wallpaper.Title ?? "Error Loading Wallpaper";
+                TitleTextBlock.Text = TextUtilities.CleanTitle(wallpaper.Title ?? "Error Loading Wallpaper");
 
                 // Set the full image using the FullPhotoUrl property
                 if (!string.IsNullOrEmpty(wallpaper.FullPhotoUrl))

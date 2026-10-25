@@ -2262,3 +2262,25 @@ no `-p:Platform`) with the user's real config (Category / `All categories` /
   DesktopNexus-only config actually loaded 21 items, so the earlier
   "desktopnexus.com 403s everything site-wide" note was a temporary live block,
   not a permanent one - do not assert that 403 in future probes.
+
+### artwork html markup stripping in descriptions and titles (2026-10-25)
+
+user report: raw `<p>` and `</p>` tags showed up in the description text of artwork
+opened from History (observed on the ArtStation artwork "Iara").
+
+- **root cause**: ArtStation API descriptions are rich-text HTML (wrapped in `<p>...</p>`,
+  with line breaks, links, and HTML entities like `&amp;`, `&quot;`). When parsed in
+  `ArtStationService` or stored in `wallpaper_history.json`, raw markup flowed directly
+  into `DescriptionTextBlock.Text` and stored snapshots without HTML tag stripping or entity decoding.
+- **fix**: added `TextUtilities` (`CleanHtml` and `CleanTitle`):
+  - Converts block tags (`</p>`, `</div>`, `</li>`, etc.) and break tags (`<br>`) to newlines.
+  - Strips all remaining `<[^>]+>` HTML tags and comments.
+  - Decodes HTML entities with `WebUtility.HtmlDecode`.
+  - Normalizes whitespace, non-breaking spaces, and blank line sequences.
+  - Applied across:
+    - `ArtStationService` (`GetProjectDetailsAsync`, `CreateWallpaperItem`, `CreateSearchWallpaperItem`).
+    - `ArtStationDetailPage` and `PublicWallpaperDetailPage` (cleans descriptions and titles before rendering).
+    - `Backiee` and `AlphaCoders` detail pages (cleans titles).
+    - `WallpaperHistoryService`: `ToWallpaperItem`, `FromWallpaperItem`, `AddEntry`, `RebuildNavigation`, and `LoadFromDisk` (so existing stored history entries with `<p>` tags are cleaned in-memory and sanitized).
+- verified menuless live on the installed build via UIA: opened History -> navigated to
+  "Iara" -> `DescriptionTextBlock` asserted free of `<p>`/`</p>` tags and populated with clean text.

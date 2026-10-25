@@ -29,8 +29,8 @@ namespace Aura.Services
         public WallpaperItem ToWallpaperItem() => new WallpaperItem
         {
             Id = Id,
-            Title = Title,
-            Description = Description,
+            Title = TextUtilities.CleanTitle(Title),
+            Description = TextUtilities.CleanHtml(Description),
             ImageUrl = ImageUrl,
             FullPhotoUrl = FullPhotoUrl,
             SourceUrl = SourceUrl,
@@ -45,8 +45,8 @@ namespace Aura.Services
         public static HistoryWallpaper FromWallpaperItem(WallpaperItem wallpaper) => new HistoryWallpaper
         {
             Id = wallpaper.Id,
-            Title = wallpaper.Title,
-            Description = wallpaper.Description,
+            Title = TextUtilities.CleanTitle(wallpaper.Title),
+            Description = TextUtilities.CleanHtml(wallpaper.Description),
             ImageUrl = wallpaper.ImageUrl,
             FullPhotoUrl = wallpaper.FullPhotoUrl,
             SourceUrl = wallpaper.SourceUrl,
@@ -102,6 +102,13 @@ namespace Aura.Services
         public void AddEntry(string title, string imageUrl, string wallpaperType, string source,
             WallpaperItem? wallpaper = null, string page = "", string platform = "", string category = "")
         {
+            title = TextUtilities.CleanTitle(title);
+            if (wallpaper != null)
+            {
+                wallpaper.Title = TextUtilities.CleanTitle(wallpaper.Title);
+                wallpaper.Description = TextUtilities.CleanHtml(wallpaper.Description);
+            }
+
             var effectivePlatform = !string.IsNullOrEmpty(platform) ? platform : wallpaper?.Platform ?? "";
             var entry = new HistoryEntry
             {
@@ -224,7 +231,15 @@ namespace Aura.Services
                 if (list == null) return;
 
                 foreach (var entry in list)
+                {
+                    entry.Title = TextUtilities.CleanTitle(entry.Title);
+                    if (entry.Navigation?.Wallpaper != null)
+                    {
+                        entry.Navigation.Wallpaper.Title = TextUtilities.CleanTitle(entry.Navigation.Wallpaper.Title);
+                        entry.Navigation.Wallpaper.Description = TextUtilities.CleanHtml(entry.Navigation.Wallpaper.Description);
+                    }
                     Entries.Add(entry);
+                }
             }
             catch
             {
@@ -390,7 +405,7 @@ namespace Aura.Services
                 Wallpaper = new HistoryWallpaper
                 {
                     Id = id ?? "",
-                    Title = entry.Title ?? "",
+                    Title = TextUtilities.CleanTitle(entry.Title ?? ""),
                     ImageUrl = entry.ImageUrl,
                     FullPhotoUrl = entry.ImageUrl,
                     SourceUrl = platform == "AlphaCoders" && !string.IsNullOrEmpty(id)

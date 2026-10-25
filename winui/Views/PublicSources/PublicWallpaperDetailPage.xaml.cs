@@ -50,8 +50,8 @@ namespace Aura.Views.PublicSources
             }
 
             PlatformTextBlock.Text = _platformName;
-            TitleTextBlock.Text = _wallpaper.Title;
-            DescriptionTextBlock.Text = _wallpaper.Description;
+            TitleTextBlock.Text = TextUtilities.CleanTitle(_wallpaper.Title);
+            DescriptionTextBlock.Text = TextUtilities.CleanHtml(_wallpaper.Description);
             ResolutionTextBlock.Text = string.IsNullOrWhiteSpace(_wallpaper.Resolution) ? "-" : _wallpaper.Resolution;
             LikesTextBlock.Text = string.IsNullOrWhiteSpace(_wallpaper.Likes) ? "-" : _wallpaper.Likes;
             DownloadsTextBlock.Text = string.IsNullOrWhiteSpace(_wallpaper.Downloads) ? "-" : _wallpaper.Downloads;
