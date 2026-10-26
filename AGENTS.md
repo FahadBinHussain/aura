@@ -2294,3 +2294,9 @@ opened from History (observed on the ArtStation artwork "Iara").
   - Automated agent sandboxes and terminal workers may run on an isolated desktop station (`exebox-...` under `WinSta0`), where no explorer taskbar exists (`Shell_TrayWnd = 0x0`). Attempting `Shell_NotifyIcon(NIM_ADD)` on that sandbox desktop yields `0x80004005` (`E_FAIL` / `win32 0`).
   - The actual user desktop is `WinSta0\Default`, which hosts the live `Shell_TrayWnd` (verified `0x1B0994`).
   - Direct child processes spawned from the agent command shell are bound to the command's job object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), terminating when the command session closes. Starting persistent background instances of Aura requires detached execution outside the job object (e.g. WMI `Invoke-CimMethod -ClassName Win32_Process -MethodName Create` or `schtasks`) targeting the interactive desktop `WinSta0\Default`.
+
+
+### history badges streamlined to platform and category (2026-10-26)
+
+- **issue**: history rows displayed 4 badges per item ([Desktop] [Slideshow] [Platform] [Category]), which created repetitive clutter when slideshow is active.
+- **fix**: `HistoryPage.BuildEntryCard` dropped the redundant `entry.WallpaperType` and `entry.Source` pills. Rows now show at most 2 badges: the platform name (`MediumPurple`) and the category name (`Chocolate`) (or 1 when category is unavailable).

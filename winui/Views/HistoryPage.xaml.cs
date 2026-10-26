@@ -93,22 +93,28 @@ namespace Aura.Views
                 Child = image
             };
 
-            // Badges: type, source, then site + category stickers when known
+            // Badges: the platform name and the category name
             var badgeRow = new StackPanel
             {
                 Orientation = Orientation.Horizontal,
                 Spacing = 4
             };
-            badgeRow.Children.Add(MakeBadge(entry.WallpaperType, Microsoft.UI.Colors.Gray));
-            badgeRow.Children.Add(MakeBadge(entry.Source, entry.Source == "Manual"
-                ? Microsoft.UI.Colors.SteelBlue
-                : Microsoft.UI.Colors.SeaGreen));
 
             var site = WallpaperHistoryService.DeriveSite(entry);
-            if (!string.IsNullOrEmpty(site) && site != entry.Source)
+            if (string.IsNullOrEmpty(site) && !string.IsNullOrEmpty(entry.Source) && entry.Source != "Manual" && entry.Source != "Slideshow")
+            {
+                site = entry.Source;
+            }
+
+            if (!string.IsNullOrEmpty(site))
             {
                 badgeRow.Children.Add(MakeBadge(site, Microsoft.UI.Colors.MediumPurple));
             }
+            else if (!string.IsNullOrEmpty(entry.Source))
+            {
+                badgeRow.Children.Add(MakeBadge(entry.Source, Microsoft.UI.Colors.MediumPurple));
+            }
+
             if (!string.IsNullOrEmpty(entry.Category))
             {
                 badgeRow.Children.Add(MakeBadge(entry.Category, Microsoft.UI.Colors.Chocolate));
