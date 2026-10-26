@@ -129,7 +129,8 @@ namespace Aura.Views.ArtStation
                         "ArtStation",
                         _currentArtwork,
                         "ArtStation",
-                        platform: "ArtStation");
+                        platform: "ArtStation",
+                        category: _currentArtwork.Category ?? "");
 
                     ShowStatus($"{(isLockScreen ? "Lock screen" : "Desktop wallpaper")} set successfully.", InfoBarSeverity.Success);
                 }

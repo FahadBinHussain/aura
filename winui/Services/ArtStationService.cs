@@ -211,7 +211,40 @@ namespace Aura.Services
                 wallpaper.Resolution = resolution;
             }
 
+            var category = ExtractCategory(root);
+            if (!string.IsNullOrWhiteSpace(category))
+            {
+                wallpaper.Category = category;
+            }
+
             return wallpaper;
+        }
+
+        public static string ExtractCategory(JsonElement root)
+        {
+            foreach (var key in new[] { "categories", "mediums" })
+            {
+                if (!root.TryGetProperty(key, out var entries) || entries.ValueKind != JsonValueKind.Array)
+                {
+                    continue;
+                }
+
+                foreach (var entry in entries.EnumerateArray())
+                {
+                    if (entry.ValueKind == JsonValueKind.Object &&
+                        entry.TryGetProperty("name", out var name) &&
+                        name.ValueKind == JsonValueKind.String)
+                    {
+                        var value = name.GetString()?.Trim();
+                        if (!string.IsNullOrEmpty(value))
+                        {
+                            return value;
+                        }
+                    }
+                }
+            }
+
+            return string.Empty;
         }
 
         // history-pill enrichment (registry ItemCategory): the project's OWN category
@@ -242,27 +275,10 @@ namespace Aura.Services
             var json = await CurlClient.GetStringAsync(url, cancellationToken, ProjectDetailHeaders);
 
             using var document = JsonDocument.Parse(json);
-            var root = document.RootElement;
-            foreach (var key in new[] { "categories", "mediums" })
+            var category = ExtractCategory(document.RootElement);
+            if (!string.IsNullOrWhiteSpace(category))
             {
-                if (!root.TryGetProperty(key, out var entries) || entries.ValueKind != JsonValueKind.Array)
-                {
-                    continue;
-                }
-
-                foreach (var entry in entries.EnumerateArray())
-                {
-                    if (entry.ValueKind == JsonValueKind.Object &&
-                        entry.TryGetProperty("name", out var name) &&
-                        name.ValueKind == JsonValueKind.String)
-                    {
-                        var value = name.GetString()?.Trim();
-                        if (!string.IsNullOrEmpty(value))
-                        {
-                            return value;
-                        }
-                    }
-                }
+                return category;
             }
 
             throw new InvalidOperationException(

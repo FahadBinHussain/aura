@@ -2300,3 +2300,19 @@ opened from History (observed on the ArtStation artwork "Iara").
 
 - **issue**: history rows displayed 4 badges per item ([Desktop] [Slideshow] [Platform] [Category]), which created repetitive clutter when slideshow is active.
 - **fix**: `HistoryPage.BuildEntryCard` dropped the redundant `entry.WallpaperType` and `entry.Source` pills. Rows now show at most 2 badges: the platform name (`MediumPurple`) and the category name (`Chocolate`) (or 1 when category is unavailable).
+
+
+### artstation detail category extraction and history backfill (2026-10-26)
+
+- **issue**: ArtStation wallpapers manually set from `ArtStationDetailPage` (e.g. "Iara") showed only `[ArtStation]` without any category badge in Wallpaper History, whereas slideshow entries for the same artwork showed `[ArtStation] [Concept Art]`.
+- **root cause**:
+  - `ArtStationService.GetProjectDetailsAsync` fetched `${BaseUrl}/projects/{id}.json` when loading the detail page, but only extracted title, description, permalink, metrics, full image url, and resolution — it ignored `categories` and `mediums` arrays. As a result, `_currentArtwork.Category` was empty string (`""`).
+  - When `ArtStationDetailPage` called `WallpaperHistoryService.Instance.AddEntry(...)`, `wallpaper.Category` was `""`, writing `"Category": ""` to `wallpaper_history.json`.
+  - In contrast, the slideshow called `ArtStationService.GetItemCategoryAsync` during `EnrichItemCategoryAsync`, which had custom parsing logic for `categories` / `mediums`.
+- **fix**:
+  - Added shared `ArtStationService.ExtractCategory(JsonElement root)` that parses `categories` (primary) and `mediums` (fallback) from ArtStation project JSON.
+  - In `GetProjectDetailsAsync`: populated `wallpaper.Category = ExtractCategory(root)`.
+  - In `GetItemCategoryAsync`: reused `ExtractCategory(document.RootElement)`.
+  - In `ArtStationDetailPage.xaml.cs`: explicitly passed `category: _currentArtwork.Category ?? ""` to `AddEntry`.
+  - In `WallpaperHistoryService.cs`: added `Category` to `HistoryWallpaper` DTO, and backfilled missing categories during `LoadFromDisk()` if `Navigation.Wallpaper.Category` is populated.
+  - Updated `wallpaper_history.json` on disk to backfill the existing "Iara" manual entry with `"Category": "Concept Art"`.

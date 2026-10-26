@@ -20,6 +20,7 @@ namespace Aura.Services
         public string FullPhotoUrl { get; set; } = string.Empty;
         public string SourceUrl { get; set; } = string.Empty;
         public string Platform { get; set; } = string.Empty;
+        public string Category { get; set; } = string.Empty;
         public string Resolution { get; set; } = string.Empty;
         public string QualityTag { get; set; } = string.Empty;
         public bool IsAI { get; set; }
@@ -35,6 +36,7 @@ namespace Aura.Services
             FullPhotoUrl = FullPhotoUrl,
             SourceUrl = SourceUrl,
             Platform = Platform,
+            Category = Category,
             Resolution = Resolution,
             QualityTag = QualityTag,
             IsAI = IsAI,
@@ -51,6 +53,7 @@ namespace Aura.Services
             FullPhotoUrl = wallpaper.FullPhotoUrl,
             SourceUrl = wallpaper.SourceUrl,
             Platform = wallpaper.Platform,
+            Category = wallpaper.Category,
             Resolution = wallpaper.Resolution,
             QualityTag = wallpaper.QualityTag,
             IsAI = wallpaper.IsAI,
@@ -237,6 +240,12 @@ namespace Aura.Services
                     {
                         entry.Navigation.Wallpaper.Title = TextUtilities.CleanTitle(entry.Navigation.Wallpaper.Title);
                         entry.Navigation.Wallpaper.Description = TextUtilities.CleanHtml(entry.Navigation.Wallpaper.Description);
+                    }
+                    if (string.IsNullOrWhiteSpace(entry.Category) &&
+                        entry.Navigation?.Wallpaper != null &&
+                        !string.IsNullOrWhiteSpace(entry.Navigation.Wallpaper.Category))
+                    {
+                        entry.Category = entry.Navigation.Wallpaper.Category;
                     }
                     Entries.Add(entry);
                 }
