@@ -2284,3 +2284,13 @@ opened from History (observed on the ArtStation artwork "Iara").
     - `WallpaperHistoryService`: `ToWallpaperItem`, `FromWallpaperItem`, `AddEntry`, `RebuildNavigation`, and `LoadFromDisk` (so existing stored history entries with `<p>` tags are cleaned in-memory and sanitized).
 - verified menuless live on the installed build via UIA: opened History -> navigated to
   "Iara" -> `DescriptionTextBlock` asserted free of `<p>`/`</p>` tags and populated with clean text.
+
+### tray icon startup resilience and desktop isolation gotcha (2026-10-26)
+
+- **tray startup resilience**:
+  - `TrayIconService.AddIcon()` and `ReAddIconAfterExplorerRestart()` now execute a pre-emptive `Shell_NotifyIconW(NimDelete, ref nid)` before calling `NimAdd`. If a previous Aura process terminated forcefully or crashed without running `Dispose()`, any stale/zombie tray registration is cleared, preventing `NIM_ADD` rejection.
+  - `AddIcon()` introduces a 3-attempt retry loop with a 300ms pause to cleanly handle transient shell startup races when Windows is booting or explorer is refreshing.
+- **desktop isolation / sandbox gotcha**:
+  - Automated agent sandboxes and terminal workers may run on an isolated desktop station (`exebox-...` under `WinSta0`), where no explorer taskbar exists (`Shell_TrayWnd = 0x0`). Attempting `Shell_NotifyIcon(NIM_ADD)` on that sandbox desktop yields `0x80004005` (`E_FAIL` / `win32 0`).
+  - The actual user desktop is `WinSta0\Default`, which hosts the live `Shell_TrayWnd` (verified `0x1B0994`).
+  - Direct child processes spawned from the agent command shell are bound to the command's job object (`JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE`), terminating when the command session closes. Starting persistent background instances of Aura requires detached execution outside the job object (e.g. WMI `Invoke-CimMethod -ClassName Win32_Process -MethodName Create` or `schtasks`) targeting the interactive desktop `WinSta0\Default`.

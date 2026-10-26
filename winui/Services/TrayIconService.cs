@@ -124,9 +124,27 @@ namespace Aura.Services
         private void AddIcon()
         {
             var nid = BuildData();
-            if (!Shell_NotifyIconW(NimAdd, ref nid))
+            // clean up any stale/orphaned icon from an unclean previous process shutdown
+            Shell_NotifyIconW(NimDelete, ref nid);
+
+            bool ok = false;
+            int err = 0;
+            for (int attempt = 1; attempt <= 3; attempt++)
             {
-                int err = Marshal.GetLastWin32Error();
+                if (Shell_NotifyIconW(NimAdd, ref nid))
+                {
+                    ok = true;
+                    break;
+                }
+                err = Marshal.GetLastWin32Error();
+                if (attempt < 3)
+                {
+                    System.Threading.Thread.Sleep(300);
+                }
+            }
+
+            if (!ok)
+            {
                 throw new Win32Exception(err, $"Shell_NotifyIcon NIM_ADD failed (win32 {err}) - tray icon not shown");
             }
             _iconAdded = true;
@@ -141,6 +159,7 @@ namespace Aura.Services
         {
             if (_disposed) return;
             var nid = BuildData();
+            Shell_NotifyIconW(NimDelete, ref nid);
             if (Shell_NotifyIconW(NimAdd, ref nid))
             {
                 _iconAdded = true;
