@@ -2316,3 +2316,19 @@ opened from History (observed on the ArtStation artwork "Iara").
   - In `ArtStationDetailPage.xaml.cs`: explicitly passed `category: _currentArtwork.Category ?? ""` to `AddEntry`.
   - In `WallpaperHistoryService.cs`: added `Category` to `HistoryWallpaper` DTO, and backfilled missing categories during `LoadFromDisk()` if `Navigation.Wallpaper.Category` is populated.
   - Updated `wallpaper_history.json` on disk to backfill the existing "Iara" manual entry with `"Category": "Concept Art"`.
+
+
+### desktopnexus category extraction from subdomain and history backfill (2026-10-26)
+
+- **issue**: DesktopNexus wallpapers in Wallpaper History (such as "Nuclear Mushroom Cloud") showed only `[DesktopNexus]` without any category badge, while other platforms showed `[Platform] [Category]` (e.g. `[Pixabay] [Leaf]`).
+- **root cause**:
+  - DesktopNexus organizes its browse galleries under category subdomains (`abstract.desktopnexus.com`, `space.desktopnexus.com`, `nature.desktopnexus.com`, etc.).
+  - In `PublicWallpaperService.cs`, `DesktopNexusCategories` listed 15 category galleries mapped to subdomains, but `GetDesktopNexusWallpapersAsync` regex did not capture the subdomain into `WallpaperItem.Category` or `WallpaperItem.Platform`.
+  - The `DesktopNexus` `PlatformSpec` in `PublicWallpaperService.cs` lacked an `ItemCategory` resolver (`ItemCategory = null`).
+  - When slideshow ran with "All categories" or "latest" mode, `wallpaper.Category = "latest"`, which `NormalizeCategory("DesktopNexus", "latest")` stripped because "latest" is a fetch mode rather than a category name. Since `ItemCategory` was null, category enrichment was skipped, leaving `Category` as `""` (100% of DesktopNexus history entries were missing category).
+- **fix**:
+  - Added `GetDesktopNexusItemCategoryAsync(string itemUrl)` in `PublicWallpaperService.cs`: extracts `<subdomain>` from `itemUrl` and maps it via `DesktopNexusCategories` (zero HTTP requests, instant offline lookup).
+  - Registered `ItemCategory = (svc, url) => svc.GetDesktopNexusItemCategoryAsync(url)` on DesktopNexus `PlatformSpec`.
+  - Updated `GetDesktopNexusWallpapersAsync` regex to capture `(?<subdomain>[a-z0-9]+)`, resolve the gallery title, and assign `Platform = DesktopNexus` and `Category = category`.
+  - Added fallback recovery in `WallpaperHistoryService.LoadFromDisk()` for DesktopNexus history items to parse the category from `SourceUrl` or `ImageUrl` subdomain.
+  - Backfilled existing DesktopNexus entries in `%APPDATA%\Aura\wallpaper_history.json` with their corresponding gallery categories (`Nuclear Mushroom Cloud` -> `Abstract`, `Planet Sunset` -> `Space`, etc.).

@@ -351,6 +351,37 @@ namespace Aura.Services
             return WebUtility.HtmlDecode(crumb.Groups["n"].Value).Trim();
         }
 
+        // desktopnexus: the subdomain in the wallpaper's URL IS its gallery category
+        // ("abstract" -> "Abstract", "space" -> "Space" - verified live across all galleries).
+        // zero-fetch resolution directly off the URL subdomain.
+        public Task<string> GetDesktopNexusItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
+        {
+            if (string.IsNullOrWhiteSpace(itemUrl))
+            {
+                throw new ArgumentException("desktopnexus item url is empty - cannot look up its category", nameof(itemUrl));
+            }
+
+            var match = Regex.Match(itemUrl, @"https?://(?<subdomain>[a-z0-9]+)\.desktopnexus\.com", RegexOptions.IgnoreCase);
+            if (match.Success)
+            {
+                var subdomain = match.Groups["subdomain"].Value;
+                if (!subdomain.Equals("www", StringComparison.OrdinalIgnoreCase))
+                {
+                    var catEntry = DesktopNexusCategories
+                        .FirstOrDefault(c => c.Subdomain.Equals(subdomain, StringComparison.OrdinalIgnoreCase));
+                    var cat = string.IsNullOrEmpty(catEntry.Title)
+                        ? char.ToUpperInvariant(subdomain[0]) + subdomain.Substring(1)
+                        : catEntry.Title;
+                    if (!string.IsNullOrEmpty(cat))
+                    {
+                        return Task.FromResult(cat);
+                    }
+                }
+            }
+
+            return Task.FromResult(string.Empty);
+        }
+
         // pexels categories = the site's own Wallpapers discover index
         // (https://www.pexels.com/discover/wallpapers/ - the __NEXT_DATA__
         // props.pageProps.topics[] array: 9 topics of search-term pills, each
@@ -849,7 +880,8 @@ namespace Aura.Services
                 CategoryCapable = true,
                 Description = "15 category galleries plus All from Desktop Nexus's public browse pages.",
                 Modes = () => DesktopNexusCategories.Select(category => category.Title).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetDesktopNexusWallpapersAsync(page, mode, ct)
+                Fetch = (svc, page, mode, ct) => svc.GetDesktopNexusWallpapersAsync(page, mode, ct),
+                ItemCategory = (svc, url) => svc.GetDesktopNexusItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -1868,7 +1900,7 @@ namespace Aura.Services
 
             var matches = Regex.Matches(
                 html,
-                "<a href=\"(?<href>https://[a-z0-9]+\\.desktopnexus\\.com/wallpaper/\\d+)/\" alt=\"(?<title>[^\"]+)\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://assets\\.desktopnexus\\.com/[^\"]+)\"",
+                "<a href=\"(?<href>https://(?<subdomain>[a-z0-9]+)\\.desktopnexus\\.com/wallpaper/\\d+)/\" alt=\"(?<title>[^\"]+)\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://assets\\.desktopnexus\\.com/[^\"]+)\"",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             foreach (Match match in matches)
@@ -1876,10 +1908,21 @@ namespace Aura.Services
                 var href = WebUtility.HtmlDecode(match.Groups["href"].Value) + "/";
                 var title = WebUtility.HtmlDecode(match.Groups["title"].Value);
                 var thumb = match.Groups["thumb"].Value;
+                var itemSubdomain = match.Groups["subdomain"].Value;
 
                 if (string.IsNullOrWhiteSpace(title) || !seen.Add(href))
                 {
                     continue;
+                }
+
+                var category = string.Empty;
+                if (!string.IsNullOrEmpty(itemSubdomain) && !itemSubdomain.Equals("www", StringComparison.OrdinalIgnoreCase))
+                {
+                    var catEntry = DesktopNexusCategories
+                        .FirstOrDefault(c => c.Subdomain.Equals(itemSubdomain, StringComparison.OrdinalIgnoreCase));
+                    category = string.IsNullOrEmpty(catEntry.Title)
+                        ? char.ToUpperInvariant(itemSubdomain[0]) + itemSubdomain.Substring(1)
+                        : catEntry.Title;
                 }
 
                 var id = Regex.Match(href, "\\d+").Value;
@@ -1891,6 +1934,8 @@ namespace Aura.Services
                     ImageUrl = thumb.Replace("/thumbnail", "/preview"),
                     FullPhotoUrl = thumb.Replace("/thumbnail", "/original"),
                     SourceUrl = href,
+                    Platform = DesktopNexus,
+                    Category = category,
                     Likes = string.Empty,
                     Downloads = string.Empty,
                     IsAI = false

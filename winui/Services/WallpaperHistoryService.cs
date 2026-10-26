@@ -247,6 +247,24 @@ namespace Aura.Services
                     {
                         entry.Category = entry.Navigation.Wallpaper.Category;
                     }
+                    if (string.IsNullOrWhiteSpace(entry.Category) &&
+                        (entry.Platform == "DesktopNexus" || entry.Navigation?.Platform == "DesktopNexus"))
+                    {
+                        var url = entry.Navigation?.Wallpaper?.SourceUrl ?? entry.ImageUrl;
+                        var dnMatch = System.Text.RegularExpressions.Regex.Match(url, @"https?://(?<subdomain>[a-z0-9]+)\.desktopnexus\.com", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        if (dnMatch.Success)
+                        {
+                            var sub = dnMatch.Groups["subdomain"].Value;
+                            if (!sub.Equals("www", System.StringComparison.OrdinalIgnoreCase))
+                            {
+                                entry.Category = char.ToUpperInvariant(sub[0]) + sub.Substring(1);
+                            }
+                        }
+                        if (string.IsNullOrWhiteSpace(entry.Category) && entry.Title.Equals("digital art", System.StringComparison.OrdinalIgnoreCase))
+                        {
+                            entry.Category = "Abstract";
+                        }
+                    }
                     Entries.Add(entry);
                 }
             }
