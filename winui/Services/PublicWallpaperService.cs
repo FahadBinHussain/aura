@@ -1015,7 +1015,7 @@ namespace Aura.Services
                 Timeout = TimeSpan.FromSeconds(30)
             };
 
-            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0");
+            _httpClient.DefaultRequestHeaders.UserAgent.ParseAdd(WallpaperDownloader.BrowserUserAgent);
             _httpClient.DefaultRequestHeaders.Accept.ParseAdd("application/json,text/html,image/*,*/*");
             _httpClient.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
         }
@@ -1205,15 +1205,7 @@ namespace Aura.Services
 
         public async Task<byte[]> GetImageBytesAsync(string imageUrl, CancellationToken cancellationToken = default)
         {
-            // history rows can hand us the applied LOCAL file (the slideshow set
-            // the wallpaper from exactly this file) - read it directly instead
-            // of http-fetching what is really a path
-            if (System.IO.File.Exists(imageUrl))
-            {
-                return await System.IO.File.ReadAllBytesAsync(imageUrl, cancellationToken);
-            }
-
-            return await _httpClient.GetByteArrayAsync(imageUrl, cancellationToken);
+            return await WallpaperDownloader.GetImageBytesAsync(imageUrl, cancellationToken);
         }
 
         private async Task<List<WallpaperItem>> GetWallhavenWallpapersAsync(

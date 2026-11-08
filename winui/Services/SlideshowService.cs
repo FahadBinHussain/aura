@@ -398,10 +398,9 @@ namespace Aura.Services
                         _desktopCurrentIndex = 0;
                         var failures = await LoadWallpapersForDesktop(_desktopPlatforms, _desktopCategory, _desktopBasis, _desktopCategories);
                         SaveProgress(); // Save progress after loading new batch
-                        if (failures.Count > 0)
-                        {
-                            SetDesktopLoadError($"Desktop slideshow running, skipped: {string.Join("; ", failures)}");
-                        }
+                        SetDesktopLoadError(failures.Count > 0
+                            ? $"Desktop slideshow running, skipped: {string.Join("; ", failures)}"
+                            : null);
                     }
                     
                     if (_desktopWallpapers.Count > 0 && _desktopCurrentIndex < _desktopWallpapers.Count)
@@ -442,10 +441,9 @@ namespace Aura.Services
                         _lockScreenCurrentIndex = 0;
                         var failures = await LoadWallpapersForLockScreen(_lockScreenPlatforms, _lockScreenCategory, _lockScreenBasis, _lockScreenCategories);
                         SaveProgress(); // Save progress after loading new batch
-                        if (failures.Count > 0)
-                        {
-                            SetLockScreenLoadError($"Lock screen slideshow running, skipped: {string.Join("; ", failures)}");
-                        }
+                        SetLockScreenLoadError(failures.Count > 0
+                            ? $"Lock screen slideshow running, skipped: {string.Join("; ", failures)}"
+                            : null);
                     }
                     
                     if (_lockScreenWallpapers.Count > 0 && _lockScreenCurrentIndex < _lockScreenWallpapers.Count)
@@ -870,73 +868,93 @@ namespace Aura.Services
             }
         }
 
+        private async Task<string> ResolveWallpaperDownloadUrlAsync(WallpaperItem wallpaper)
+        {
+            if (wallpaper.Platform == "AlphaCoders")
+            {
+                var targetUrl = !string.IsNullOrEmpty(wallpaper.FullPhotoUrl) ? wallpaper.FullPhotoUrl : wallpaper.ImageUrl;
+                if (string.IsNullOrEmpty(targetUrl))
+                {
+                    return string.Empty;
+                }
+
+                if (targetUrl.Contains("initiate.alphacoders.com", StringComparison.OrdinalIgnoreCase))
+                {
+                    return targetUrl;
+                }
+
+                var scraperService = new AlphaCodersScraperService();
+                var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(wallpaper.Id, targetUrl);
+                if (string.IsNullOrEmpty(bigThumbUrl))
+                {
+                    return targetUrl;
+                }
+
+                var bigThumbUri = new Uri(bigThumbUrl);
+                var bigThumbPath = bigThumbUri.AbsolutePath;
+                var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
+
+                var imageId = wallpaper.Id;
+                var uri = new Uri(targetUrl);
+                var domainParts = uri.Host.Split('.');
+                var domainShort = domainParts[0];
+
+                return $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
+            }
+
+            return !string.IsNullOrWhiteSpace(wallpaper.FullPhotoUrl)
+                ? wallpaper.FullPhotoUrl
+                : wallpaper.ImageUrl;
+        }
+
+        private static string GetImageExtension(string imageUrl)
+        {
+            if (Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
+            {
+                var extension = Path.GetExtension(uri.AbsolutePath).TrimStart('.').ToLowerInvariant();
+                if (!string.IsNullOrWhiteSpace(extension) && extension.Length <= 5)
+                {
+                    return extension;
+                }
+            }
+            return "jpg";
+        }
+
+        private static string SanitizeFileName(string value)
+        {
+            var invalidChars = Path.GetInvalidFileNameChars();
+            var safeName = new string((value ?? string.Empty).Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray()).Trim();
+            return string.IsNullOrWhiteSpace(safeName) ? "wallpaper" : safeName;
+        }
+
         private async Task SetDesktopWallpaper(WallpaperItem wallpaper)
         {
             try
             {
-                // Use platform-specific logic based on wallpaper's platform tag
-                if (wallpaper.Platform == "AlphaCoders")
-                {
-                    await SetDesktopWallpaper_AlphaCoders(wallpaper);
-                }
-                else // Backiee
-                {
-                    await SetDesktopWallpaper_Backiee(wallpaper);
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-        private async Task SetDesktopWallpaper_Backiee(WallpaperItem wallpaper)
-        {
-            try
-            {
-                string imageUrl = wallpaper.FullPhotoUrl;
+                string imageUrl = await ResolveWallpaperDownloadUrlAsync(wallpaper);
                 if (string.IsNullOrEmpty(imageUrl))
                 {
                     SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no image URL");
                     return;
                 }
 
-                LogInfo($"Downloading desktop wallpaper: {wallpaper.Title}");
+                LogInfo($"Downloading desktop wallpaper: {wallpaper.Title} from {wallpaper.Platform}");
 
-                // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
                 var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
 
-                string stableFileName = $"wallpaper-{wallpaper.Id}.jpg";
-                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
+                string fileExtension = GetImageExtension(imageUrl);
+                string stableFileName = $"wallpaper-{SanitizeFileName(wallpaper.Id)}.{fileExtension}";
+                string stableFilePath = Path.Combine(wallpapersFolder.Path, stableFileName);
 
                 Windows.Storage.StorageFile wallpaperFile;
-                if (System.IO.File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                if (File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Reuse existing file — skip download
                     wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
                 }
                 else
                 {
-                    // Download the image
-                    byte[] imageBytes;
-                    if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
-                        string appPath = AppDomain.CurrentDomain.BaseDirectory;
-                        string fullLocalPath = Path.Combine(appPath, localPath);
-                        if (File.Exists(fullLocalPath))
-                            imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                        else
-                        {
-                            SetDesktopApplyError($"Could not apply '{wallpaper.Title}': local file missing ({fullLocalPath})");
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        imageBytes = await BackieeNetworkClient.GetByteArrayAsync(imageUrl);
-                    }
-
+                    byte[] imageBytes = await WallpaperDownloader.GetImageBytesAsync(imageUrl);
                     wallpaperFile = await wallpapersFolder.CreateFileAsync(
                         stableFileName,
                         Windows.Storage.CreationCollisionOption.ReplaceExisting);
@@ -946,22 +964,20 @@ namespace Aura.Services
                         await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
                     }
 
-                    LogInfo($"Wallpaper saved to: {wallpaperFile.Path}");
+                    LogInfo($"Desktop wallpaper saved to: {wallpaperFile.Path}");
                 }
 
-                // Try to set the wallpaper using WinRT API
                 bool success = false;
                 var userProfilePersonalizationSettings = Windows.System.UserProfile.UserProfilePersonalizationSettings.Current;
-
                 try
                 {
                     success = await userProfilePersonalizationSettings.TrySetWallpaperImageAsync(wallpaperFile);
                 }
                 catch (Exception ex)
                 {
+                    LogInfo($"WinRT TrySetWallpaperImageAsync failed: {ex.Message}");
                 }
 
-                // If WinRT API fails, try WallpaperHelper as fallback
                 if (!success)
                 {
                     try
@@ -971,6 +987,7 @@ namespace Aura.Services
                     }
                     catch (Exception ex)
                     {
+                        LogInfo($"SystemParametersInfo failed: {ex.Message}");
                     }
                 }
 
@@ -979,136 +996,10 @@ namespace Aura.Services
                     LogInfo($"Desktop wallpaper set to: {wallpaper.Title}");
                     await EnrichItemCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
-                    
-                    // Store the current wallpaper URL and raise event
+
                     _currentDesktopWallpaperUrl = imageUrl;
                     _currentDesktopWallpaperFile = wallpaperFile.Path;
                     DesktopWallpaperChanged?.Invoke(this, imageUrl);
-                    SetDesktopApplyError(null);
-                }
-                else
-                {
-                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': Windows refused the wallpaper change (WinRT and SystemParametersInfo both failed)");
-                }
-            }
-            catch (Exception ex)
-            {
-                SetDesktopApplyError($"Could not apply '{wallpaper.Title}': {ex.Message}");
-            }
-        }
-
-        private async Task SetDesktopWallpaper_AlphaCoders(WallpaperItem wallpaper)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(wallpaper.ImageUrl))
-                {
-                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no image URL");
-                    return;
-                }
-
-                LogInfo($"Downloading desktop wallpaper: {wallpaper.Title}");
-
-                // Get Pictures folder
-                var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
-                var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
-
-                // Get the big thumb URL to extract extension
-                var scraperService = new AlphaCodersScraperService();
-                var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(wallpaper.Id, wallpaper.ImageUrl);
-
-                if (string.IsNullOrEmpty(bigThumbUrl))
-                {
-                    SetDesktopApplyError($"Could not apply '{wallpaper.Title}': no full-size image URL from AlphaCoders");
-                    return;
-                }
-
-                // Extract extension from big thumb URL
-                var bigThumbUri = new Uri(bigThumbUrl);
-                var bigThumbPath = bigThumbUri.AbsolutePath;
-                var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
-
-                // Build original URL with same extension
-                var imageId = wallpaper.Id;
-                var uri = new Uri(wallpaper.ImageUrl);
-                var domainParts = uri.Host.Split('.');
-                var domainShort = domainParts[0];
-
-                var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
-
-
-                byte[] imageBytes;
-                // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
-                string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
-                string stableFileName = $"wallpaper-{wallpaper.Id}.{fileExtension}";
-                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
-
-                Windows.Storage.StorageFile wallpaperFile;
-                if (System.IO.File.Exists(stableFilePath))
-                {
-                    // Reuse existing file — skip download
-                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
-                    LogInfo($"Reusing cached AlphaCoders wallpaper: {stableFileName}");
-                }
-                else
-                {
-                    try
-                    {
-                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                        LogInfo($"Successfully downloaded AlphaCoders wallpaper");
-                    }
-                    catch (Exception ex)
-                    {
-                        SetDesktopApplyError($"Could not apply '{wallpaper.Title}': download failed - {ex.Message}");
-                        return;
-                    }
-
-                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                        stableFileName,
-                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
-                    {
-                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                    }
-
-                    LogInfo($"AlphaCoders wallpaper saved to: {wallpaperFile.Path}");
-                }
-
-                // Try to set the wallpaper using WinRT API
-                bool success = false;
-                var userProfilePersonalizationSettings = Windows.System.UserProfile.UserProfilePersonalizationSettings.Current;
-
-                try
-                {
-                    success = await userProfilePersonalizationSettings.TrySetWallpaperImageAsync(wallpaperFile);
-                }
-                catch (Exception ex)
-                {
-                }
-
-                // If WinRT API fails, try SystemParametersInfo as fallback
-                if (!success)
-                {
-                    try
-                    {
-                        SystemParametersInfo(SPI_SETDESKWALLPAPER, 0, wallpaperFile.Path, SPIF_UPDATEINIFILE | SPIF_SENDCHANGE);
-                        success = true;
-                    }
-                    catch (Exception ex)
-                    {
-                    }
-                }
-
-                if (success)
-                {
-                    LogInfo($"AlphaCoders desktop wallpaper set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Desktop", "Slideshow", wallpaper);
-                    
-                    // Store the current wallpaper URL and raise event
-                    _currentDesktopWallpaperUrl = originalUrl;
-                    _currentDesktopWallpaperFile = wallpaperFile.Path;
-                    DesktopWallpaperChanged?.Invoke(this, originalUrl);
                     SetDesktopApplyError(null);
                 }
                 else
@@ -1126,67 +1017,30 @@ namespace Aura.Services
         {
             try
             {
-                // Use platform-specific logic based on wallpaper's platform tag
-                if (wallpaper.Platform == "AlphaCoders")
-                {
-                    await SetLockScreenWallpaper_AlphaCoders(wallpaper);
-                }
-                else // Backiee
-                {
-                    await SetLockScreenWallpaper_Backiee(wallpaper);
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-        }
-
-        private async Task SetLockScreenWallpaper_Backiee(WallpaperItem wallpaper)
-        {
-            try
-            {
-                string imageUrl = wallpaper.FullPhotoUrl;
+                string imageUrl = await ResolveWallpaperDownloadUrlAsync(wallpaper);
                 if (string.IsNullOrEmpty(imageUrl))
                 {
                     SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no image URL");
                     return;
                 }
 
-                LogInfo($"Downloading lock screen wallpaper: {wallpaper.Title}");
+                LogInfo($"Downloading lock screen wallpaper: {wallpaper.Title} from {wallpaper.Platform}");
 
-                // Get Pictures folder
                 var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
                 var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
 
-                string stableFileName = $"lockscreen-{wallpaper.Id}.jpg";
-                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
+                string fileExtension = GetImageExtension(imageUrl);
+                string stableFileName = $"lockscreen-{SanitizeFileName(wallpaper.Id)}.{fileExtension}";
+                string stableFilePath = Path.Combine(wallpapersFolder.Path, stableFileName);
 
                 Windows.Storage.StorageFile wallpaperFile;
-                if (System.IO.File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
+                if (File.Exists(stableFilePath) && !imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
                 {
                     wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
                 }
                 else
                 {
-                    byte[] imageBytes;
-                    if (imageUrl.StartsWith("ms-appx://", StringComparison.OrdinalIgnoreCase))
-                    {
-                        string localPath = imageUrl.Replace("ms-appx:///", "").Replace("/", "\\");
-                        string appPath = AppDomain.CurrentDomain.BaseDirectory;
-                        string fullLocalPath = Path.Combine(appPath, localPath);
-                        if (File.Exists(fullLocalPath))
-                            imageBytes = await File.ReadAllBytesAsync(fullLocalPath);
-                        else
-                        {
-                            SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: local file missing ({fullLocalPath})");
-                            return;
-                        }
-                    }
-                    else
-                    {
-                        imageBytes = await BackieeNetworkClient.GetByteArrayAsync(imageUrl);
-                    }
-
+                    byte[] imageBytes = await WallpaperDownloader.GetImageBytesAsync(imageUrl);
                     wallpaperFile = await wallpapersFolder.CreateFileAsync(
                         stableFileName,
                         Windows.Storage.CreationCollisionOption.ReplaceExisting);
@@ -1199,79 +1053,26 @@ namespace Aura.Services
                     LogInfo($"Lock screen image saved to: {wallpaperFile.Path}");
                 }
 
-                // Use registry method (same as WallpaperDetailPage)
                 bool success = false;
-                const string PERSONALIZE_REG_KEY = @"Software\Microsoft\Windows\CurrentVersion\PersonalizationCSP";
-                const string LOCKSCREEN_PATH_REG_VALUE = "LockScreenImagePath";
-                const string LOCKSCREEN_STATUS_REG_VALUE = "LockScreenImageStatus";
-                const string LOCKSCREEN_URL_REG_VALUE = "LockScreenImageUrl";
-
-                // Method: Using Registry for lock screen with LocalMachine
+                var userProfilePersonalizationSettings = Windows.System.UserProfile.UserProfilePersonalizationSettings.Current;
                 try
                 {
-                    using (var key = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(PERSONALIZE_REG_KEY, true))
-                    {
-                        if (key == null)
-                        {
-                            // Try to create the key if it doesn't exist
-                            using (var newKey = Microsoft.Win32.Registry.LocalMachine.CreateSubKey(PERSONALIZE_REG_KEY, true))
-                            {
-                                if (newKey != null)
-                                {
-                                    newKey.SetValue(LOCKSCREEN_PATH_REG_VALUE, wallpaperFile.Path);
-                                    newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
-                                    newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
-                                    success = true;
-                                }
-                            }
-                        }
-                        else
-                        {
-                            // Key exists, set the values
-                            key.SetValue(LOCKSCREEN_PATH_REG_VALUE, wallpaperFile.Path);
-                            key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
-                            key.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
-                            success = true;
-                        }
-                    }
+                    success = await userProfilePersonalizationSettings.TrySetLockScreenImageAsync(wallpaperFile);
                 }
                 catch (Exception ex)
                 {
+                    LogInfo($"WinRT TrySetLockScreenImageAsync failed: {ex.Message}");
                 }
 
-                // If LocalMachine failed, try with CurrentUser as fallback
                 if (!success)
                 {
                     try
                     {
-                        using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(PERSONALIZE_REG_KEY, true))
-                        {
-                            if (key == null)
-                            {
-                                // Try to create the key if it doesn't exist
-                                using (var newKey = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(PERSONALIZE_REG_KEY, true))
-                                {
-                                    if (newKey != null)
-                                    {
-                                        newKey.SetValue(LOCKSCREEN_PATH_REG_VALUE, wallpaperFile.Path);
-                                        newKey.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
-                                        newKey.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
-                                        success = true;
-                                    }
-                                }
-                            }
-                            else
-                            {
-                                // Key exists, set the values
-                                key.SetValue(LOCKSCREEN_PATH_REG_VALUE, wallpaperFile.Path);
-                                key.SetValue(LOCKSCREEN_STATUS_REG_VALUE, 1);
-                                key.SetValue(LOCKSCREEN_URL_REG_VALUE, wallpaperFile.Path);
-                                success = true;
-                            }
-                        }
+                        success = Aura.Views.AlphaCoders.WallpaperHelper.SetLockScreen(wallpaperFile.Path);
                     }
-                    catch (Exception innerEx)
+                    catch (Exception ex)
                     {
+                        LogInfo($"WallpaperHelper.SetLockScreen failed: {ex.Message}");
                     }
                 }
 
@@ -1280,8 +1081,7 @@ namespace Aura.Services
                     LogInfo($"Lock screen set to: {wallpaper.Title}");
                     await EnrichItemCategoryAsync(wallpaper);
                     WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
-                    
-                    // Store the current wallpaper URL and raise event
+
                     _currentLockScreenWallpaperUrl = imageUrl;
                     _currentLockScreenWallpaperFile = wallpaperFile.Path;
                     LockScreenWallpaperChanged?.Invoke(this, imageUrl);
@@ -1289,118 +1089,7 @@ namespace Aura.Services
                 }
                 else
                 {
-                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: registry write failed (needs admin for the machine-wide key, and the per-user key also failed)");
-                }
-            }
-            catch (Exception ex)
-            {
-                SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: {ex.Message}");
-            }
-        }
-
-        private async Task SetLockScreenWallpaper_AlphaCoders(WallpaperItem wallpaper)
-        {
-            try
-            {
-                if (string.IsNullOrEmpty(wallpaper.ImageUrl))
-                {
-                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no image URL");
-                    return;
-                }
-
-                LogInfo($"Downloading lock screen wallpaper: {wallpaper.Title}");
-
-                // Get Pictures folder
-                var picturesFolder = Windows.Storage.KnownFolders.PicturesLibrary;
-                var wallpapersFolder = await picturesFolder.CreateFolderAsync("Aura", Windows.Storage.CreationCollisionOption.OpenIfExists);
-
-                // Get the big thumb URL to extract extension
-                var scraperService = new AlphaCodersScraperService();
-                var bigThumbUrl = await scraperService.GetBigImageUrlForWallpaperAsync(wallpaper.Id, wallpaper.ImageUrl);
-
-                if (string.IsNullOrEmpty(bigThumbUrl))
-                {
-                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: no full-size image URL from AlphaCoders");
-                    return;
-                }
-
-                // Extract extension from big thumb URL
-                var bigThumbUri = new Uri(bigThumbUrl);
-                var bigThumbPath = bigThumbUri.AbsolutePath;
-                var extension = System.IO.Path.GetExtension(bigThumbPath).TrimStart('.');
-
-                // Build original URL with same extension
-                var imageId = wallpaper.Id;
-                var uri = new Uri(wallpaper.ImageUrl);
-                var domainParts = uri.Host.Split('.');
-                var domainShort = domainParts[0];
-
-                var originalUrl = $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
-
-
-                byte[] imageBytes;
-                // Use stable filename based on wallpaper ID (no timestamp to avoid duplicates)
-                string fileExtension = !string.IsNullOrEmpty(extension) ? extension : "jpg";
-                string stableFileName = $"lockscreen-{wallpaper.Id}.{fileExtension}";
-                string stableFilePath = System.IO.Path.Combine(wallpapersFolder.Path, stableFileName);
-
-                Windows.Storage.StorageFile wallpaperFile;
-                if (System.IO.File.Exists(stableFilePath))
-                {
-                    wallpaperFile = await wallpapersFolder.GetFileAsync(stableFileName);
-                    LogInfo($"Reusing cached AlphaCoders lock screen wallpaper: {stableFileName}");
-                }
-                else
-                {
-                    try
-                    {
-                        imageBytes = await _httpClient.GetByteArrayAsync(originalUrl);
-                        LogInfo($"Successfully downloaded AlphaCoders wallpaper for lock screen");
-                    }
-                    catch (Exception ex)
-                    {
-                        SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: download failed - {ex.Message}");
-                        return;
-                    }
-
-                    wallpaperFile = await wallpapersFolder.CreateFileAsync(
-                        stableFileName,
-                        Windows.Storage.CreationCollisionOption.ReplaceExisting);
-
-                    using (var stream = await wallpaperFile.OpenStreamForWriteAsync())
-                    {
-                        await stream.WriteAsync(imageBytes, 0, imageBytes.Length);
-                    }
-
-                    LogInfo($"AlphaCoders lock screen wallpaper saved to: {wallpaperFile.Path}");
-                }
-
-                // Try to set the lock screen using WinRT API
-                bool success = false;
-                var userProfilePersonalizationSettings = Windows.System.UserProfile.UserProfilePersonalizationSettings.Current;
-
-                try
-                {
-                    success = await userProfilePersonalizationSettings.TrySetLockScreenImageAsync(wallpaperFile);
-                }
-                catch (Exception ex)
-                {
-                }
-
-                if (success)
-                {
-                    LogInfo($"AlphaCoders lock screen set to: {wallpaper.Title}");
-                    WallpaperHistoryService.Instance.AddEntry(wallpaper.Title, wallpaperFile.Path, "Lock Screen", "Slideshow", wallpaper);
-                    
-                    // Store the current wallpaper URL and raise event
-                    _currentLockScreenWallpaperUrl = originalUrl;
-                    _currentLockScreenWallpaperFile = wallpaperFile.Path;
-                    LockScreenWallpaperChanged?.Invoke(this, originalUrl);
-                    SetLockScreenApplyError(null);
-                }
-                else
-                {
-                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: Windows refused the change (WinRT TrySetLockScreenImageAsync failed)");
+                    SetLockScreenApplyError($"Could not apply '{wallpaper.Title}' to the lock screen: Windows refused the change (WinRT and registry both failed)");
                 }
             }
             catch (Exception ex)

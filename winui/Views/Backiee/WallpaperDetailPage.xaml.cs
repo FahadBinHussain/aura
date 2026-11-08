@@ -708,9 +708,7 @@ namespace Aura.Views.Backiee
         // wallpaper from it) - read it directly instead of http-fetching a path
         private static async Task<byte[]> GetImageBytesAsync(string urlOrPath)
         {
-            return File.Exists(urlOrPath)
-                ? await File.ReadAllBytesAsync(urlOrPath)
-                : await BackieeNetworkClient.GetByteArrayAsync(urlOrPath);
+            return await WallpaperDownloader.GetImageBytesAsync(urlOrPath);
         }
 
         // Helper to try to get current window via reflection

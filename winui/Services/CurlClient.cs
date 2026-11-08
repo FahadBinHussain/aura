@@ -51,7 +51,7 @@ namespace Aura.Services
             process.StartInfo.ArgumentList.Add("--max-time");
             process.StartInfo.ArgumentList.Add("30");
             process.StartInfo.ArgumentList.Add("--user-agent");
-            process.StartInfo.ArgumentList.Add("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0");
+            process.StartInfo.ArgumentList.Add(WallpaperDownloader.BrowserUserAgent);
             if (extraHeaders != null)
             {
                 foreach (var header in extraHeaders)

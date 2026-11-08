@@ -2332,3 +2332,18 @@ opened from History (observed on the ArtStation artwork "Iara").
   - Updated `GetDesktopNexusWallpapersAsync` regex to capture `(?<subdomain>[a-z0-9]+)`, resolve the gallery title, and assign `Platform = DesktopNexus` and `Category = category`.
   - Added fallback recovery in `WallpaperHistoryService.LoadFromDisk()` for DesktopNexus history items to parse the category from `SourceUrl` or `ImageUrl` subdomain.
   - Backfilled existing DesktopNexus entries in `%APPDATA%\Aura\wallpaper_history.json` with their corresponding gallery categories (`Nuclear Mushroom Cloud` -> `Abstract`, `Planet Sunset` -> `Space`, etc.).
+
+
+### backiee 403 user-agent block and unified wallpaper downloader (2026-11-08)
+
+- **issues**:
+  1. Desktop and Lock Screen slideshows showed warning: `skipped: Backiee: curl request failed with exit code 22: curl: (22) The requested URL returned error: 403`.
+  2. Lock screen slideshow failed to apply Pixiv wallpaper (`お菓子曲・擬人化`): `Could not apply 'お菓子曲・擬人化' to the lock screen: Response status code does not indicate success: 403 (Forbidden).`
+- **root causes**:
+  1. Cloudflare on `backiee.com` started blocking the `Aura/1.0` token in the `User-Agent` header (`Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0`) with HTTP 403, while standard Chrome User-Agent (`Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36`) passes with HTTP 200. Additionally, `.NET` `SocketsHttpHandler` TLS ClientHello is blocked on `backiee.com`, so requests must route directly through `CurlClient`.
+  2. In `SlideshowService.cs`, `SetDesktopWallpaper` and `SetLockScreenWallpaper` branched only on `wallpaper.Platform == "AlphaCoders"`, sending all other 17 platforms into `SetDesktopWallpaper_Backiee` / `SetLockScreenWallpaper_Backiee`. Those methods called `BackieeNetworkClient.GetByteArrayAsync(imageUrl)`, which sent no `Referer` header and only caught `IsBackieeUrl` for curl. When a Pixiv image (`i.pximg.net`) was downloaded, the missing `Referer: https://www.pixiv.net/` caused `i.pximg.net` to return 403 Forbidden. Furthermore, `SetLockScreenWallpaper_Backiee` bypassed WinRT `TrySetLockScreenImageAsync` and only attempted registry keys.
+- **fixes**:
+  - Created `WallpaperDownloader` (`winui/Services/WallpaperDownloader.cs`): centralizes image byte downloads across all services and models (`SlideshowService`, `WallpaperItem`, `PublicWallpaperService`, `ArtStationService`, `BackieeNetworkClient`, detail pages) with standard Chrome `BrowserUserAgent`, per-host `Referer` (`https://www.pixiv.net/` for `i.pximg.net`, etc.), and direct `CurlClient` routing for `cara.app` and `backiee.com`.
+  - Updated `CurlClient.cs` to use `WallpaperDownloader.BrowserUserAgent`.
+  - Unified `SlideshowService.SetDesktopWallpaper` and `SetLockScreenWallpaper` across all platforms, using `TrySetLockScreenImageAsync` (with `WallpaperHelper.SetLockScreen` fallback) and clearing `SetDesktopLoadError(null)` / `SetLockScreenLoadError(null)` when subsequent batches load with 0 failures.
+  - Verified live in `app.log`: Desktop loaded 402 wallpapers from 10 platforms (0 failed) and Lock Screen loaded 657 wallpapers from 18 platforms (0 failed).

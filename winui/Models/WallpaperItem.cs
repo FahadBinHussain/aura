@@ -82,23 +82,7 @@ namespace Aura.Models
         public async Task<BitmapImage> LoadImageAsync()
         {
 
-            using (var httpClient = new System.Net.Http.HttpClient())
-            {
-                // Add browser-like headers
-                httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-                httpClient.DefaultRequestHeaders.Add("Accept", "image/webp,image/apng,image/*,*/*;q=0.8");
-                httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
-                httpClient.DefaultRequestHeaders.Add("Referer", GetRefererFor(ImageUrl));
-
-
-                // Download the image data, host-routed: curl is cara's ONLY transport
-                // (TLS-fingerprint 403), backiee keeps its proven client, everything
-                // else continues through HttpClient
-                var imageBytes = IsCaraUrl(ImageUrl)
-                    ? await CurlClient.GetByteArrayAsync(ImageUrl)
-                    : IsBackieeUrl(ImageUrl)
-                        ? await BackieeNetworkClient.GetByteArrayAsync(ImageUrl)
-                        : await httpClient.GetByteArrayAsync(ImageUrl);
+            var imageBytes = await WallpaperDownloader.GetImageBytesAsync(ImageUrl);
 
                 // decode + re-encode OFF the UI thread: every await above resumes on
                 // the app dispatcher (WinUI SynchronizationContext), and ImageSharp's
@@ -143,7 +127,6 @@ namespace Aura.Models
                 }
 
                 return bitmap;
-            }
         }
 
         // Method to load the full image with WebP support
@@ -152,22 +135,7 @@ namespace Aura.Models
             try
             {
 
-                using (var httpClient = new System.Net.Http.HttpClient())
-                {
-                    // Add browser-like headers
-                    httpClient.DefaultRequestHeaders.Add("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
-                    httpClient.DefaultRequestHeaders.Add("Accept", "image/webp,image/apng,image/*,*/*;q=0.8");
-                    httpClient.DefaultRequestHeaders.Add("Accept-Language", "en-US,en;q=0.5");
-                    httpClient.DefaultRequestHeaders.Add("Referer", GetRefererFor(FullPhotoUrl));
-
-                    // Download the image data, host-routed: curl is cara's ONLY transport
-                    // (TLS-fingerprint 403), backiee keeps its proven client, everything
-                    // else continues through HttpClient
-                    var imageBytes = IsCaraUrl(FullPhotoUrl)
-                        ? await CurlClient.GetByteArrayAsync(FullPhotoUrl)
-                        : IsBackieeUrl(FullPhotoUrl)
-                            ? await BackieeNetworkClient.GetByteArrayAsync(FullPhotoUrl)
-                            : await httpClient.GetByteArrayAsync(FullPhotoUrl);
+                var imageBytes = await WallpaperDownloader.GetImageBytesAsync(FullPhotoUrl);
 
                     // decode + re-encode OFF the UI thread - same dispatcher freeze as
                     // the thumbnail path (a detail page opened as one big stutter while
@@ -201,7 +169,6 @@ namespace Aura.Models
 
                     return bitmap;
                 }
-            }
             catch (Exception ex)
             {
 

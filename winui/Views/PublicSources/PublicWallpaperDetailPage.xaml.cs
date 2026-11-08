@@ -81,7 +81,7 @@ namespace Aura.Views.PublicSources
             try
             {
                 using var client = new HttpClient();
-                client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (Windows NT 10.0; Win64; x64) Aura/1.0");
+                client.DefaultRequestHeaders.UserAgent.ParseAdd(WallpaperDownloader.BrowserUserAgent);
                 var html = await client.GetStringAsync(_wallpaper!.SourceUrl);
                 var match = Regex.Match(
                     html,
