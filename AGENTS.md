@@ -2347,3 +2347,18 @@ opened from History (observed on the ArtStation artwork "Iara").
   - Updated `CurlClient.cs` to use `WallpaperDownloader.BrowserUserAgent`.
   - Unified `SlideshowService.SetDesktopWallpaper` and `SetLockScreenWallpaper` across all platforms, using `TrySetLockScreenImageAsync` (with `WallpaperHelper.SetLockScreen` fallback) and clearing `SetDesktopLoadError(null)` / `SetLockScreenLoadError(null)` when subsequent batches load with 0 failures.
   - Verified live in `app.log`: Desktop loaded 402 wallpapers from 10 platforms (0 failed) and Lock Screen loaded 657 wallpapers from 18 platforms (0 failed).
+
+
+### dark mode visibility across mainwindow, historypage, and detail pages (2026-11-09)
+
+- **issue**: In OS Dark Mode, `HistoryPage` (along with the left navigation sidebar, "Next Gen Edition" badge, and any page with `Background="Transparent"`) rendered white dark-theme text (`TextFillColorPrimaryBrush`) and translucent dark-theme card fills (`CardBackgroundFillColorDefaultBrush`, `#0DFFFFFF`) directly over a bright light-gray `#f9f9f9` background, making all titles, subtitles, timestamps, and buttons nearly invisible.
+- **root causes**:
+  1. `MainWindow.xaml` line 200 hardcoded `<Grid Grid.Row="1" Background="#f9f9f9">` behind both `NavigationContainer` and `ContentFrame`. Any page with `Background="Transparent"` (`HistoryPage`, `PlatformSelectionPage`, `SettingsPage`, `CategoriesPage`, `PublicWallpaperGridPage`, etc.) exposed `#f9f9f9` underneath dark-theme translucent cards and white text.
+  2. `MainWindow.xaml.cs` hardcoded light-theme navigation button colors (`#EAEAEA` active background and `#191919` / `DarkGray` text) and did not update `FontIcon` foregrounds (such as `HistoryButton`'s icon) or re-apply styles on `ActualThemeChanged`.
+  3. `HistoryPage.xaml` had `Background="Transparent"` instead of `{ThemeResource ApplicationPageBackgroundThemeBrush}`, and `HistoryPage.xaml.cs` left `HistoryEntryButton`'s default `ButtonBackground` behind `card` and used opacity-dimmed default foregrounds instead of explicit `TextFillColorPrimaryBrush` / `TextFillColorSecondaryBrush`.
+  4. `Views/AlphaCoders/WallpaperDetailPage.xaml` and `Views/Backiee/WallpaperDetailPage.xaml` hardcoded `Foreground="Black"` on the `Set`, `Download`, and `View on Web` action buttons inside a dark secondary card, and `Views/AlphaCoders/AlphaCodersGridPage.xaml` hardcoded `#f8f9fa` / `#495057` on `DebugPanel`.
+- **fixes**:
+  - `MainWindow.xaml`: replaced `Background="#f9f9f9"` on `Grid.Row="1"` with `Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"`.
+  - `MainWindow.xaml.cs`: added theme-aware `GetNavSelectedBgBrush()` (`#2D2D2D` dark / `#EAEAEA` light), `GetNavSelectedTextBrush()` (`White` dark / `#191919` light), and `GetNavUnselectedTextBrush()` (`#B0B0B0` dark / `DarkGray` light), updated both `TextBlock` and `FontIcon` children, and hooked `Loaded` + `ActualThemeChanged` to refresh nav button styles live.
+  - `Views/HistoryPage.xaml` & `Views/HistoryPage.xaml.cs`: set page `Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"`, explicit `TextFillColorPrimaryBrush` / `TextFillColorSecondaryBrush` foregrounds on header, subtitle, card title, and card timestamp, and `Transparent` background on `HistoryEntryButton`.
+  - `Views/AlphaCoders/WallpaperDetailPage.xaml`, `Views/Backiee/WallpaperDetailPage.xaml`, and `Views/AlphaCoders/AlphaCodersGridPage.xaml`: removed hardcoded `Foreground="Black"` and `#f8f9fa` light debug panel colors in favor of theme resources.

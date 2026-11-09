@@ -8,7 +8,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d"
-    Background="Transparent">
+    Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
 
     <Grid Margin="24,16">
         <Grid.RowDefinitions>
@@ -20,8 +20,8 @@
 
         <!-- Header -->
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="12" Margin="0,0,0,4">
-            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE81C;" FontSize="20" VerticalAlignment="Center"/>
-            <TextBlock Text="Wallpaper History" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center"/>
+            <FontIcon FontFamily="Segoe Fluent Icons" Glyph="&#xE81C;" FontSize="20" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
+            <TextBlock Text="Wallpaper History" FontSize="22" FontWeight="SemiBold" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorPrimaryBrush}"/>
         </StackPanel>
 
         <!-- Loud status line (click-through errors, etc.) -->
@@ -41,7 +41,7 @@
                        Grid.Column="0"
                        Text="All wallpaper changes — manual and slideshow"
                        FontSize="13"
-                       Opacity="0.6"
+                       Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                        VerticalAlignment="Center"/>
             <Button x:Name="ClearHistoryButton"
                     Grid.Column="1"

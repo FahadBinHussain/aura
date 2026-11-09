@@ -54,6 +54,11 @@ namespace Aura
 
         // Public property to access ContentFrame for navigation
         public Frame NavigationFrame => ContentFrame;
+        private Button? _selectedNavButton;
+        private bool IsDarkTheme() => (Content is FrameworkElement el && el.ActualTheme != ElementTheme.Default) ? el.ActualTheme == ElementTheme.Dark : Application.Current.RequestedTheme == ApplicationTheme.Dark;
+        private SolidColorBrush GetNavSelectedBgBrush() => IsDarkTheme() ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 45, 45, 45)) : new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 234, 234, 234));
+        private SolidColorBrush GetNavSelectedTextBrush() => IsDarkTheme() ? new SolidColorBrush(Colors.White) : new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 25, 25, 25));
+        private SolidColorBrush GetNavUnselectedTextBrush() => IsDarkTheme() ? new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 176, 176, 176)) : new SolidColorBrush(Colors.DarkGray);
 
         public MainWindow()
         {
@@ -68,7 +73,7 @@ namespace Aura
             try
             {
                 // Initialize the selected background brush with the desired color
-                var selectedBgBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 234, 234, 234)); // #eaeaea
+                var selectedBgBrush = GetNavSelectedBgBrush();
 
                 // We need to access the resource dictionary through Content's Resources in WinUI 3
                 if (Content is FrameworkElement element)
@@ -125,6 +130,7 @@ namespace Aura
                 if(this.Content is FrameworkElement rootElement)
                 {
                     rootElement.ActualThemeChanged += RootElement_ActualThemeChanged;
+                    rootElement.Loaded += (s, e) => { ResetAllNavButtonStyles(); if (_selectedNavButton != null) ApplySelectedButtonStyle(_selectedNavButton); };
                 }
 
                 // Set initial colors
@@ -846,7 +852,7 @@ namespace Aura
                         {
                             if (contentChild is TextBlock textBlock)
                             {
-                                textBlock.Foreground = new SolidColorBrush(Colors.DarkGray);
+                                textBlock.Foreground = GetNavUnselectedTextBrush(); } else if (contentChild is FontIcon fontIcon) { fontIcon.Foreground = GetNavUnselectedTextBrush();
                             }
                         }
                     }
@@ -884,7 +890,7 @@ namespace Aura
                 }
 
                 // Reset text color
-                FindAndUpdateTextBlock(buttonStack, new SolidColorBrush(Colors.DarkGray));
+                FindAndUpdateTextBlock(buttonStack, GetNavUnselectedTextBrush());
             }
         }
 
@@ -894,6 +900,7 @@ namespace Aura
                 return;
 
             // Check if we're using the new Grid-based approach or the old Border approach
+            _selectedNavButton = button;
             if (selectedStack.Children[0] is Grid selectedGrid)
             {
                 // Set up the background and orange indicator for active buttons
@@ -901,7 +908,7 @@ namespace Aura
                 {
                     if (child is Border border)
                     {
-                        border.Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 234, 234, 234)); // #eaeaea
+                        border.Background = GetNavSelectedBgBrush();
                     }
                     else if (child is Microsoft.UI.Xaml.Shapes.Rectangle rectangle)
                     {
@@ -933,7 +940,7 @@ namespace Aura
                                     textBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 25, 25, 25)); // #191919
                                 }
 
-                                textBlock.Foreground = textBrush;
+                                textBlock.Foreground = GetNavSelectedTextBrush(); } else if (contentChild is FontIcon fontIcon) { fontIcon.Foreground = GetNavSelectedTextBrush();
                             }
                         }
                     }
@@ -944,7 +951,7 @@ namespace Aura
                 // Old approach
                 // Apply active style to border
                 // Always directly set the background color to ensure consistency
-                selectedBorder.Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 234, 234, 234)); // #eaeaea
+                selectedBorder.Background = GetNavSelectedBgBrush();
                 selectedBorder.BorderThickness = new Thickness(4, 0, 0, 0);
                 selectedBorder.BorderBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 255, 87, 51)); // #FF5733
 
@@ -978,7 +985,7 @@ namespace Aura
                         selectedBorder.Style = activeStyle;
 
                         // Ensure the background is set to our desired color even after applying the style
-                        selectedBorder.Background = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 234, 234, 234)); // #eaeaea
+                        selectedBorder.Background = GetNavSelectedBgBrush();
                     }
                 }
                 catch (Exception ex)
@@ -1005,7 +1012,7 @@ namespace Aura
                     selectedTextBrush = new SolidColorBrush(Microsoft.UI.ColorHelper.FromArgb(255, 25, 25, 25)); // #191919
                 }
 
-                FindAndUpdateTextBlock(selectedStack, selectedTextBrush);
+                FindAndUpdateTextBlock(selectedStack, GetNavSelectedTextBrush());
             }
         }
 
@@ -1066,6 +1073,8 @@ namespace Aura
              if (AppWindowTitleBar.IsCustomizationSupported())
              {
                 UpdateTitleBarColors(m_appWindow.TitleBar);
+                ResetAllNavButtonStyles();
+                if (_selectedNavButton != null) ApplySelectedButtonStyle(_selectedNavButton);
              }
         }
 

@@ -112,8 +112,8 @@
             <!-- Debug Panel -->
             <Border x:Name="DebugPanel"
                     Grid.Row="1"
-                    Background="#f8f9fa"
-                    BorderBrush="#dee2e6"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                     BorderThickness="1"
                     CornerRadius="4"
                     Margin="24,0,24,12"
@@ -125,7 +125,7 @@
                               FontFamily="Consolas"
                               FontSize="11"
                               Text="Debug logs will appear here..."
-                              Foreground="#495057"
+                              Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                               TextWrapping="Wrap"/>
                 </ScrollViewer>
             </Border>

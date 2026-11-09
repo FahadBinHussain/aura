@@ -125,7 +125,7 @@ namespace Aura.Views
             {
                 Text = entry.Title,
                 FontSize = 13,
-                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+                FontWeight = Microsoft.UI.Text.FontWeights.SemiBold, Foreground = (Brush)Application.Current.Resources["TextFillColorPrimaryBrush"],
                 TextWrapping = TextWrapping.NoWrap,
                 TextTrimming = TextTrimming.CharacterEllipsis
             };
@@ -134,7 +134,7 @@ namespace Aura.Views
             {
                 Text = entry.Timestamp.ToString("MMM d, yyyy  h:mm tt"),
                 FontSize = 11,
-                Opacity = 0.55
+                Foreground = (Brush)Application.Current.Resources["TextFillColorSecondaryBrush"]
             };
 
             var textStack = new StackPanel { Spacing = 4, VerticalAlignment = VerticalAlignment.Center };
@@ -167,7 +167,7 @@ namespace Aura.Views
             var button = new HistoryEntryButton
             {
                 Content = card,
-                Tag = entry,
+                Tag = entry, Background = new SolidColorBrush(Microsoft.UI.Colors.Transparent),
                 Padding = new Thickness(0),
                 BorderThickness = new Thickness(0),
                 HorizontalAlignment = HorizontalAlignment.Stretch,

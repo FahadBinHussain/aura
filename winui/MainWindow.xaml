@@ -197,7 +197,7 @@
             </Grid>
         </Grid>
 
-        <Grid Grid.Row="1" Background="#f9f9f9">
+        <Grid Grid.Row="1" Background="{ThemeResource ApplicationPageBackgroundThemeBrush}">
             <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="76" />
                 <ColumnDefinition Width="*" />

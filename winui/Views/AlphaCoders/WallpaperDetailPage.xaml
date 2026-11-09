@@ -133,8 +133,8 @@
                                             </MenuFlyout>
                                         </Button.Flyout>
                                         <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE136;" FontSize="14" Foreground="Black"/>
-                                            <TextBlock Text="Set" FontSize="14" FontWeight="SemiBold" Foreground="Black"/>
+                                            <FontIcon Glyph="&#xE136;" FontSize="14"/>
+                                            <TextBlock Text="Set" FontSize="14" FontWeight="SemiBold"/>
                                         </StackPanel>
                                     </Button>
                                     <!-- Download Button -->
@@ -143,8 +143,8 @@
                                             BorderBrush="Transparent"
                                             Click="DownloadButton_Click">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE74E;" FontSize="14" Foreground="Black"/>
-                                            <TextBlock Text="Download" FontSize="14" FontWeight="SemiBold" Foreground="Black"/>
+                                            <FontIcon Glyph="&#xE74E;" FontSize="14"/>
+                                            <TextBlock Text="Download" FontSize="14" FontWeight="SemiBold"/>
                                         </StackPanel>
                                     </Button>
 
@@ -154,8 +154,8 @@
                                             BorderBrush="Transparent"
                                             Click="ViewOnWebButton_Click">
                                         <StackPanel Orientation="Horizontal" Spacing="8">
-                                            <FontIcon Glyph="&#xE774;" FontSize="14" Foreground="Black"/>
-                                            <TextBlock Text="View on Web" FontSize="14" FontWeight="SemiBold" Foreground="Black"/>
+                                            <FontIcon Glyph="&#xE774;" FontSize="14"/>
+                                            <TextBlock Text="View on Web" FontSize="14" FontWeight="SemiBold"/>
                                         </StackPanel>
                                     </Button>
 
