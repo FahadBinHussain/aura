@@ -267,9 +267,92 @@ namespace Aura
             {
                 presenter.Restore();
             }
-            Activate();
+            ForceForeground();
             LogInfo("window shown from tray");
         }
+
+        // WinUI's Activate() only raises the window - it does not WIN the foreground.
+        // Windows grants SetForegroundWindow to the window that owns the foreground
+        // thread, and here that thread is the SHELL (explorer's tray), so a plain
+        // Show()+Activate() reliably produced a window that was visible but unfocused
+        // (the reported bug). the documented way around the foreground lock is
+        // AttachThreadInput to the current foreground window's thread, which makes our
+        // thread temporarily share the input queue, then SetForegroundWindow + the
+        // WinUI Activate, then detach. restore/z-order hints are best effort - a window
+        // that is already up just needs the focus handoff.
+        private void ForceForeground()
+        {
+            if (m_appWindow == null) return;
+
+            try
+            {
+                var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(m_appWindow);
+                if (hWnd == IntPtr.Zero) return;
+
+                var foreground = GetForegroundWindow();
+                var foregroundThread = foreground == IntPtr.Zero ? 0u : GetWindowThreadProcessId(foreground, IntPtr.Zero);
+                var ourThread = GetCurrentThreadId();
+
+                bool attached = foregroundThread != 0 &&
+                                foregroundThread != ourThread &&
+                                AttachThreadInput(ourThread, foregroundThread, true);
+
+                try
+                {
+                    if (IsIconic(hWnd)) ShowWindow(hWnd, SwRestore);
+                    BringWindowToTop(hWnd);
+                    SetForegroundWindow(hWnd);
+                    // WinUI's own activation, now that the foreground lock is released
+                    Activate();
+                    // the XAML island owns the real focus target - without this the
+                    // window frame was foreground but keyboard focus stayed on nothing,
+                    // so typing went to the previous app
+                    SetFocus(hWnd);
+                }
+                finally
+                {
+                    if (attached) AttachThreadInput(ourThread, foregroundThread, false);
+                }
+            }
+            catch (Exception ex)
+            {
+                // never let a focus nicety break the restore itself
+                LogInfo($"force foreground failed: {ex.Message}");
+            }
+        }
+
+        private const int SwRestore = 9;
+
+        // NOTE: GetWindowThreadProcessId returns a DWORD thread id, NOT a bool - declaring
+        // it as IntPtr/bool here was what threw "Specified cast is not valid" on the
+        // returned value's marshalling. Keep every one of these exactly as the Win32
+        // header has them and the calls are plain and boring.
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr GetForegroundWindow();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern uint GetWindowThreadProcessId(IntPtr hWnd, IntPtr processId);
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll")]
+        private static extern uint GetCurrentThreadId();
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool BringWindowToTop(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")]
+        private static extern IntPtr SetFocus(IntPtr hWnd);
 
         /// <summary>
         /// Startup path when App.StartHiddenToTray is on: WinUI creates this window
