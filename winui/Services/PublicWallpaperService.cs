@@ -1639,7 +1639,18 @@ namespace Aura.Services
                 var description = GetString(item, "description", title);
                 var thumbnail = GetString(item, "thumbnail");
                 var full = GetWallpaperHubBestResolution(item, out var resolutionLabel, out var resolution);
-                var sourceUrl = GetString(item, "source", $"https://www.wallpaperhub.app/wallpapers");
+
+                // do NOT read the entity's "source" field: WallpaperHub fills it with the
+                // ORIGINAL PUBLISHER's referral link, and for every "Bing Wallpaper" entry
+                // that is a bing.com/search?q=... topic search, not a page. checking one
+                // (id 500020, 2026-11-13) the whole bing URL IS the source value - so
+                // "View on web" landed on a search result and looked like a bug in our
+                // own handler. the site's real per-image page is /wallpapers/<id> (200,
+                // title "<name> by <creator> | Wallpapers | WallpaperHub"), so build that
+                // instead and keep the publisher credit in Description where it belongs.
+                var sourceUrl = string.IsNullOrWhiteSpace(id)
+                    ? "https://www.wallpaperhub.app/wallpapers"
+                    : $"https://www.wallpaperhub.app/wallpapers/{id}";
 
                 if (string.IsNullOrWhiteSpace(id) || string.IsNullOrWhiteSpace(thumbnail))
                 {
