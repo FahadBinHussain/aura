@@ -233,6 +233,8 @@ namespace Aura.Services
                 var list = JsonSerializer.Deserialize<List<HistoryEntry>>(json);
                 if (list == null) return;
 
+                var historyMigrated = false;
+
                 foreach (var entry in list)
                 {
                     entry.Title = TextUtilities.CleanTitle(entry.Title);
@@ -265,7 +267,32 @@ namespace Aura.Services
                             entry.Category = "Abstract";
                         }
                     }
+
+                    // migration: WallpaperHub rows saved before eccb7a0 carry the
+                    // publisher's referral link as SourceUrl, and every "Bing Wallpaper"
+                    // entry's is a bing.com/search?q=... topic search - so "View on web"
+                    // from History reopened a search result even after the parser was
+                    // fixed (History replays the stored snapshot verbatim, it never
+                    // re-parses). the site's real per-image page is /wallpapers/<id>, and
+                    // the row's own id is the same entity id the parser builds it from.
+                    // rewriting in place keeps SavedAt/order untouched, so the list does
+                    // not reshuffle; the entries are also re-persisted at the end of load.
+                    if (IsBingSearchSource(entry.Navigation?.Wallpaper?.SourceUrl))
+                    {
+                        var hubId = entry.Navigation!.Wallpaper!.Id;
+                        if (!string.IsNullOrWhiteSpace(hubId))
+                        {
+                            entry.Navigation.Wallpaper.SourceUrl =
+                                $"https://www.wallpaperhub.app/wallpapers/{hubId}";
+                            historyMigrated = true;
+                        }
+                    }
                     Entries.Add(entry);
+                }
+
+                if (historyMigrated)
+                {
+                    SaveToDisk();
                 }
             }
             catch
@@ -273,6 +300,16 @@ namespace Aura.Services
                 // Ignore read errors — start fresh
             }
         }
+
+        /// <summary>
+        /// WallpaperHub's entity "source" field is the ORIGINAL publisher's referral
+        /// link, and for its "Bing Wallpaper" entries that is a bare bing.com/search
+        /// topic query - never a page. such a value is useless behind "View on web",
+        /// so LoadFromDisk rewrites it to the site's own /wallpapers/&lt;id&gt; page.
+        /// </summary>
+        private static bool IsBingSearchSource(string? sourceUrl) =>
+            !string.IsNullOrWhiteSpace(sourceUrl) &&
+            sourceUrl.Contains("bing.com/search", StringComparison.OrdinalIgnoreCase);
 
         private void SaveToDisk()
         {
