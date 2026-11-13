@@ -1292,14 +1292,28 @@ namespace Aura.Services
                 var title = GetString(item, "title", "Bing wallpaper");
                 var description = GetString(item, "copyright", title);
                 var relativeImageUrl = GetString(item, "url");
-                var sourceUrl = GetString(item, "copyrightlink");
+                var relativeUrlBase = GetString(item, "urlbase");
 
-                if (string.IsNullOrWhiteSpace(relativeImageUrl))
+                if (string.IsNullOrWhiteSpace(relativeImageUrl) && string.IsNullOrWhiteSpace(relativeUrlBase))
                 {
                     continue;
                 }
 
-                var imageUrl = MakeAbsoluteUrl("https://www.bing.com", relativeImageUrl);
+                // "url" (the daily feed entry) is the 1920x1080 render only. the same asset
+                // served with an _UHD suffix is the untouched 3840x2160 original
+                // (verified 2026-11-12: _UHD = 3.7 MB, _1920x1080 = 333 KB), and "urlbase"
+                // is the suffix-free stem both sizes hang off. prefer 4K, keep the feed url
+                // only for entries that carry no urlbase at all.
+                var imageUrl = string.IsNullOrWhiteSpace(relativeUrlBase)
+                    ? MakeAbsoluteUrl("https://www.bing.com", relativeImageUrl)
+                    : MakeAbsoluteUrl("https://www.bing.com", relativeUrlBase + "_UHD.jpg&pid=hp");
+
+                // bing's copyrightlink is a topic SEARCH (/search?q=...&form=hpcapt), not a
+                // source page - microsoft publishes no per-image page and huilanding is empty
+                // (verified 2026-11-12), so "View on web" would land on a search result. open
+                // the 4K image itself instead: that is the real asset behind the wallpaper. the
+                // photographer/licensor credit survives in Description (the copyright string).
+                var sourceUrl = imageUrl;
                 wallpapers.Add(new WallpaperItem
                 {
                     Id = string.IsNullOrWhiteSpace(startDate) ? Guid.NewGuid().ToString("N") : startDate,
@@ -1310,8 +1324,8 @@ namespace Aura.Services
                     SourceUrl = sourceUrl,
                     Likes = string.Empty,
                     Downloads = string.Empty,
-                    Resolution = "1920x1080",
-                    QualityTag = "1080p",
+                    Resolution = string.IsNullOrWhiteSpace(relativeUrlBase) ? "1920x1080" : "3840x2160",
+                    QualityTag = string.IsNullOrWhiteSpace(relativeUrlBase) ? "1080p" : "4K",
                     IsAI = false
                 });
             }
