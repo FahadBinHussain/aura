@@ -2411,11 +2411,38 @@ opened from History (observed on the ArtStation artwork "Iara").
   `phone-adb.sh` wrapper; `~/workspace/aura-ssh.sh` is the saved wrapper).
 - **session gotcha**: the SSH shell runs in session 0, Aura must run in
   session 1 (interactive console) - a plain `Start-Process` from SSH lands
-  in session 0 with no tray and no wallpaper control. launch with psexec
-  (scoop shims): `psexec -accepteula -i 1 -d -w <installdir> Aura.exe`.
-  TRAP: psexec can exit 40 while still printing `started ... with process
-  ID` - trust the process check (`Get-Process Aura`, SessionId 1), never
-  the exit code.
+  in session 0 with no tray and no wallpaper control. launch with a
+  one-time interactive scheduled task (runs with the user's normal
+  filtered token, exactly like the logon Run key):
+  `schtasks /create /tn AuraRelaunch /tr "<installdir>\Aura.exe" /sc once
+  /st 23:59 /it /ru Admin /f`, then `schtasks /run /tn AuraRelaunch`,
+  then `schtasks /delete /tn AuraRelaunch /f` once it is running.
+- **TRAP: never relaunch with psexec** (`psexec -i 1 -d`): it launches the
+  process ELEVATED (High integrity - proven 2026-11-22 with a probe:
+  `elevated=True`, `S-1-16-12288`), and from an elevated process WinRT
+  `TrySetWallpaperImageAsync` returns true while the visible desktop
+  NEVER changes - no error anywhere, the log still says "set to", the
+  history row is still written. the 20:22 install's psexec relaunch left
+  the desktop frozen on the 19:39 wallpaper for 3.5 hours (20:22, 21:22,
+  22:00 sets all phantom); the 22:03 schtasks relaunch fixed it.
+  verify a set LANDED, never trust the log line: `TranscodedWallpaper`
+  mtime, the `HKCU:\Control Panel\Desktop` Wallpaper value, and
+  `BackgroundHistoryPath0` must all move to the new file. (psexec can
+  also exit 40 while still printing `started ... with process ID` -
+  trust the process check, never the exit code.)
+- **history row repair** (2026-11-22): the pre-fix bug also poisoned
+  stored history rows - a scan found 3 mismatched wallpaper-cave rows in
+  the 200-row file (#33 wp2471731->wp2471732, #13 x2
+  wp1814740->wp2471710). repaired in place with Aura STOPPED (the app
+  rewrites the file on every apply and would clobber an edit): Id,
+  SourceUrl and Category corrected from the row's own image id, local
+  file renamed to match; scripts in the VM workspace
+  (`aura-scan-wcave-history.ps1` read-only scan,
+  `aura-fix-wcave-history.ps1` repair, `aura-finish-wcave-rename.ps1`
+  rename); backups `wallpaper_history.json.bak-20261122[-2]`. the
+  repair script refuses to rename a file the registry still names as
+  the current wallpaper. categories came from live /w/ page
+  breadcrumbs (both true images uncategorized -> "").
 - **replace flow** (used 2026-11-22 for 70f007e): download
   `releases/download/latest/Aura-x64.zip`, verify byte size against the
   release API asset size; extract to a `C:\tmp\Aura-new` staging dir and
@@ -2423,9 +2450,11 @@ opened from History (observed on the ArtStation artwork "Iara").
   to `C:\tmp\Aura-rollback-<date>` (rollback for this install:
   `C:\tmp\Aura-rollback-20261122`, the 11/13 build); `Stop-Process -Name
   Aura -Force`, wait for exit; `Copy-Item` staging over the install dir;
-  verify the live `Aura.dll` hash equals staging; relaunch via psexec;
-  verify via process + `app.log` tail (`started hidden in the tray`,
-  `Loaded N wallpapers`, next change set). clean up staging + zip after
+  verify the live `Aura.dll` hash equals staging; relaunch via the
+  schtasks method above (never psexec - see the trap); verify via
+  process + `app.log` tail (`started hidden in the tray`,
+  `Loaded N wallpapers`, next change set) AND the set-landed check
+  (`TranscodedWallpaper` mtime moved). clean up staging + zip after
   (C: is tight, ~2.7 GB free) but keep the rollback dir.
 - **verify a link fix live without touching the ui**: the history file is
   newest-first - the newest Wallpaper Cave entry's
