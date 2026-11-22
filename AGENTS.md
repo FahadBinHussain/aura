@@ -2466,3 +2466,26 @@ opened from History (observed on the ArtStation artwork "Iara").
   contain NO inner double quotes (cmd unbalances and splits on `|`) and
   the bash single-quote wrapper forbids inner single quotes too - use
   `.Contains(33)`-style calls instead of `-like '*33*'`.
+
+
+### tray restore never focused the window (2026-11-22)
+
+- **symptom**: clicking the tray icon showed the window but it stayed
+  behind the other windows, unfocused; the log said `force foreground
+  failed: Specified cast is not valid.` on every restore (11/15, 11/20,
+  11/22 - broken since the feature landed in a3e5f02).
+- **cause**: `ForceForeground` (MainWindow.xaml.cs) called
+  `WinRT.Interop.WindowNative.GetWindowHandle(m_appWindow)`, but
+  `m_appWindow` is an `AppWindow`, not a XAML `Window`.
+  `GetWindowHandle` takes an `object` (so it compiles) and casts it to
+  the XAML Window's native interface at runtime - `InvalidCastException`
+  on the FIRST line of the try, so the whole focus handoff
+  (AttachThreadInput / SetForegroundWindow / Activate / SetFocus) never
+  ran. the old NOTE blaming the `GetWindowThreadProcessId` declaration
+  was a misdiagnosis: the message alone (`Specified cast is not valid.`)
+  pointed at the wrong suspect, which is why the catch now logs the
+  exception TYPE too.
+- **fix**: `Win32Interop.GetWindowFromWindowId(m_appWindow.Id)` - the
+  exact inverse of what the constructor does (`GetWindowHandle(this)` +
+  `GetWindowIdFromWindow`). rule: `GetWindowHandle` only ever takes the
+  XAML `Window` (`this`); an `AppWindow`'s HWND comes from its `Id`.

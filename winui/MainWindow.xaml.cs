@@ -286,7 +286,13 @@ namespace Aura
 
             try
             {
-                var hWnd = WinRT.Interop.WindowNative.GetWindowHandle(m_appWindow);
+                // GetWindowHandle takes an object and casts it to the XAML Window's
+                // native interface - passing m_appWindow (an AppWindow, not a
+                // XAML Window) threw InvalidCastException on this very line, so
+                // NOTHING below ever ran and the window stayed behind the others.
+                // the AppWindow's HWND comes from its Id instead (the inverse of
+                // what the constructor does with GetWindowIdFromWindow).
+                var hWnd = Win32Interop.GetWindowFromWindowId(m_appWindow.Id);
                 if (hWnd == IntPtr.Zero) return;
 
                 var foreground = GetForegroundWindow();
@@ -316,17 +322,22 @@ namespace Aura
             }
             catch (Exception ex)
             {
-                // never let a focus nicety break the restore itself
-                LogInfo($"force foreground failed: {ex.Message}");
+                // never let a focus nicety break the restore itself. log the TYPE
+                // too: the message alone ("Specified cast is not valid.") once sent
+                // a fix after the P/Invoke declarations below, while the real throw
+                // was GetWindowHandle(m_appWindow) - see the note at the top of this
+                // method.
+                LogInfo($"force foreground failed: {ex.GetType().Name}: {ex.Message}");
             }
         }
 
         private const int SwRestore = 9;
 
-        // NOTE: GetWindowThreadProcessId returns a DWORD thread id, NOT a bool - declaring
-        // it as IntPtr/bool here was what threw "Specified cast is not valid" on the
-        // returned value's marshalling. Keep every one of these exactly as the Win32
-        // header has them and the calls are plain and boring.
+        // NOTE: these declarations match the Win32 headers exactly (notably
+        // GetWindowThreadProcessId returns a DWORD thread id, NOT a bool) - keep
+        // them that way. the "Specified cast is not valid" in the log was NOT
+        // these declarations: it was GetWindowHandle being passed the AppWindow
+        // instead of the XAML Window (fixed 2026-11-22, see ForceForeground).
         [System.Runtime.InteropServices.DllImport("user32.dll")]
         private static extern IntPtr GetForegroundWindow();
 
