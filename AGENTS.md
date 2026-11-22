@@ -2395,3 +2395,45 @@ opened from History (observed on the ArtStation artwork "Iara").
   `tv-and-movies` 404s live (`https://wallpapercave.com/tv-and-movies` =
   404), so that category fetches nothing. needs the site's real slug before
   it can be fixed.
+
+
+### installing a release build on the laptop from the vm (2026-11-22)
+
+- **install location**: `C:\Users\Admin\AppData\Local\Programs\Aura\Aura.exe`
+  (the `Downloads\aura\winui\bin\Debug` copy is a stale 10/26 debug build -
+  never the running one). autostart = HKCU Run key `Aura`; the app starts
+  hidden to tray (`App.StartHiddenToTray = true`), so a relaunch steals no
+  focus. `%APPDATA%\Aura` holds history/settings; `app.log` + the thumb
+  caches (`big_thumbs`, `small_thumbs`, `originals`, `metadata`) live NEXT
+  TO the exe - never wipe the install folder, overwrite in place.
+- **transport**: SSH to laptop-main over Tailscale (`Admin@100.76.10.50`
+  via the hatch egress proxy, same `socat PROXY:...:3130` pattern as the
+  `phone-adb.sh` wrapper; `~/workspace/aura-ssh.sh` is the saved wrapper).
+- **session gotcha**: the SSH shell runs in session 0, Aura must run in
+  session 1 (interactive console) - a plain `Start-Process` from SSH lands
+  in session 0 with no tray and no wallpaper control. launch with psexec
+  (scoop shims): `psexec -accepteula -i 1 -d -w <installdir> Aura.exe`.
+  TRAP: psexec can exit 40 while still printing `started ... with process
+  ID` - trust the process check (`Get-Process Aura`, SessionId 1), never
+  the exit code.
+- **replace flow** (used 2026-11-22 for 70f007e): download
+  `releases/download/latest/Aura-x64.zip`, verify byte size against the
+  release API asset size; extract to a `C:\tmp\Aura-new` staging dir and
+  confirm the new `Aura.dll` hash differs; back up live `Aura.*` + `*.xbf`
+  to `C:\tmp\Aura-rollback-<date>` (rollback for this install:
+  `C:\tmp\Aura-rollback-20261122`, the 11/13 build); `Stop-Process -Name
+  Aura -Force`, wait for exit; `Copy-Item` staging over the install dir;
+  verify the live `Aura.dll` hash equals staging; relaunch via psexec;
+  verify via process + `app.log` tail (`started hidden in the tray`,
+  `Loaded N wallpapers`, next change set). clean up staging + zip after
+  (C: is tight, ~2.7 GB free) but keep the rollback dir.
+- **verify a link fix live without touching the ui**: the history file is
+  newest-first - the newest Wallpaper Cave entry's
+  `Navigation.Wallpaper` `ImageUrl` vs `SourceUrl` ids must match. proven
+  2026-11-22: old build `#33` showed `dwp1x/wp2471732.jpg` under
+  `/w/wp2471731` (the reported bug, in his own data); new build `#45`
+  shows `wp2471741` on both. quoting trap for remote probes: the SSH
+  command goes through cmd, so a powershell `-Command "..."` string must
+  contain NO inner double quotes (cmd unbalances and splits on `|`) and
+  the bash single-quote wrapper forbids inner single quotes too - use
+  `.Contains(33)`-style calls instead of `-like '*33*'`.
