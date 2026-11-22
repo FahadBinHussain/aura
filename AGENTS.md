@@ -2362,3 +2362,36 @@ opened from History (observed on the ArtStation artwork "Iara").
   - `MainWindow.xaml.cs`: added theme-aware `GetNavSelectedBgBrush()` (`#2D2D2D` dark / `#EAEAEA` light), `GetNavSelectedTextBrush()` (`White` dark / `#191919` light), and `GetNavUnselectedTextBrush()` (`#B0B0B0` dark / `DarkGray` light), updated both `TextBlock` and `FontIcon` children, and hooked `Loaded` + `ActualThemeChanged` to refresh nav button styles live.
   - `Views/HistoryPage.xaml` & `Views/HistoryPage.xaml.cs`: set page `Background="{ThemeResource ApplicationPageBackgroundThemeBrush}"`, explicit `TextFillColorPrimaryBrush` / `TextFillColorSecondaryBrush` foregrounds on header, subtitle, card title, and card timestamp, and `Transparent` background on `HistoryEntryButton`.
   - `Views/AlphaCoders/WallpaperDetailPage.xaml`, `Views/Backiee/WallpaperDetailPage.xaml`, and `Views/AlphaCoders/AlphaCodersGridPage.xaml`: removed hardcoded `Foreground="Black"` and `#f8f9fa` light debug panel colors in favor of theme resources.
+
+
+### wallpaper cave view-on-web opened the wrong wallpaper (2026-11-22)
+
+- **issue**: user screenshot - detail page `Wallpapers #33` shows the TMNT
+  wallpaper, but View on Web opens a different wallpaper's page.
+- **root cause**: `GetWallpaperCaveWallpapersAsync`'s tile regex only matched
+  `\.jpg` for the `<img>`, while album items ship jpg, png AND webp (soulslike
+  is 35/43 webp). whenever an anchor's own image was png/webp, the non-greedy
+  `.*?` spanned past that item's `</a>` (and its stickers div) and grabbed the
+  NEXT item's jpg img - so the card showed item N+1's image under item N's
+  `/w/` link, and both items' own anchors were consumed (the png/webp item
+  never got a card at all). measured live on 2026-11-22 across the 8 live
+  albums: 40 wrong-link cards (soulslike 6/6, ocean 6/12, cloud 10/71).
+  the reported card: anchor wp2471731 is a png (`1080p No Nonsense
+  Wallpaper`, og:image `/wp/wp2471731.png`) while the card showed
+  wp2471732.jpg (the TMNT image, verified visually).
+- **fix**: the img group now takes the anchor's own id via a backreference
+  and all three formats: `(?<img>/wp/\k<id>\.(?:jpg|png|webp))`. a match can
+  never span items now (each wp id's only img is its own), and png/webp items
+  get real cards. `dwp1x/` serves the same extension (png 200-verified, webp
+  in the desktop srcset) and WinUI decodes all three, so `ImageUrl` /
+  `FullPhotoUrl` needed no change beyond a comment fix (the thumb is no
+  longer JPEG-only).
+- **verified**: the fixed pattern replayed against captured HTML of all 8
+  live albums: matches == anchors on every album (57/86/56/54/60/99/28/43),
+  0 wrong links (was 40). no dotnet in the VM, so the C# pattern was verified
+  by its exact Python equivalent (`(?P=id)` for `\k<id>`); the CI build is
+  the compile check.
+- **found along the way, NOT fixed here**: the `TV & Movies` album slug
+  `tv-and-movies` 404s live (`https://wallpapercave.com/tv-and-movies` =
+  404), so that category fetches nothing. needs the site's real slug before
+  it can be fixed.

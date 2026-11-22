@@ -2240,7 +2240,11 @@ namespace Aura.Services
 
         // wallpaper cave: album pages are single-shot (no server pagination exists anywhere on the
         // site); per-item titles do not exist on list pages, so cards get `<h1> #<n>` positional
-        // titles (automata-private/wallpapercave.com/AGENTS.md)
+        // titles (automata-private/wallpapercave.com/AGENTS.md). items ship jpg, png AND webp -
+        // the img id MUST equal the anchor id (the \k<id> backreference): the old jpg-only
+        // pattern let .*? span past a png/webp item's </a> into the NEXT item and pair that
+        // image with the wrong /w/ link - 40 wrong-link cards across the 8 live albums on
+        // 2026-11-22, incl. Wallpapers #33 (TMNT wp2471732 shown under wp2471731's link)
         private async Task<List<WallpaperItem>> GetWallpaperCaveWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
         {
             if (page > 1)
@@ -2264,7 +2268,7 @@ namespace Aura.Services
 
             var matches = Regex.Matches(
                 html,
-                "<a href=\"/w/(?<id>wp\\d+)\"[^>]*>\\s*<picture>.*?<img src=\"(?<img>/wp/wp\\d+\\.jpg)\"[^>]*class=\"wimg\"",
+                "<a href=\"/w/(?<id>wp\\d+)\"[^>]*>\\s*<picture>.*?<img src=\"(?<img>/wp/\\k<id>\\.(?:jpg|png|webp))\"[^>]*class=\"wimg\"",
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
             var index = 0;
@@ -2283,7 +2287,7 @@ namespace Aura.Services
                     Id = id,
                     Title = $"{albumTitle} #{index}",
                     Description = "Wallpaper Cave wallpaper",
-                    ImageUrl = $"https://wallpapercave.com/dwp1x/{file.Substring(4)}", // desktop <source> thumb: JPEG (/mwp/ now transcodes to image/avif - WinUI has no AVIF decoder, tiles decode-fail)
+                    ImageUrl = $"https://wallpapercave.com/dwp1x/{file.Substring(4)}", // desktop <source> thumb in the item's own format (jpg/png/webp; /mwp/ now transcodes to image/avif - WinUI has no AVIF decoder, tiles decode-fail)
                     FullPhotoUrl = $"https://wallpapercave.com{file}",               // 1980px original
                     SourceUrl = $"https://wallpapercave.com/w/{id}",
                     Likes = string.Empty,
