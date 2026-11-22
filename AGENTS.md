@@ -2489,3 +2489,25 @@ opened from History (observed on the ArtStation artwork "Iara").
   exact inverse of what the constructor does (`GetWindowHandle(this)` +
   `GetWindowIdFromWindow`). rule: `GetWindowHandle` only ever takes the
   XAML `Window` (`this`); an `AppWindow`'s HWND comes from its `Id`.
+
+
+### history back-navigation scrolled to top (2026-11-22)
+
+- **symptom**: going back to the History page from a wallpaper detail
+  page always landed at the top instead of the row the user came from.
+- **cause (two parts)**: (1) HistoryPage had the default
+  `NavigationCacheMode.Disabled`, so back navigation created a FRESH
+  page instance; (2) `Loaded` rebuilt the whole list unconditionally,
+  and Loaded fires on every return to a cached page too - so even
+  caching alone would not have saved the scroll position.
+- **fix** (mirrors AlphaCodersGridPage, the one page that already did
+  this right): `NavigationCacheMode.Required` in the constructor, the
+  list builds once (`_isInitialized` guard in Loaded), and data changes
+  keep flowing through `HistoryChanged`. belt and braces: `RebuildList`
+  saves the ScrollViewer's offset and restores it after the next layout
+  pass (one-shot `LayoutUpdated` hook - a `ChangeView` right after
+  adding children would clamp to 0, the new cards have no extent yet),
+  so a slideshow apply landing while browsing - or while on a detail
+  page - does not move the scroll either. side effect of caching: the
+  `HistoryChanged` subscription now lives on one instance instead of
+  leaking one per visit (pages never unsubscribed).

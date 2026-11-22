@@ -12,15 +12,40 @@ namespace Aura.Views
 {
     public sealed partial class HistoryPage : Page
     {
+        private bool _isInitialized = false;
+
+        // a scroll restore waiting for the next layout pass (see RebuildList):
+        // -1 means none pending. one hook serves every pending rebuild - a
+        // later rebuild just overwrites the offset, the last one wins.
+        private double _pendingScrollOffset = -1;
+        private bool _scrollRestoreHooked = false;
+
         public HistoryPage()
         {
             this.InitializeComponent();
+
+            // Enable navigation caching to preserve page state (same as
+            // AlphaCodersGridPage): without this, going back from a detail
+            // page created a FRESH HistoryPage, and Loaded rebuilt the list
+            // from scratch - so the scroll position always reset to the top.
+            // with the cache, back navigation reuses this instance and its
+            // ScrollViewer keeps its offset. side effect: the HistoryChanged
+            // subscription below now lives on one instance for the app's
+            // lifetime instead of leaking one per visit.
+            this.NavigationCacheMode = Microsoft.UI.Xaml.Navigation.NavigationCacheMode.Required;
+
             this.Loaded += HistoryPage_Loaded;
             WallpaperHistoryService.Instance.HistoryChanged += OnHistoryChanged;
         }
 
         private void HistoryPage_Loaded(object sender, RoutedEventArgs e)
         {
+            // Loaded fires on EVERY return to a cached page (it re-enters
+            // the visual tree), so build the list only the first time -
+            // rebuilding here would wipe the scroll position the cache
+            // just preserved. later data changes come via OnHistoryChanged.
+            if (_isInitialized) return;
+            _isInitialized = true;
             RebuildList();
         }
 
@@ -32,6 +57,11 @@ namespace Aura.Views
 
         private void RebuildList()
         {
+            // a rebuild (slideshow apply landing while browsing, or while
+            // on a detail page) must not move the user's scroll position:
+            // keep the offset and put it back after the new cards lay out.
+            double savedOffset = HistoryScrollViewer?.VerticalOffset ?? 0;
+
             HistoryListPanel.Children.Clear();
 
             var entries = WallpaperHistoryService.Instance.Entries;
@@ -54,6 +84,35 @@ namespace Aura.Views
             foreach (var entry in entries)
             {
                 HistoryListPanel.Children.Add(BuildEntryCard(entry));
+            }
+
+            RestoreScrollOffset(savedOffset);
+        }
+
+        // the new cards have no laid-out extent yet, so a ChangeView right
+        // now would clamp to 0 - wait for the next layout pass instead.
+        // one-shot: the handler unhooks itself after it runs. if the page
+        // is off-screen (cached, user on a detail page) no layout pass runs
+        // until it returns, and the restore simply waits for that.
+        private void RestoreScrollOffset(double offset)
+        {
+            if (offset <= 0) return;
+            _pendingScrollOffset = offset;
+            if (_scrollRestoreHooked) return;
+            _scrollRestoreHooked = true;
+            HistoryListPanel.LayoutUpdated += OnPanelLayoutUpdatedRestoreScroll;
+        }
+
+        private void OnPanelLayoutUpdatedRestoreScroll(object sender, object e)
+        {
+            HistoryListPanel.LayoutUpdated -= OnPanelLayoutUpdatedRestoreScroll;
+            _scrollRestoreHooked = false;
+            double offset = _pendingScrollOffset;
+            _pendingScrollOffset = -1;
+            if (offset > 0)
+            {
+                // instant jump, no scroll animation on the way back
+                HistoryScrollViewer?.ChangeView(null, offset, null, true);
             }
         }
 

@@ -51,7 +51,7 @@
         </Grid>
 
         <!-- History List -->
-        <ScrollViewer Grid.Row="3" VerticalScrollBarVisibility="Auto">
+        <ScrollViewer x:Name="HistoryScrollViewer" Grid.Row="3" VerticalScrollBarVisibility="Auto">
             <StackPanel x:Name="HistoryListPanel" Spacing="4"/>
         </ScrollViewer>
 
