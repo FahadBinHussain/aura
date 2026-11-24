@@ -2563,3 +2563,17 @@ opened from History (observed on the ArtStation artwork "Iara").
 - bump the snapshot when a newer capture exists: check the CDX API
   (`web.archive.org/cdx/search/cdx?url=alphacoders.com/tag/is-category`)
   and update `ArchiveSnapshotUrl` + `ArchiveSnapshotDate` together.
+- **follow-up, same day 17:52**: the user still saw the red bar - the
+  archive fetch had failed too, `The SSL connection could not be
+  established, see inner exception.` root cause = TRANSIENT, not the
+  archive and not .NET: ten minutes later the snapshot fetched 200
+  (59602 bytes) 3/3 from the laptop itself on every stack (curl.exe,
+  .NET Framework IWR, .NET Core IWR via pwsh 7.6.2/.NET 10 - the app's
+  own stack). the app had tried the archive exactly ONCE, so a
+  seconds-long blip blanked the platform until the next Categories
+  open. fix: `GetArchiveSnapshotHtmlAsync` retries the SAME fetch once
+  after 2s (a retry is not a fallback), and the combined failure
+  message flattens the exception chain (`FlattenException`) so a
+  `see inner exception` wrapper can never again hide the real reason
+  from the loud bar. re-opening Categories retries the loads anyway
+  (`Loaded` fires per visit - the page is not cached).

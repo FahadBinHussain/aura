@@ -106,7 +106,7 @@ namespace Aura.Services
             {
                 try
                 {
-                    var html = await _httpClient.GetStringAsync(ArchiveSnapshotUrl);
+                    var html = await GetArchiveSnapshotHtmlAsync();
                     var rows = ParseCategoryRows(html);
                     if (rows.Count == 0)
                     {
@@ -129,9 +129,46 @@ namespace Aura.Services
                 catch (Exception archiveError)
                 {
                     throw new InvalidOperationException(
-                        $"alphacoders category index failed live ({liveError.Message}) and from the archive snapshot ({archiveError.Message}).");
+                        $"alphacoders category index failed live ({FlattenException(liveError)}) and from the archive snapshot ({FlattenException(archiveError)}).");
                 }
             }
+        }
+
+        // the archive fetch gets ONE retry after 2s: a transient TLS / network
+        // blip at open time must not blank the whole platform (proven 2026-11-24
+        // - the 17:52 SSL failure, fine 3/3 ten minutes later on every stack:
+        // curl, .NET Framework IWR, and .NET Core IWR from the laptop itself).
+        // a retry of the SAME method is not a fallback; if the retry fails too,
+        // the loud error shows.
+        private async Task<string> GetArchiveSnapshotHtmlAsync()
+        {
+            try
+            {
+                return await _httpClient.GetStringAsync(ArchiveSnapshotUrl);
+            }
+            catch (Exception)
+            {
+                await Task.Delay(TimeSpan.FromSeconds(2));
+                return await _httpClient.GetStringAsync(ArchiveSnapshotUrl);
+            }
+        }
+
+        // ex.Message alone hides the cause for wrapped failures ("The SSL
+        // connection could not be established, see inner exception." names
+        // nothing) - flatten the chain so the loud bar shows the real reason.
+        private static string FlattenException(Exception ex)
+        {
+            var parts = new List<string>();
+            for (var current = ex; current != null; current = current.InnerException)
+            {
+                var message = current.Message?.Trim();
+                if (!string.IsNullOrEmpty(message) && !parts.Contains(message))
+                {
+                    parts.Add(message);
+                }
+            }
+
+            return parts.Count > 0 ? string.Join(" <- ", parts) : ex.GetType().Name;
         }
 
         // fetch the real category page AND its ?page=N continuation (the index
