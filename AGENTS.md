@@ -141,7 +141,10 @@ extended). key facts the code depends on:
   `https://alphacoders.com/tag/is-category` (24 desktop rows over the index's 2
   pages; `GetCategoryIndexAsync`
   + `SetCategories`, same loud contract as backiee - a failed fetch = a loud
-  error line, never a silent empty list) - the merged grid AND
+  error line, never a silent empty list) - (SUPERSEDED in part 2026-11-24:
+  the live site is Cloudflare-challenged, so a failed live fetch now falls
+  back to a pinned web.archive.org snapshot, labeled loudly - see the dated
+  section at the end.) the merged grid AND
   `AlphaCodersGridPage` titles both read `AlphaCodersService.Categories`;
   deep-linked categories leave the 3 quick buttons unselected instead of faking
   4K. the old 63-entry homepage-curated table was REMOVED 2026-10-08 (see the
@@ -2511,3 +2514,52 @@ opened from History (observed on the ArtStation artwork "Iara").
   page - does not move the scroll either. side effect of caching: the
   `HistoryChanged` subscription now lives on one instance instead of
   leaking one per visit (pages never unsubscribed).
+
+
+### alphacoders 403: cloudflare JS challenge, categories re-sourced to a pinned archive snapshot (2026-11-24)
+
+- **symptom**: the Categories page showed `Couldn't load alphacoders
+  categories: Response status code does not indicate success: 403
+  (Forbidden).` in the red error bar and no alphacoders cards at all.
+- **cause**: alphacoders.com + wall.alphacoders.com are behind a
+  Cloudflare managed JS challenge (switched on ~2026-11-20 - the last
+  successful alphacoders log lines are 11/20). EVERY non-browser client
+  gets 403 + a `Just a moment...` page (`Cf-Mitigated: challenge`):
+  HttpClient and curl.exe alike, any User-Agent, even curl + the full
+  6-header browser set that passes pexels/pixabay (verified live
+  2026-11-24 from two networks, incl. the user's laptop). this is NOT
+  the TLS-fingerprint pattern `CurlClient` exists for - no HTTP client
+  can pass a JS challenge. `images.alphacoders.com` still answers 200,
+  so image downloads are unaffected; the official api2.0 endpoint is
+  challenged too, so no API-key route exists either.
+- **fix** (`AlphaCodersService.GetCategoryIndexAsync`): live first, then
+  a pinned `web.archive.org` snapshot (`20260615211350id_`, 15 Jun 2026
+  - the newest capture, verified to parse to the same 20 page-1 rows
+  with the live regex). the archive never captured `?page=2`, so its 4
+  rows (Dark/Technology/Religious/Humor) ride along as
+  `ArchivePage2Rows` - names from this repo's own record, slugs verified
+  against archived browse pages. the live fetch is ALWAYS tried first,
+  so the app heals itself if the challenge ever lifts; if BOTH sources
+  fail the exception names both reasons. the tuple return
+  `(Categories, FromArchive)` carries the source to the callers.
+- **loud label (rule 8)**: the Categories page shows `alphacoders
+  categories are from a web.archive.org snapshot (15 Jun 2026) - the
+  live site blocks automated requests (Cloudflare 403).` in the error
+  bar whenever the snapshot is in use - the cards are real but the
+  source is named, never pretended live. the slideshow catalog
+  deliberately does NOT add the note (its `LoadAsync` THROWS on any
+  error, and an archive-sourced list is a working list, not a failure).
+- **NOT fixed by this change** (same wall, needs a browser engine):
+  the grid page + slideshow alphacoders fetches (`ScrapeWallpapersAsync`
+  / `ScrapeWallpapersByCategoryAsync` on alphacoders.com browse pages)
+  also 403, and the scraper SWALLOWS every exception and returns an
+  empty list - so the grid shows empty and the slideshow batch silently
+  has 0 alphacoders items (no `platform load failed` line ever logs
+  for it). category-card thumbnails for alphacoders also fail through
+  the same scraper (loud per-card line, placeholders on the cards).
+  the real fix for live listing pages is a WebView2 clearance flow
+  (load the site in a real browser engine, harvest the cf_clearance
+  cookie) - a bigger job, not started.
+- bump the snapshot when a newer capture exists: check the CDX API
+  (`web.archive.org/cdx/search/cdx?url=alphacoders.com/tag/is-category`)
+  and update `ArchiveSnapshotUrl` + `ArchiveSnapshotDate` together.

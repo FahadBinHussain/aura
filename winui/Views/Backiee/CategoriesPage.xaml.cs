@@ -166,7 +166,7 @@ namespace Aura.Views.Backiee
                 var loadErrors = new List<string>();
                 try
                 {
-                    var alphaCategories = await new AlphaCodersService().GetCategoryIndexAsync();
+                    var (alphaCategories, fromArchive) = await new AlphaCodersService().GetCategoryIndexAsync();
                     if (alphaCategories.Count == 0)
                     {
                         loadErrors.Add("alphacoders returned no categories - the /tag/is-category markup may have changed.");
@@ -174,6 +174,13 @@ namespace Aura.Views.Backiee
                     else
                     {
                         AlphaCodersService.SetCategories(alphaCategories);
+                        if (fromArchive)
+                        {
+                            // LOUD second-method label (rule 8): the cards are real,
+                            // but their source is an archive snapshot, not the live
+                            // site - never pretend otherwise.
+                            loadErrors.Add($"alphacoders categories are from a web.archive.org snapshot ({AlphaCodersService.ArchiveSnapshotDate}) - the live site blocks automated requests (Cloudflare 403).");
+                        }
                     }
                 }
                 catch (Exception ex)

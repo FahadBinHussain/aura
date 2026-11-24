@@ -205,7 +205,12 @@ namespace Aura.Services
                 var own = new List<string>();
                 try
                 {
-                    alphaCategories = await new AlphaCodersService().GetCategoryIndexAsync();
+                    // FromArchive is deliberately discarded here: LoadAsync THROWS
+                    // on any error, and an archive-sourced list is a working list,
+                    // not a failure. the Categories page carries the loud archive
+                    // label (rule 8); the slideshow picker just uses the list.
+                    var (categories, _) = await new AlphaCodersService().GetCategoryIndexAsync();
+                    alphaCategories = categories;
                     if (alphaCategories.Count == 0)
                     {
                         own.Add("alphacoders returned no categories - its tag index markup may have changed");

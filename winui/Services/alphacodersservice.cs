@@ -31,12 +31,14 @@ namespace Aura.Services
         // the site's REAL category page = https://alphacoders.com/tag/is-category
         // ("Explore Alpha Coders Category Tags"): one <h3> row per desktop category,
         // row text = display name, row's "Desktop Wallpapers" cell = the browse target
-        // (https://alphacoders.com/<slug>-wallpapers?page=N). live-loaded by the
-        // Categories page (GetCategoryIndexAsync + SetCategories) with the same
-        // contract as backiee's /categories: NO static fallback list - a failed fetch
-        // leaves this empty and the failure shows in the loud error bar. "4k" is the
-        // resolution-page exception for the grid page's quick button, not a category
-        // row. single source for the merged Categories grid AND the grid page titles.
+        // (https://alphacoders.com/<slug>-wallpapers?page=N). loaded by the Categories
+        // page (GetCategoryIndexAsync + SetCategories): live first, and since the
+        // live site answers every non-browser client with a Cloudflare 403
+        // (~2026-11-20), a failed live fetch falls back to the pinned
+        // web.archive.org snapshot - the caller MUST label that loudly in the UI
+        // (rule 8: a second method is never silent). "4k" is the resolution-page
+        // exception for the grid page's quick button, not a category row. single
+        // source for the merged Categories grid AND the grid page titles.
         // see automata-private/wall.alphacoders.com/AGENTS.md
         public const string CategoryIndexUrl = "https://alphacoders.com/tag/is-category";
 
@@ -64,6 +66,74 @@ namespace Aura.Services
             }
         }
 
+        // the live site is behind a Cloudflare JS challenge since ~2026-11-20:
+        // alphacoders.com + wall.alphacoders.com answer EVERY non-browser client
+        // with 403 + a "Just a moment..." page - HttpClient AND curl.exe, any
+        // User-Agent, even the full 6-header browser set that passes pexels/
+        // pixabay (verified live 2026-11-24 from two networks, incl. the user's
+        // own laptop). this is NOT the TLS-fingerprint pattern CurlClient
+        // exists for - no HTTP client can pass a JS challenge. so the second
+        // method (LOUD - rule 8, the caller MUST label it in the UI) is the
+        // pinned web.archive.org snapshot below: 15 Jun 2026, the newest
+        // capture, verified to parse to the same 20 page-1 rows with the live
+        // regex. the live fetch is ALWAYS tried first, so the app heals itself
+        // if the challenge ever lifts; the archive only runs when live fails.
+        // the archive never captured ?page=2, so its 4 rows ride along as
+        // ArchivePage2Rows: names from this file's own record (written while
+        // the live page was readable) and slugs verified against archived
+        // browse pages (dark/technology/religious/humor-wallpapers all have
+        // captures). bump the snapshot when a newer capture exists. no partial
+        // results on either path: the caller only SetCategories()s the complete
+        // list, and if BOTH sources fail the exception names both reasons.
+        public const string ArchiveSnapshotUrl = "https://web.archive.org/web/20260615211350id_/https://alphacoders.com/tag/is-category";
+        public const string ArchiveSnapshotDate = "15 Jun 2026";
+
+        private static readonly (string Key, string Name)[] ArchivePage2Rows =
+        {
+            ("dark", "Dark"),
+            ("technology", "Technology"),
+            ("religious", "Religious"),
+            ("humor", "Humor"),
+        };
+
+        public async Task<(List<(string Key, string Name)> Categories, bool FromArchive)> GetCategoryIndexAsync()
+        {
+            try
+            {
+                return (await LoadLiveIndexAsync(), false);
+            }
+            catch (Exception liveError)
+            {
+                try
+                {
+                    var html = await _httpClient.GetStringAsync(ArchiveSnapshotUrl);
+                    var rows = ParseCategoryRows(html);
+                    if (rows.Count == 0)
+                    {
+                        throw new InvalidOperationException(
+                            "the archive snapshot parsed to 0 categories - its markup may have changed.");
+                    }
+
+                    var seen = new HashSet<string>(rows.Select(r => r.Key), StringComparer.OrdinalIgnoreCase);
+                    var result = new List<(string Key, string Name)>(rows);
+                    foreach (var row in ArchivePage2Rows)
+                    {
+                        if (seen.Add(row.Key))
+                        {
+                            result.Add(row);
+                        }
+                    }
+
+                    return (result, true);
+                }
+                catch (Exception archiveError)
+                {
+                    throw new InvalidOperationException(
+                        $"alphacoders category index failed live ({liveError.Message}) and from the archive snapshot ({archiveError.Message}).");
+                }
+            }
+        }
+
         // fetch the real category page AND its ?page=N continuation (the index
         // paginates: 20 rows on page 1, 4 more on page 2 = Dark/Technology/Religious/
         // Humor, page >= 3 is empty) and parse the <h3> rows: only row headers parse,
@@ -72,7 +142,7 @@ namespace Aura.Services
         // a broken empty-page response can't loop forever, and hitting it throws LOUD
         // (-> error bar) - never a silently truncated list. no partial results: the
         // caller only SetCategories()s the complete list, any failed page = exception.
-        public async Task<List<(string Key, string Name)>> GetCategoryIndexAsync()
+        private async Task<List<(string Key, string Name)>> LoadLiveIndexAsync()
         {
             var result = new List<(string Key, string Name)>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
