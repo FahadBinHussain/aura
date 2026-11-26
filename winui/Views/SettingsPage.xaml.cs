@@ -25,6 +25,7 @@ namespace Aura.Views
             {
                 StartWithWindowsToggle.IsOn = IsStartupEnabled();
                 PexelsApiKeyBox.Password = ApiKeySettingsService.GetStoredPexelsApiKey();
+                AlphaCodersApiKeyBox.Password = ApiKeySettingsService.GetStoredAlphaCodersApiKey();
             }
             catch { }
             finally
@@ -84,7 +85,7 @@ namespace Aura.Views
             {
                 // pixabay no longer needs a key (collections are scraped) - the empty
                 // second slot clears any legacy stored pixabay key on save
-                ApiKeySettingsService.SaveApiKeys(PexelsApiKeyBox.Password, string.Empty);
+                ApiKeySettingsService.SaveApiKeys(PexelsApiKeyBox.Password, string.Empty, AlphaCodersApiKeyBox.Password);
                 ShowApiKeyStatus("API keys saved. Platform pages will use them the next time they load.", InfoBarSeverity.Success);
             }
             catch (Exception ex)
@@ -99,6 +100,7 @@ namespace Aura.Views
             {
                 ApiKeySettingsService.ClearApiKeys();
                 PexelsApiKeyBox.Password = string.Empty;
+                AlphaCodersApiKeyBox.Password = string.Empty;
                 ShowApiKeyStatus("Saved API keys cleared.", InfoBarSeverity.Informational);
             }
             catch (Exception ex)

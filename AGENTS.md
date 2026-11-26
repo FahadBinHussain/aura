@@ -144,7 +144,10 @@ extended). key facts the code depends on:
   error line, never a silent empty list) - (SUPERSEDED in part 2026-11-24:
   the live site is Cloudflare-challenged, so a failed live fetch now falls
   back to a pinned web.archive.org snapshot, labeled loudly - see the dated
-  section at the end.) the merged grid AND
+  section at the end. SUPERSEDED in part 2026-11-26: LISTINGS now come from
+  the official API 4.0 when a key is set in Settings > API Keys - see the
+  dated section at the end. the category INDEX still uses the archive
+  fallback; only the listings moved.) the merged grid AND
   `AlphaCodersGridPage` titles both read `AlphaCodersService.Categories`;
   deep-linked categories leave the 3 quick buttons unselected instead of faking
   4K. the old 63-entry homepage-curated table was REMOVED 2026-10-08 (see the
@@ -2530,8 +2533,12 @@ opened from History (observed on the ArtStation artwork "Iara").
   2026-11-24 from two networks, incl. the user's laptop). this is NOT
   the TLS-fingerprint pattern `CurlClient` exists for - no HTTP client
   can pass a JS challenge. `images.alphacoders.com` still answers 200,
-  so image downloads are unaffected; the official api2.0 endpoint is
-  challenged too, so no API-key route exists either.
+  so image downloads are unaffected. (CORRECTED 2026-11-26: the "no
+  API-key route exists" line below was wrong - the old api2.0 endpoint
+  was challenged, but the current API 4.0 host `api.alphacoders.com` is
+  NOT challenged and answers plain HttpClient calls, key or no key -
+  verified live 2026-11-25/26. listings now use it when a key is set;
+  see the dated API section at the end.)
 - **fix** (`AlphaCodersService.GetCategoryIndexAsync`): live first, then
   a pinned `web.archive.org` snapshot (`20260615211350id_`, 15 Jun 2026
   - the newest capture, verified to parse to the same 20 page-1 rows
@@ -2559,7 +2566,10 @@ opened from History (observed on the ArtStation artwork "Iara").
   the same scraper (loud per-card line, placeholders on the cards).
   the real fix for live listing pages is a WebView2 clearance flow
   (load the site in a real browser engine, harvest the cf_clearance
-  cookie) - a bigger job, not started.
+  cookie) - a bigger job, not started. (SUPERSEDED 2026-11-26: the
+  official API 4.0 fixed the listings instead - no WebView2 flow is
+  planned anymore. the grid + slideshow + thumbnails all run through
+  `AlphaCodersService` now, API when a key is set, scrape when not.)
 - bump the snapshot when a newer capture exists: check the CDX API
   (`web.archive.org/cdx/search/cdx?url=alphacoders.com/tag/is-category`)
   and update `ArchiveSnapshotUrl` + `ArchiveSnapshotDate` together.
@@ -2577,3 +2587,73 @@ opened from History (observed on the ArtStation artwork "Iara").
   `see inner exception` wrapper can never again hide the real reason
   from the loud bar. re-opening Categories retries the loads anyway
   (`Loaded` fires per visit - the page is not cached).
+
+### alphacoders listings now live from the official API 4.0 (2026-11-26)
+
+- **what changed**: the grid page, the slideshow (Latest + Category bases)
+  and the category-card thumbnails all run through `AlphaCodersService`
+  again - but the LISTINGS come from the official API 4.0
+  (`AlphaCodersApiService`, `https://api.alphacoders.com/4.0`, key as the
+  `auth` query param) whenever a key is set. the site scrape is still
+  there, untouched, as the keyless path (it 403s today and returns empty,
+  exactly as before). the category INDEX did NOT move - the API has no
+  "categories" endpoint (`/tags` lists thousands of tags, not the site's
+  24), so the index still comes from the live scrape with the pinned
+  archive snapshot as the loud-labeled fallback.
+- **the key**: free personal key, created on the alphacoders keys page
+  (`https://alphacoders.com/api/keys/<user-id>`), 32 hex chars, personal
+  tier 30 calls/min, 500/day, max page 200, 30 items per page, all keys
+  on one account share the cap. the user's key (account `fahad`) was
+  verified live 2026-11-26 via `/query-count` (`success:true`, tier
+  personal) and seeded into the app's settings on laptop-main
+  (`%LOCALAPPDATA%\Aura\api-keys.json`, `AlphaCodersApiKey`). the key is
+  also in the Bitwarden vault item `alphacoders.com` (notes) - the vault
+  previously held a 41-char value that was NEVER the key (invalid_auth
+  on every authed call); the real key came from the keys page, not the
+  vault. a bare HTTP 200 on the no-key test URLs proves NOTHING about a
+  key - `query-count` is the only validity test.
+- **endpoints**: `/contents?content_type=wallpaper&sort=newest&width=3840
+  &height=2160&operator=min&page=N` = the latest feed, 4K-or-bigger only
+  (the same feed the old scraper read from `/resolution/4k-wallpapers`);
+  `/search?term=<slug>&content_type=wallpaper&page=N` = one category
+  (a term that matches an approved tag returns that tag's contents,
+  otherwise the term is alt-text searched - this is how the tag-less
+  categories dark / technology / religious / humor resolve: their search
+  results ARE the category's wallpapers); `/contents/{id}` = one item
+  for the detail page's uncached-id path. `content_type=wallpaper`
+  everywhere (desktop only - no mobile_wallpaper). `4k` is the
+  resolution-page exception, not a tag - it reads the latest feed.
+- **mapping** (API content -> `WallpaperItem`, all REAL now - the scraper
+  faked Title/Resolution/Likes/Downloads): Id = content_id (same id the
+  scraper derived from thumb filenames, so history rows + the
+  initiate-download derivation keep working), Title = name, ImageUrl =
+  thumb_350, FullPhotoUrl = thumb_1920, SourceUrl = url_page (the big.php
+  detail page, the old "View on Web" target), Resolution = width x height,
+  QualityTag = `DetermineQualityTag(width, height)`, Likes =
+  favorite_count, Downloads = view_count (the API has no download count -
+  view_count is the closest honest number), Platform = "AlphaCoders".
+- **paging + rate limits**: the API returns 30 items per page while the
+  grid slices 15, the slideshow 30, thumbnails 1 - `FillFromApiAsync`
+  fetches only the API pages that cover the requested slice (one API page
+  covers two grid pages). one API call per grid page / thumbnail, and the
+  static service cache + the Categories page's session bitmap cache mean
+  re-opens cost nothing. the download URL still derives through the
+  initiate host (`BuildInitiateDownloadUrl`, same formula the slideshow
+  already used) - the API's `src` is the original file but there is no
+  field for it on `WallpaperItem`, so FullPhotoUrl stays the 1920 thumb.
+- **failures are LOUD**: the API client throws with the API's own error
+  string (`invalid_auth`, `rate_limit` with Retry-After, `invalid_page`),
+  never an empty list. the Categories page surfaces it through the
+  thumbnail error bar; the grid stops at the failed page (its empty
+  catch is pre-existing - the Categories page is where a bad key shows).
+  a key saved or removed mid-session invalidates the static cache
+  (`_cacheFromApi`), same as a category change, so scrape items and API
+  items never mix. the old api2.0 `ParseWallpaperResponse` (dead code,
+  nothing called it) was deleted.
+- **key slot**: `ApiKeySettingsService` gained `AlphaCodersApiKey` +
+  `GetAlphaCodersApiKey()` (env `ALPHACODERS_API_KEY`) +
+  `GetStoredAlphaCodersApiKey()`; `SaveApiKeys` takes the third arg.
+  Settings > API Keys has an AlphaCoders box next to the Pexels one
+  (same PasswordBox pattern). the slideshow's two direct scraper calls
+  (`LoadLatestFeedAsync`, the category per-tick loop) now go through
+  `AlphaCodersService` - one fetch path for every consumer.

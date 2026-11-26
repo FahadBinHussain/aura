@@ -976,7 +976,7 @@ namespace Aura.Services
                 LiveIndex = true,
                 // static, non thread-safe scrape cache in AlphaCodersService
                 SoloThumbGate = true,
-                Description = "AlphaCoders' own catalog, from its category index (an archive snapshot while the live site blocks automated requests)."
+                Description = "AlphaCoders' own catalog, from its category index (an archive snapshot while the live site blocks automated requests). Listings come from the official API 4.0 when an API key is set in Settings > API Keys."
             },
             new PlatformSpec
             {

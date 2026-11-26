@@ -20,7 +20,6 @@ namespace Aura.Services
         public static SlideshowService Instance => _instance ??= new SlideshowService();
 
         private readonly AlphaCodersService _alphaCodersService;
-        private readonly AlphaCodersScraperService _alphaCodersScraperService;
         private readonly WallpaperService _wallpaperService;
 
         private DispatcherQueueTimer? _desktopTimer;
@@ -156,7 +155,6 @@ namespace Aura.Services
         private SlideshowService()
         {
             _alphaCodersService = new AlphaCodersService();
-            _alphaCodersScraperService = new AlphaCodersScraperService();
             _wallpaperService = new WallpaperService();
         }
 
@@ -610,15 +608,11 @@ namespace Aura.Services
             var result = new List<WallpaperItem>();
             if (platform == "AlphaCoders")
             {
-                string categoryKey = category switch
-                {
-                    "4K Wallpapers" => "4k",
-                    "Harvest Wallpapers" => "harvest",
-                    "Rain Wallpapers" => "rain",
-                    _ => "4k"
-                };
-
-                var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(categoryKey, batch, batch);
+                // the latest feed IS the 4k feed (the category switch the
+                // scraper needed is gone - the service's latest path is the
+                // 4K-or-bigger newest feed, API when a key is set, scrape
+                // when not). batch = the service page, 30 items per batch.
+                var wallpapers = await _alphaCodersService.GetLatestWallpapersAsync(batch, 30);
                 foreach (var wallpaper in wallpapers)
                 {
                     wallpaper.Platform = "AlphaCoders";
@@ -783,9 +777,11 @@ namespace Aura.Services
             }
             else if (platform == "AlphaCoders")
             {
-                // the scrape cache is STATIC and not thread-safe - the per-tick loop
-                // runs sequentially, the same contract the grid/thumb fill use
-                var wallpapers = await _alphaCodersScraperService.ScrapeWallpapersByCategoryAsync(key, batch, batch);
+                // the service cache is STATIC and not thread-safe - the per-tick loop
+                // runs sequentially, the same contract the grid/thumb fill use.
+                // batch = the service page, 30 items per batch; API when a key
+                // is set, scrape when not.
+                var wallpapers = await _alphaCodersService.GetWallpapersByCategoryAsync(key, batch, 30);
                 foreach (var wallpaper in wallpapers)
                 {
                     wallpaper.Platform = "AlphaCoders";

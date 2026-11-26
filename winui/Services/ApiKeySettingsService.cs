@@ -18,6 +18,11 @@ namespace Aura.Services
             return GetApiKey(settings => settings.PixabayApiKey, "PIXABAY_API_KEY");
         }
 
+        public static string GetAlphaCodersApiKey()
+        {
+            return GetApiKey(settings => settings.AlphaCodersApiKey, "ALPHACODERS_API_KEY");
+        }
+
         public static string GetStoredPexelsApiKey()
         {
             return LoadSettings().PexelsApiKey;
@@ -28,13 +33,19 @@ namespace Aura.Services
             return LoadSettings().PixabayApiKey;
         }
 
-        public static void SaveApiKeys(string pexelsApiKey, string pixabayApiKey)
+        public static string GetStoredAlphaCodersApiKey()
+        {
+            return LoadSettings().AlphaCodersApiKey;
+        }
+
+        public static void SaveApiKeys(string pexelsApiKey, string pixabayApiKey, string alphaCodersApiKey)
         {
             lock (SyncLock)
             {
                 var settings = LoadSettings();
                 settings.PexelsApiKey = NormalizeApiKey(pexelsApiKey);
                 settings.PixabayApiKey = NormalizeApiKey(pixabayApiKey);
+                settings.AlphaCodersApiKey = NormalizeApiKey(alphaCodersApiKey);
                 SaveSettings(settings);
             }
         }
@@ -104,6 +115,7 @@ namespace Aura.Services
         {
             public string PexelsApiKey { get; set; } = string.Empty;
             public string PixabayApiKey { get; set; } = string.Empty;
+            public string AlphaCodersApiKey { get; set; } = string.Empty;
         }
     }
 }

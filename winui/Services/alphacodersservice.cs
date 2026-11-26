@@ -16,9 +16,13 @@ namespace Aura.Services
         private readonly string _baseUrl = "https://alphacoders.com";
         private readonly string _wallBaseUrl = "https://wall.alphacoders.com";
         private readonly AlphaCodersScraperService _scraperService;
+        private readonly AlphaCodersApiService _apiService;
         private static List<WallpaperItem> _cachedWallpapers = new List<WallpaperItem>();
         private static int _lastScrapedPage = 0;
         private static string _currentCategory = "4k"; // Track current category for cache management
+        // which source filled the static cache - switching sources (a key saved
+        // mid-session, or removed) invalidates it, same as a category change
+        private static bool _cacheFromApi = false;
 
         // Static debug logger that can be set by the UI
         public static Action<string> DebugLogger { get; set; }
@@ -261,6 +265,7 @@ namespace Aura.Services
         {
             _httpClient = new HttpClient();
             _scraperService = new AlphaCodersScraperService();
+            _apiService = new AlphaCodersApiService();
 
             // Set debug logger for scraper
             AlphaCodersScraperService.DebugLogger = LogDebug;
@@ -272,99 +277,159 @@ namespace Aura.Services
             _httpClient.DefaultRequestHeaders.Add("Referer", "https://wall.alphacoders.com/");
         }
 
+        // Two sources, one cache, same slicing. With an API key set the
+        // listings come from the official API 4.0 (the site scrape 403s since
+        // the Cloudflare challenge) and failures THROW loud - the callers that
+        // can show an error (Categories thumbnails) do, and the grid simply
+        // stops at the failed page. Without a key the old scraper path runs
+        // unchanged (it 403s today and returns empty, as before).
         public async Task<List<WallpaperItem>> GetLatestWallpapersAsync(int page = 1, int count = 15)
         {
-            try
-            {
+            var useApi = AlphaCodersApiService.HasApiKey;
 
-                // Load the requested page if we haven't loaded it yet
-                if (page > _lastScrapedPage)
+            // the latest feed IS the "4k" feed - keep the cache contract with
+            // GetWallpapersByCategoryAsync so a category browse then a latest
+            // load never slices the wrong category's items
+            if (_currentCategory != "4k" || _cacheFromApi != useApi)
+            {
+                _cachedWallpapers.Clear();
+                _lastScrapedPage = 0;
+                _currentCategory = "4k";
+                _cacheFromApi = useApi;
+            }
+
+            if (useApi)
+            {
+                await FillFromApiAsync(page, count, p => _apiService.GetLatestAsync(p));
+            }
+            else
+            {
+                try
                 {
-                    // Load only the pages we need, not all from 1 to current
-                    for (int p = _lastScrapedPage + 1; p <= page; p++)
+                    // Load the requested page if we haven't loaded it yet
+                    if (page > _lastScrapedPage)
                     {
-                        var newWallpapers = await _scraperService.ScrapeWallpapersAsync(p, p);
-                        if (newWallpapers.Count > 0)
+                        // Load only the pages we need, not all from 1 to current
+                        for (int p = _lastScrapedPage + 1; p <= page; p++)
                         {
-                            _cachedWallpapers.AddRange(newWallpapers);
-                            _lastScrapedPage = p;
-                        }
-                        else
-                        {
-                            break; // Stop loading if we hit an empty page
+                            var newWallpapers = await _scraperService.ScrapeWallpapersAsync(p, p);
+                            if (newWallpapers.Count > 0)
+                            {
+                                _cachedWallpapers.AddRange(newWallpapers);
+                                _lastScrapedPage = p;
+                            }
+                            else
+                            {
+                                break; // Stop loading if we hit an empty page
+                            }
                         }
                     }
                 }
-
-                // Calculate pagination based on cached wallpapers
-                int startIndex = (page - 1) * count;
-                int endIndex = Math.Min(startIndex + count, _cachedWallpapers.Count);
-
-                if (startIndex >= _cachedWallpapers.Count)
+                catch (Exception ex)
                 {
                     return new List<WallpaperItem>();
                 }
-
-                var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
-
-                return pageWallpapers;
             }
-            catch (Exception ex)
+
+            // Calculate pagination based on cached wallpapers
+            int startIndex = (page - 1) * count;
+
+            if (startIndex >= _cachedWallpapers.Count)
             {
                 return new List<WallpaperItem>();
             }
+
+            var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
+
+            return pageWallpapers;
         }
 
         public async Task<List<WallpaperItem>> GetWallpapersByCategoryAsync(string category, int page = 1, int count = 15)
         {
-            try
+            var useApi = AlphaCodersApiService.HasApiKey;
+
+            // Clear cache if category changed, or if the source changed (a key
+            // saved or removed mid-session must not mix scrape items with API items)
+            if (category != _currentCategory || _cacheFromApi != useApi)
             {
+                _cachedWallpapers.Clear();
+                _lastScrapedPage = 0;
+                _currentCategory = category;
+                _cacheFromApi = useApi;
+            }
 
-                // Clear cache if category changed
-                if (category != _currentCategory)
+            if (useApi)
+            {
+                await FillFromApiAsync(page, count, p => _apiService.GetCategoryAsync(category, p));
+                foreach (var item in _cachedWallpapers)
                 {
-                    _cachedWallpapers.Clear();
-                    _lastScrapedPage = 0;
-                    _currentCategory = category;
+                    item.Category = category;
                 }
-
-                // the category slug IS the browse key (the scraper turns it into <slug>-wallpapers)
-                string searchTerm = category;
-
-                // Load the requested page with the specific search term
-                if (page > _lastScrapedPage)
+            }
+            else
+            {
+                try
                 {
-                    for (int p = _lastScrapedPage + 1; p <= page; p++)
+                    // the category slug IS the browse key (the scraper turns it into <slug>-wallpapers)
+                    string searchTerm = category;
+
+                    // Load the requested page with the specific search term
+                    if (page > _lastScrapedPage)
                     {
-                        var newWallpapers = await _scraperService.ScrapeWallpapersByCategoryAsync(searchTerm, p, p);
-                        if (newWallpapers.Count > 0)
+                        for (int p = _lastScrapedPage + 1; p <= page; p++)
                         {
-                            _cachedWallpapers.AddRange(newWallpapers);
-                            _lastScrapedPage = p;
-                        }
-                        else
-                        {
-                            break;
+                            var newWallpapers = await _scraperService.ScrapeWallpapersByCategoryAsync(searchTerm, p, p);
+                            if (newWallpapers.Count > 0)
+                            {
+                                _cachedWallpapers.AddRange(newWallpapers);
+                                _lastScrapedPage = p;
+                            }
+                            else
+                            {
+                                break;
+                            }
                         }
                     }
                 }
-
-                // Calculate pagination based on cached wallpapers
-                int startIndex = (page - 1) * count;
-                int endIndex = Math.Min(startIndex + count, _cachedWallpapers.Count);
-
-                if (startIndex >= _cachedWallpapers.Count)
+                catch (Exception ex)
                 {
                     return new List<WallpaperItem>();
                 }
-
-                var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
-
-                return pageWallpapers;
             }
-            catch (Exception ex)
+
+            // Calculate pagination based on cached wallpapers
+            int startIndex = (page - 1) * count;
+
+            if (startIndex >= _cachedWallpapers.Count)
             {
                 return new List<WallpaperItem>();
+            }
+
+            var pageWallpapers = _cachedWallpapers.GetRange(startIndex, Math.Min(count, _cachedWallpapers.Count - startIndex));
+
+            return pageWallpapers;
+        }
+
+        // The API returns 30 items per page while callers slice 15 (grid) or
+        // 30 (slideshow) or 1 (thumbnail) per page - fetch only the API pages
+        // that actually cover the requested slice, never one per grid page.
+        // An empty API page means the list genuinely ends here (not a failure),
+        // so stop filling; the slice below then returns what exists.
+        private async Task FillFromApiAsync(int page, int count, Func<int, Task<List<WallpaperItem>>> fetchApiPage)
+        {
+            int startIndex = (page - 1) * count;
+            int apiPagesNeeded = (startIndex + count + AlphaCodersApiService.PageSize - 1) / AlphaCodersApiService.PageSize;
+
+            for (int p = _lastScrapedPage + 1; p <= apiPagesNeeded; p++)
+            {
+                var newWallpapers = await fetchApiPage(p);
+                if (newWallpapers.Count == 0)
+                {
+                    break;
+                }
+
+                _cachedWallpapers.AddRange(newWallpapers);
+                _lastScrapedPage = p;
             }
         }
 
@@ -384,6 +449,24 @@ namespace Aura.Services
                         cachedWallpaper.ImageSource = await cachedWallpaper.LoadFullImageAsync();
                     }
                     return cachedWallpaper;
+                }
+
+                // With a key the single-item API call replaces the big.php
+                // scrape (challenged) - an API failure falls through to the
+                // HTML path and then the placeholder, as before
+                if (AlphaCodersApiService.HasApiKey)
+                {
+                    try
+                    {
+                        var apiWallpaper = await _apiService.GetContentAsync(wallpaperId);
+                        if (apiWallpaper != null)
+                        {
+                            return apiWallpaper;
+                        }
+                    }
+                    catch
+                    {
+                    }
                 }
 
                 // Fallback to original HTML parsing method
@@ -418,10 +501,21 @@ namespace Aura.Services
         {
             try
             {
-                // Try to find the original URL from scraped data first
+                // Try to find the original URL from cached data first
                 if (_cachedWallpapers.Count > 0)
                 {
                     var cachedWallpaper = _cachedWallpapers.FirstOrDefault(w => w.Id == wallpaperId);
+                    if (cachedWallpaper != null && !string.IsNullOrEmpty(cachedWallpaper.FullPhotoUrl)
+                        && Uri.TryCreate(cachedWallpaper.FullPhotoUrl, UriKind.Absolute, out var fullUri)
+                        && fullUri.Host.EndsWith("alphacoders.com", StringComparison.OrdinalIgnoreCase))
+                    {
+                        // API items (and detail-parsed items) carry an
+                        // images-host URL in FullPhotoUrl - the original
+                        // downloads through the initiate host, same derivation
+                        // the slideshow uses (ResolveWallpaperDownloadUrlAsync)
+                        return BuildInitiateDownloadUrl(wallpaperId, cachedWallpaper.FullPhotoUrl);
+                    }
+
                     if (cachedWallpaper != null && !string.IsNullOrEmpty(cachedWallpaper.SourceUrl))
                     {
                         return cachedWallpaper.SourceUrl;
@@ -435,6 +529,25 @@ namespace Aura.Services
             {
                 return null;
             }
+        }
+
+        // https://images8.alphacoders.com/136/thumb-1920-1363709.png (or the
+        // bare .../136/1363709.png) -> the original file on the initiate host
+        internal static string BuildInitiateDownloadUrl(string imageId, string imageUrl)
+        {
+            if (!Uri.TryCreate(imageUrl, UriKind.Absolute, out var uri))
+            {
+                return string.Empty;
+            }
+
+            var domainShort = uri.Host.Split('.')[0];
+            var extension = Path.GetExtension(uri.AbsolutePath).TrimStart('.');
+            if (string.IsNullOrEmpty(extension))
+            {
+                extension = "jpg";
+            }
+
+            return $"https://initiate.alphacoders.com/download/{domainShort}/{imageId}/{extension}";
         }
 
         private List<WallpaperItem> ParseHtmlWallpaperResponse(string htmlContent, int count)
@@ -667,53 +780,7 @@ namespace Aura.Services
             }
         }
 
-        private List<WallpaperItem> ParseWallpaperResponse(string jsonContent)
-        {
-            var wallpapers = new List<WallpaperItem>();
-
-            try
-            {
-                // Parse the JSON response
-                using (JsonDocument doc = JsonDocument.Parse(jsonContent))
-                {
-                    JsonElement root = doc.RootElement;
-
-                    // Check if the API returned success
-                    if (root.TryGetProperty("success", out JsonElement success) && success.GetBoolean())
-                    {
-                        // Get the wallpapers array
-                        if (root.TryGetProperty("wallpapers", out JsonElement wallpapersArray))
-                        {
-                            foreach (JsonElement wallpaperElement in wallpapersArray.EnumerateArray())
-                            {
-                                var wallpaper = new WallpaperItem
-                                {
-                                    Id = wallpaperElement.GetProperty("id").GetString(),
-                                    Title = wallpaperElement.GetProperty("name").GetString(),
-                                    ImageUrl = wallpaperElement.GetProperty("url_thumb").GetString(),
-                                    FullPhotoUrl = wallpaperElement.GetProperty("url_image").GetString(),
-                                    SourceUrl = wallpaperElement.GetProperty("url_page").GetString(),
-                                    Resolution = $"{wallpaperElement.GetProperty("width").GetInt32()}x{wallpaperElement.GetProperty("height").GetInt32()}",
-                                    QualityTag = DetermineQualityTag(wallpaperElement.GetProperty("width").GetInt32(), wallpaperElement.GetProperty("height").GetInt32()),
-                                    Likes = wallpaperElement.GetProperty("favorites").GetString(),
-                                    Downloads = wallpaperElement.GetProperty("views").GetString(),
-                                    IsAI = false // Alpha Coders doesn't specify AI-generated content in the API
-                                };
-
-                                wallpapers.Add(wallpaper);
-                            }
-                        }
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-            }
-
-            return wallpapers;
-        }
-
-        private string DetermineQualityTag(int width, int height)
+        internal static string DetermineQualityTag(int width, int height)
         {
             int maxDimension = Math.Max(width, height);
 
