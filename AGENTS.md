@@ -2657,3 +2657,94 @@ opened from History (observed on the ArtStation artwork "Iara").
   (same PasswordBox pattern). the slideshow's two direct scraper calls
   (`LoadLatestFeedAsync`, the category per-tick loop) now go through
   `AlphaCodersService` - one fetch path for every consumer.
+
+## the red lines on the Categories page: 3 sources, 3 different causes (2026-11-26)
+
+the Categories page showed THREE red lines at once. they are NOT one bug -
+each line is a different source failing a different way, and the error bar
+was the only place that said so:
+
+1. `alphacoders categories are from a web.archive.org snapshot (15 Jun 2026)`
+   + `Alpha Coders category thumbnails: 1/1 failed - Image cannot be loaded.
+   Available decoders: JPEG, BMP, Webp, QOI, GIF, TIFF, ICO, PNG, PBM`
+   - the live alphacoders.com is behind a Cloudflare managed JS challenge
+   since ~2026-11-20 (curl + HttpClient + every UA get HTTP 403 + "Just a
+   moment..."). the app falls back to the pinned web.archive snapshot
+   (correct, and loudly labelled).
+   - the DECODE error is a different thing: the category's first API item
+   is an ANIMATED one - its `thumb_350` is
+   `https://images2.alphacoders.com/140/thumb-350-1405430.mp4`
+   (content-type `video/mp4`). ImageSharp gets video bytes and says
+   "Image cannot be loaded. Available decoders: ..." - the decoder list in
+   the message is a red herring: the bytes were never an image.
+   - the "Available decoders" list is ImageSharp's, not WIC's. anything in
+   the app that decodes (ImageSharp) is what raises it.
+2. `DesktopNexus category thumbnails: 7/7 failed - no items returned for
+   "All".` - the site was REDESIGNED (see the scraper section below): item
+   ids are slugs (`s58qV0z`), the assets are imgix urls
+   (`.../<uuid>/w=450,h=311,fit=cover,quality=85,format=auto`), the gallery
+   is the subdomain ROOT (`/all/` redirects to `/`) and pagination is
+   cursor based (`data-next-cursor` -> `?cursor=<base64>`). the old regex
+   (numeric ids + `<uuid>/thumbnail` + `alt=` on the anchor) matches
+   NOTHING, so the fetch returns 0 items.
+3. `Wallpaper Cave category thumbnails: 7/7 failed - No such host is known.
+   (wallpapercave.com:443)` - the domain LOST ITS DNS RECORD
+   (`Resolve-DnsName wallpapercave.com` -> "DNS name does not exist").
+   `papercave.com` resolves but is a parked lander (a one-line script that
+   redirects to `/lander`). the site is GONE - the platform must be dropped,
+   not re-scraped.
+
+### the imgix trap (why a "working" url still breaks the app)
+
+`format=auto` on a desktopnexus asset serves **AVIF** to a client that
+offers `image/avif` and JPEG to curl - verified live on the SAME url:
+`200 image/avif 51276` (browser Accept) vs `200 image/jpeg 47446` (curl).
+the app has no AVIF decoder. any asset url built from a listing must pin
+the format (`format=jpg`), and the local scraper re-encodes everything to
+JPEG anyway.
+
+## the real scraper (2026-11-26)
+
+`scraper/` is a new python package that owns the bytes instead of the UI
+thread hotlinking them:
+
+- `scraper/src/aura_scraper/transport.py` - `BypassTransport` (html via
+  the local Cloudflare bypass server: `GET /html?url=<encoded>`) and
+  `DirectTransport` (assets, plain requests). NO chaining: a site declares
+  its html transport, a failure raises with the transport named.
+- `scraper/src/aura_scraper/images.py` - magic-byte sniffing (an html error
+  page raises with the url + first bytes), and a decode + re-encode to
+  JPEG so the app never meets a format it cannot decode.
+- `scraper/src/aura_scraper/sites/` - one adapter per source
+  (alphacoders via bypass, desktopnexus direct, wallpapercave = a loud
+  tombstone because the site is gone).
+- `scraper/src/aura_scraper/store.py` - the dataset contract:
+  `<site>/thumbs/<category>/<id>.jpg`, `<site>/full/<category>/<id>.jpg`
+  and `index.json` (items + a `failures` list - a crawl that saved 40 of
+  60 says so).
+- `scraper/src/aura_scraper/cli.py` - `doctor` prints one line per source
+  (OK, or the exact reason), `crawl` writes the dataset, `index` shows it.
+
+run it:
+
+```powershell
+uv venv .venv-scraper --python 3.12
+uv pip install --python .venv-scraper\Scripts\python.exe -e scraper
+.venv-scraper\Scripts\python.exe -m aura_scraper.cli doctor
+```
+
+the bypass server is a SEPARATE process and is never started implicitly
+(the scraper fails loudly with the start command instead):
+
+```powershell
+Start-Process .venv\Scripts\python.exe -ArgumentList 'server.py','--host','127.0.0.1','--port','8000' `
+  -WorkingDirectory C:\Users\Admin\Downloads\CloudflareBypassForScraping
+```
+
+verified live 2026-11-26: `doctor` -> alphacoders OK (24 categories, via
+bypass), desktopnexus OK (16 galleries), wallpapercave FAILED (SiteGone).
+crawl alphacoders --category nature --category comic -> 30 items, 0
+failures, every file a real JPEG with a real title; crawl desktopnexus
+--category nature -> 48 items, 0 failures. the alpha browse page really
+parses: `div.thumb-container-wallpaper-desktop` + `meta[itemprop=...]`
+(contentUrl / url / name) + `img.thumb` (thumbbig).
