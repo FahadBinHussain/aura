@@ -2748,3 +2748,34 @@ failures, every file a real JPEG with a real title; crawl desktopnexus
 --category nature -> 48 items, 0 failures. the alpha browse page really
 parses: `div.thumb-container-wallpaper-desktop` + `meta[itemprop=...]`
 (contentUrl / url / name) + `img.thumb` (thumbbig).
+
+### the app-side fixes for those three lines (2026-11-26, same commit as the scraper)
+
+- **wallpaper cave is GONE from the app**: its registry row, its album
+  table, its fetcher and its item-category resolver were deleted. the
+  picker, the category cards and the slides now simply do not have it -
+  a dead host is not a source. (the wpf variant still hardcodes a few
+  wallpapercave urls in a demo array - that app is not built by CI.)
+- **desktopnexus parser rewritten** for the redesign: the gallery is the
+  subdomain root (the `www` gallery is `/all/freshness/`), item ids are
+  slugs, the assets are imgix urls with `format=jpg` PINNED (the `auto`
+  variant serves AVIF to a browser Accept header), the full image is the
+  same uuid folder + `/original`, and pagination follows
+  `data-next-cursor` -> `?cursor=<base64>`. verified live 2026-11-26 with
+  the REAL pattern pulled out of the service source: 48 items on page 1
+  and 48 on page 2 (cursor), disjoint, thumb + original both 200
+  image/jpeg.
+- **alphacoders animated items are dropped, not decoded**: the API serves
+  a VIDEO as the thumbnail for some items - the `comic` category's first
+  item is `thumb_350/thumb_1920/src` = `.../1405430.mp4`
+  (content-type video/mp4). ImageSharp threw "Image cannot be loaded.
+  Available decoders: ..." on it, which is what the Categories page
+  showed. now `MapContent` falls back to the original `src` when the
+  thumb is a video, and DROPS the item (null + a logged count) when even
+  that is a video - a video is never handed to a decoder.
+
+what is left on that page: the alphacoders "categories are from a
+web.archive.org snapshot" notice. that is a LABEL, not a failure - the
+live site is behind a Cloudflare JS challenge and the app still reads the
+live site through the scraper (or a dataset) instead of pretending the
+snapshot is live.

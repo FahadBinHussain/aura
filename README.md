@@ -32,7 +32,6 @@ they get ported (17 as of 2026-10-08).
 | [HDwallpapers](https://www.hdwallpapers.net) | latest feed + category listings |
 | [Pixiv](https://www.pixiv.net) | safe-search illustration tags |
 | [Cara](https://cara.app) | explore feed |
-| [Wallpaper Cave](https://wallpapercave.com) | curated albums |
 | [Wallpaper Engine workshop](https://steamcommunity.com/workshop/browse/?appid=431960) | trending / tagged browse (preview resolution) |
 | [Artgram](https://www.artgram.co) | trending / latest / oldest (full resolution on detail open) |
 
@@ -70,14 +69,16 @@ is the code - mode tables + fetchers).
   https://wallhaven.cc/api/v1/search?categories=001&purity=100&sorting=toplist&order=desc&page=1
 - **bing** - https://www.bing.com/HPImageArchive.aspx?format=js&idx=0&n=8&mkt=en-US
 - **simple desktops** - https://simpledesktops.com/browse/1/
-- **desktopnexus** - https://www.desktopnexus.com/all/ · https://abstract.desktopnexus.com/all/ ·
-  https://aircraft.desktopnexus.com/all/ · https://animals.desktopnexus.com/all/ ·
-  https://anime.desktopnexus.com/all/ · https://architecture.desktopnexus.com/all/ ·
-  https://boats.desktopnexus.com/all/ · https://cars.desktopnexus.com/all/ ·
-  https://entertainment.desktopnexus.com/all/ · https://motorcycles.desktopnexus.com/all/ ·
-  https://nature.desktopnexus.com/all/ · https://people.desktopnexus.com/all/ ·
-  https://space.desktopnexus.com/all/ · https://sports.desktopnexus.com/all/ ·
-  https://technology.desktopnexus.com/all/ · https://videogames.desktopnexus.com/all/
+- **desktopnexus** - the gallery IS the subdomain root (the old /all/ path 302s to
+  it), and the next page is a cursor url - https://www.desktopnexus.com/all/freshness/ ·
+  https://abstract.desktopnexus.com/ ·
+  https://aircraft.desktopnexus.com/ · https://animals.desktopnexus.com/ ·
+  https://anime.desktopnexus.com/ · https://architecture.desktopnexus.com/ ·
+  https://boats.desktopnexus.com/ · https://cars.desktopnexus.com/ ·
+  https://entertainment.desktopnexus.com/ · https://motorcycles.desktopnexus.com/ ·
+  https://nature.desktopnexus.com/ · https://people.desktopnexus.com/ ·
+  https://space.desktopnexus.com/ · https://sports.desktopnexus.com/ ·
+  https://technology.desktopnexus.com/ · https://videogames.desktopnexus.com/
 - **digital blasphemy** - https://digitalblasphemy.com/product-category/wallpapers/ ·
   https://digitalblasphemy.com/product-tag/free/
 - **hdwallpapers** - https://www.hdwallpapers.net/latest-wallpapers · https://www.hdwallpapers.net/3d ·
@@ -97,11 +98,6 @@ is the code - mode tables + fetchers).
   https://www.pixiv.net/ajax/search/artworks/Landscape?word=Landscape&restrict=safe&p=1&order=date_d ·
   https://www.pixiv.net/ajax/search/artworks/Nature?word=Nature&restrict=safe&p=1&order=date_d
 - **cara** - https://cara.app/explore
-- **wallpaper cave** - https://wallpapercave.com/wallpapers · https://wallpapercave.com/cloud-wallpapers ·
-  https://wallpapercave.com/desert-wallpapers · https://wallpapercave.com/fire-wallpapers ·
-  https://wallpapercave.com/ice-wallpapers · https://wallpapercave.com/lake-wallpapers ·
-  https://wallpapercave.com/ocean-wallpapers · https://wallpapercave.com/sunshine-wallpapers ·
-  https://wallpapercave.com/soulslike-wallpapers
 - **wallpaper engine** - https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1 ·
   https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Scene ·
   https://steamcommunity.com/workshop/browse/?appid=431960&browsesort=trend&days=90&p=1&requiredtags%5B0%5D=Anime ·

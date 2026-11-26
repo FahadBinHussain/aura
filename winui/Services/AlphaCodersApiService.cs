@@ -144,6 +144,7 @@ namespace Aura.Services
         private static List<WallpaperItem> ParseContents(JsonDocument doc)
         {
             var wallpapers = new List<WallpaperItem>();
+            var skippedAnimated = 0;
             if (!doc.RootElement.TryGetProperty("contents", out var contents))
             {
                 return wallpapers;
@@ -151,7 +152,22 @@ namespace Aura.Services
 
             foreach (var content in contents.EnumerateArray())
             {
-                wallpapers.Add(MapContent(content));
+                var item = MapContent(content);
+                if (item is null)
+                {
+                    // the item's only thumbnail is an animated file (mp4/webm) -
+                    // the app renders static images, so it cannot show it.
+                    skippedAnimated++;
+                    continue;
+                }
+
+                wallpapers.Add(item);
+            }
+
+            if (skippedAnimated > 0)
+            {
+                AlphaCodersService.DebugLogger?.Invoke(
+                    $"alphacoders: skipped {skippedAnimated} animated item(s) - their thumbnail is a video file (mp4/webm), not an image.");
             }
 
             return wallpapers;
@@ -165,17 +181,46 @@ namespace Aura.Services
         // Likes/Downloads are REAL now (favorite_count / view_count) - the
         // scraper faked both with Random. The API has no download count, so
         // Downloads shows view_count, the closest honest number.
-        private static WallpaperItem MapContent(JsonElement content)
+        //
+        // ANIMATED ITEMS (2026-11-26): some categories (the `comic` one)
+        // serve a VIDEO as the thumbnail - the API returns
+        // `thumb_350 = https://images2.alphacoders.com/140/thumb-350-1405430.mp4`
+        // with content-type video/mp4. ImageSharp then throws "Image cannot
+        // be loaded. Available decoders: ..." - the decoder list in that
+        // message is a red herring, the bytes were never an image. So: a video
+        // thumb falls back to the original `src` image, and if that is a video
+        // too the item is dropped (null) and the drop is logged - never
+        // handed to a decoder.
+        private static WallpaperItem? MapContent(JsonElement content)
         {
             var width = GetInt(content, "width", 0);
             var height = GetInt(content, "height", 0);
+
+            var thumb = GetString(content, "thumb_350", GetString(content, "thumb", string.Empty));
+            var full = GetString(content, "thumb_1920", GetString(content, "src", string.Empty));
+            var original = GetString(content, "src", string.Empty);
+
+            if (IsVideoUrl(thumb))
+            {
+                thumb = IsVideoUrl(original) ? string.Empty : original;
+            }
+
+            if (IsVideoUrl(full))
+            {
+                full = IsVideoUrl(original) ? string.Empty : original;
+            }
+
+            if (string.IsNullOrWhiteSpace(thumb))
+            {
+                return null;
+            }
 
             return new WallpaperItem
             {
                 Id = GetString(content, "content_id", string.Empty),
                 Title = GetString(content, "name", string.Empty),
-                ImageUrl = GetString(content, "thumb_350", GetString(content, "thumb", string.Empty)),
-                FullPhotoUrl = GetString(content, "thumb_1920", GetString(content, "src", string.Empty)),
+                ImageUrl = thumb,
+                FullPhotoUrl = string.IsNullOrWhiteSpace(full) ? thumb : full,
                 SourceUrl = GetString(content, "url_page", string.Empty),
                 Resolution = width > 0 && height > 0 ? $"{width}x{height}" : string.Empty,
                 QualityTag = AlphaCodersService.DetermineQualityTag(width, height),
@@ -184,6 +229,23 @@ namespace Aura.Services
                 Platform = "AlphaCoders",
                 IsAI = false,
             };
+        }
+
+        // the API's animated items serve a video file as the thumbnail
+        // (content-type video/mp4) - the app renders static images only.
+        private static bool IsVideoUrl(string url)
+        {
+            if (string.IsNullOrWhiteSpace(url))
+            {
+                return false;
+            }
+
+            var path = url.Split('?')[0].ToLowerInvariant();
+            return path.EndsWith(".mp4", StringComparison.Ordinal)
+                || path.EndsWith(".webm", StringComparison.Ordinal)
+                || path.EndsWith(".mov", StringComparison.Ordinal)
+                || path.EndsWith(".m4v", StringComparison.Ordinal)
+                || path.EndsWith(".avi", StringComparison.Ordinal);
         }
 
         private static string GetString(JsonElement element, string name, string fallback)

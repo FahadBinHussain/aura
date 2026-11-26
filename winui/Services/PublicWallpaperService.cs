@@ -24,7 +24,6 @@ namespace Aura.Services
         private const string Hdwallpapers = "HDwallpapers";
         private const string Pixiv = "Pixiv";
         private const string Cara = "Cara";
-        private const string WallpaperCave = "Wallpaper Cave";
         private const string WallpaperEngine = "Wallpaper Engine";
         private const string Artgram = "Artgram";
 
@@ -314,41 +313,6 @@ namespace Aura.Services
 
             throw new InvalidOperationException(
                 $"no non-year product-tag anchors on {itemUrl} - digital blasphemy item markup may have changed");
-        }
-
-        // wallpaper cave: feeds carry no category, but each item page's breadcrumb root IS
-        // the site's taxonomy ("Devices" / "Screen" / "Games" - the first
-        // <span itemprop="name"> inside #breadcrumbs; Home uses a <meta> so it never
-        // matches). the breadcrumb is the ONLY per-item category signal on the site
-        // (metas/description/JSON-LD carry none - curl-diffed 2026-10-12), and the
-        // site only assigns it to SOME uploads: 18 of 53 items on the current
-        // /wallpapers feed ship a populated nav, 34 ship it PRESENT but EMPTY
-        // (<nav id="breadcrumbs"> </nav>, uncategorized uploads) - that is honest
-        // no-pill on those rows, never a guess; a missing nav = markup drift = thrown.
-        public async Task<string> GetWallpaperCaveItemCategoryAsync(string itemUrl, CancellationToken cancellationToken = default)
-        {
-            if (string.IsNullOrWhiteSpace(itemUrl))
-            {
-                throw new ArgumentException("wallpaper cave item url is empty - cannot read its breadcrumbs", nameof(itemUrl));
-            }
-
-            var html = await _httpClient.GetStringAsync(itemUrl, cancellationToken);
-            var nav = Regex.Match(html, "<nav id=\"breadcrumbs\"[^>]*>(?<bc>.*?)</nav>",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline);
-            if (!nav.Success)
-            {
-                throw new InvalidOperationException(
-                    $"no breadcrumbs nav on {itemUrl} - wallpaper cave item markup may have changed");
-            }
-
-            var crumb = Regex.Match(nav.Groups["bc"].Value, "<span itemprop=\"name\">(?<n>[^<]+)</span>",
-                RegexOptions.IgnoreCase);
-            if (!crumb.Success)
-            {
-                return string.Empty;
-            }
-
-            return WebUtility.HtmlDecode(crumb.Groups["n"].Value).Trim();
         }
 
         // desktopnexus: the subdomain in the wallpaper's URL IS its gallery category
@@ -699,21 +663,6 @@ namespace Aura.Services
         // (automata-private/www.pixiv.net/AGENTS.md)
         private static readonly string[] PixivTags = { "Wallpaper", "Landscape", "Nature" };
 
-        // wallpaper cave: album page slugs; albums are single-shot (no server pagination anywhere)
-        // (automata-private/wallpapercave.com/AGENTS.md)
-        private static readonly (string Title, string Album)[] WallpaperCaveAlbums =
-        {
-            ("Wallpapers", "wallpapers"),
-            ("Cloud", "cloud-wallpapers"),
-            ("Desert", "desert-wallpapers"),
-            ("Fire", "fire-wallpapers"),
-            ("Ice", "ice-wallpapers"),
-            ("Lake", "lake-wallpapers"),
-            ("Ocean", "ocean-wallpapers"),
-            ("Sunshine", "sunshine-wallpapers"),
-            ("Soulslike", "soulslike-wallpapers"),
-        };
-
         // wallpaper engine: verified requiredtags filters ("Wallpaper" returned the unfiltered
         // list - excluded; Trending = no tag) (automata-private/steamcommunity.com/AGENTS.md)
         private static readonly string[] WallpaperEngineModes =
@@ -922,17 +871,6 @@ namespace Aura.Services
                 Description = "Explore feed from the Cara art community's server-rendered page.",
                 Modes = () => new[] { "Explore" },
                 Fetch = (svc, page, mode, ct) => svc.GetCaraWallpapersAsync(page, mode, ct)
-            },
-            new PlatformSpec
-            {
-                Name = WallpaperCave,
-                Kind = PlatformKind.Public,
-                CategoryCapable = true,
-                Description = "Curated albums from Wallpaper Cave (single-shot album pages).",
-                Modes = () => WallpaperCaveAlbums.Select(category => category.Title).ToArray(),
-                Fetch = (svc, page, mode, ct) => svc.GetWallpaperCaveWallpapersAsync(page, mode, ct),
-                // feeds carry no category - the item page's breadcrumb root does
-                ItemCategory = (svc, url) => svc.GetWallpaperCaveItemCategoryAsync(url)
             },
             new PlatformSpec
             {
@@ -1908,58 +1846,127 @@ namespace Aura.Services
                 .FirstOrDefault(category => category.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
                 .Subdomain ?? "www";
 
-            var url = page <= 1
-                ? $"https://{subdomain}.desktopnexus.com/all/"
-                : $"https://{subdomain}.desktopnexus.com/all/{page}/";
-            var html = await _httpClient.GetStringAsync(url, cancellationToken);
+            // the site was REDESIGNED (verified live 2026-11-26):
+            //  - the gallery is the SUBDOMAIN ROOT now - /all/ 302s to /
+            //  - item ids are SLUGS (s58qV0z), not numbers
+            //  - the assets are imgix urls (.../<uuid>/w=450,h=311,fit=cover,
+            //    quality=85,format=auto) - the old /thumbnail path is not what
+            //    the listing uses any more
+            //  - pagination is CURSOR based: the grid carries data-next-cursor
+            //    and the next page is /?cursor=<base64 json> (48 items a page)
+            //  - `format=auto` serves AVIF to a browser-shaped Accept header
+            //    (verified: 200 image/avif with Accept: image/avif,... vs
+            //    200 image/jpeg with curl) and WinUI has NO avif decoder - so
+            //    every asset url gets format=jpg pinned.
+            // the old regex matched NONE of this, which is exactly the
+            // "no items returned for All" red line.
             var wallpapers = new List<WallpaperItem>();
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            var matches = Regex.Matches(
-                html,
-                "<a href=\"(?<href>https://(?<subdomain>[a-z0-9]+)\\.desktopnexus\\.com/wallpaper/\\d+)/\" alt=\"(?<title>[^\"]+)\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://assets\\.desktopnexus\\.com/[^\"]+)\"",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-            foreach (Match match in matches)
+            // the www gallery's listing lives under /all/ (it 302s to
+            // /all/freshness/); every other gallery IS its subdomain root.
+            var listingPath = subdomain.Equals("www", StringComparison.OrdinalIgnoreCase)
+                ? "/all/freshness/"
+                : "/";
+            var url = $"https://{subdomain}.desktopnexus.com{listingPath}";
+            for (var currentPage = 1; currentPage <= page; currentPage++)
             {
-                var href = WebUtility.HtmlDecode(match.Groups["href"].Value) + "/";
-                var title = WebUtility.HtmlDecode(match.Groups["title"].Value);
-                var thumb = match.Groups["thumb"].Value;
-                var itemSubdomain = match.Groups["subdomain"].Value;
+                var html = await _httpClient.GetStringAsync(url, cancellationToken);
 
-                if (string.IsNullOrWhiteSpace(title) || !seen.Add(href))
+                var matches = Regex.Matches(
+                    html,
+                    "<article class=\"wallpaper-card\"[^>]*>\\s*<a class=\"wallpaper-card__image\" href=\"(?<href>https://(?<subdomain>[a-z0-9]+)\\.desktopnexus\\.com/wallpaper/(?<id>[a-z0-9]+)/)\"[^>]*aria-label=\"[^\"]*\"[^>]*>\\s*<img[^>]+src=\"(?<thumb>https://assets\\.desktopnexus\\.com/[^\"]+)\"[^>]*alt=\"(?<title>[^\"]*)\"",
+                    RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+                foreach (Match match in matches)
                 {
-                    continue;
+                    var href = WebUtility.HtmlDecode(match.Groups["href"].Value);
+                    var title = WebUtility.HtmlDecode(match.Groups["title"].Value);
+                    var thumb = match.Groups["thumb"].Value;
+                    var itemId = match.Groups["id"].Value;
+                    var itemSubdomain = match.Groups["subdomain"].Value;
+
+                    if (string.IsNullOrWhiteSpace(title) || !seen.Add(itemId))
+                    {
+                        continue;
+                    }
+
+                    var category = string.Empty;
+                    if (!string.IsNullOrEmpty(itemSubdomain) && !itemSubdomain.Equals("www", StringComparison.OrdinalIgnoreCase))
+                    {
+                        var catEntry = DesktopNexusCategories
+                            .FirstOrDefault(c => c.Subdomain.Equals(itemSubdomain, StringComparison.OrdinalIgnoreCase));
+                        category = string.IsNullOrEmpty(catEntry.Title)
+                            ? char.ToUpperInvariant(itemSubdomain[0]) + itemSubdomain.Substring(1)
+                            : catEntry.Title;
+                    }
+
+                    wallpapers.Add(new WallpaperItem
+                    {
+                        Id = itemId,
+                        Title = title,
+                        Description = "DesktopNexus wallpaper",
+                        ImageUrl = PinImageFormat(thumb),
+                        // the full asset is the same uuid folder without the imgix params
+                        FullPhotoUrl = OriginalAssetUrl(thumb),
+                        SourceUrl = href,
+                        Platform = DesktopNexus,
+                        Category = category,
+                        Likes = string.Empty,
+                        Downloads = string.Empty,
+                        IsAI = false
+                    });
                 }
 
-                var category = string.Empty;
-                if (!string.IsNullOrEmpty(itemSubdomain) && !itemSubdomain.Equals("www", StringComparison.OrdinalIgnoreCase))
+                if (currentPage == page)
                 {
-                    var catEntry = DesktopNexusCategories
-                        .FirstOrDefault(c => c.Subdomain.Equals(itemSubdomain, StringComparison.OrdinalIgnoreCase));
-                    category = string.IsNullOrEmpty(catEntry.Title)
-                        ? char.ToUpperInvariant(itemSubdomain[0]) + itemSubdomain.Substring(1)
-                        : catEntry.Title;
+                    break;
                 }
 
-                var id = Regex.Match(href, "\\d+").Value;
-                wallpapers.Add(new WallpaperItem
+                // next page = follow the cursor the grid handed us
+                var cursor = Regex.Match(html, "data-next-cursor=\"(?<c>[^\"]+)\"", RegexOptions.IgnoreCase);
+                if (!cursor.Success)
                 {
-                    Id = id,
-                    Title = title,
-                    Description = "DesktopNexus wallpaper",
-                    ImageUrl = thumb.Replace("/thumbnail", "/preview"),
-                    FullPhotoUrl = thumb.Replace("/thumbnail", "/original"),
-                    SourceUrl = href,
-                    Platform = DesktopNexus,
-                    Category = category,
-                    Likes = string.Empty,
-                    Downloads = string.Empty,
-                    IsAI = false
-                });
+                    break;
+                }
+
+                url = $"https://{subdomain}.desktopnexus.com{listingPath}?cursor={Uri.EscapeDataString(cursor.Groups["c"].Value)}";
             }
 
             return wallpapers;
+        }
+
+        // imgix `format=auto` serves AVIF to a client that offers image/avif -
+        // WinUI cannot decode AVIF, so every desktopnexus asset url pins jpeg.
+        private static string PinImageFormat(string assetUrl)
+        {
+            if (string.IsNullOrEmpty(assetUrl))
+            {
+                return assetUrl;
+            }
+
+            return assetUrl.Contains("format=auto", StringComparison.OrdinalIgnoreCase)
+                ? assetUrl.Replace("format=auto", "format=jpg")
+                : assetUrl;
+        }
+
+        // .../<uuid>/trim=124;0;124;0,w=450,h=311,fit=cover,quality=85,format=jpg
+        //   -> .../<uuid>/original (the full jpeg, verified 200)
+        private static string OriginalAssetUrl(string assetUrl)
+        {
+            if (string.IsNullOrEmpty(assetUrl))
+            {
+                return assetUrl;
+            }
+
+            var slash = assetUrl.LastIndexOf('/');
+            if (slash < 0)
+            {
+                return assetUrl;
+            }
+
+            var folder = assetUrl.Substring(0, slash);
+            return $"{folder}/original";
         }
 
         // digital blasphemy: woo product loop; full resolutions are membership-only, so both
@@ -2229,67 +2236,6 @@ namespace Aura.Services
                     ImageUrl = imageUrls,
                     FullPhotoUrl = imageUrls,
                     SourceUrl = $"https://cara.app/post/{id}",
-                    Likes = string.Empty,
-                    Downloads = string.Empty,
-                    IsAI = false
-                });
-            }
-
-            return wallpapers;
-        }
-
-        // wallpaper cave: album pages are single-shot (no server pagination exists anywhere on the
-        // site); per-item titles do not exist on list pages, so cards get `<h1> #<n>` positional
-        // titles (automata-private/wallpapercave.com/AGENTS.md). items ship jpg, png AND webp -
-        // the img id MUST equal the anchor id (the \k<id> backreference): the old jpg-only
-        // pattern let .*? span past a png/webp item's </a> into the NEXT item and pair that
-        // image with the wrong /w/ link - 40 wrong-link cards across the 8 live albums on
-        // 2026-11-22, incl. Wallpapers #33 (TMNT wp2471732 shown under wp2471731's link)
-        private async Task<List<WallpaperItem>> GetWallpaperCaveWallpapersAsync(int page, string mode, CancellationToken cancellationToken)
-        {
-            if (page > 1)
-            {
-                return new List<WallpaperItem>();
-            }
-
-            var album = WallpaperCaveAlbums
-                .FirstOrDefault(entry => entry.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
-                .Album ?? "wallpapers";
-            var html = await _httpClient.GetStringAsync($"https://wallpapercave.com/{album}", cancellationToken);
-            var wallpapers = new List<WallpaperItem>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            var heading = Regex.Match(html, "<h1[^>]*>(?<h1>[^<]+)</h1>", RegexOptions.Singleline);
-            var albumTitle = WebUtility.HtmlDecode(heading.Groups["h1"].Value).Trim();
-            if (string.IsNullOrWhiteSpace(albumTitle))
-            {
-                albumTitle = "Wallpapers";
-            }
-
-            var matches = Regex.Matches(
-                html,
-                "<a href=\"/w/(?<id>wp\\d+)\"[^>]*>\\s*<picture>.*?<img src=\"(?<img>/wp/\\k<id>\\.(?:jpg|png|webp))\"[^>]*class=\"wimg\"",
-                RegexOptions.IgnoreCase | RegexOptions.Singleline);
-
-            var index = 0;
-            foreach (Match match in matches)
-            {
-                var id = match.Groups["id"].Value;
-                var file = match.Groups["img"].Value; // /wp/wp2471696.jpg
-                if (!seen.Add(id))
-                {
-                    continue;
-                }
-
-                index++;
-                wallpapers.Add(new WallpaperItem
-                {
-                    Id = id,
-                    Title = $"{albumTitle} #{index}",
-                    Description = "Wallpaper Cave wallpaper",
-                    ImageUrl = $"https://wallpapercave.com/dwp1x/{file.Substring(4)}", // desktop <source> thumb in the item's own format (jpg/png/webp; /mwp/ now transcodes to image/avif - WinUI has no AVIF decoder, tiles decode-fail)
-                    FullPhotoUrl = $"https://wallpapercave.com{file}",               // 1980px original
-                    SourceUrl = $"https://wallpapercave.com/w/{id}",
                     Likes = string.Empty,
                     Downloads = string.Empty,
                     IsAI = false
