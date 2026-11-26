@@ -43,7 +43,10 @@ def crawl_site(
     skip_existing: bool = True,
 ) -> CrawlReport:
     report = CrawlReport(site=site.name)
-    report.categories = [category.key for category in categories]
+    report.categories = [
+        {"key": category.key, "name": category.name}
+        for category in categories
+    ]
 
     for category in categories:
         for page in range(1, pages + 1):

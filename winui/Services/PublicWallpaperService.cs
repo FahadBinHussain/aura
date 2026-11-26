@@ -1016,6 +1016,17 @@ namespace Aura.Services
             return Sorted(PlatformRegistry.Where(spec => spec.Kind == PlatformKind.Public).Select(spec => spec.Name));
         }
 
+        // the desktopnexus gallery subdomain behind a mode title ("Nature" ->
+        // "nature", "All" -> "www") - the scraped dataset stores the
+        // subdomain as its category key, the app addresses the gallery by
+        // its title, so the lookup needs both.
+        public static string GetDesktopNexusSubdomain(string? mode)
+        {
+            return DesktopNexusCategories
+                .FirstOrDefault(category => category.Title.Equals(mode ?? string.Empty, StringComparison.OrdinalIgnoreCase))
+                .Subdomain ?? "www";
+        }
+
         // the Categories scope menu: implemented AND category-capable (a rejected scope would
         // always render an empty grid)
         public static IReadOnlyList<string> GetCategoryPlatformNames()

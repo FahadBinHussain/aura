@@ -83,7 +83,7 @@ class AlphaCodersSite(Site):
                 new_rows += 1
                 name = link.get_text(" ", strip=True)
                 categories.append(
-                    Category(key=slug, name=name or slug.replace("-", " ").title())
+                    Category(key=slug, name=_display_name(name) or slug.replace("-", " ").title())
                 )
 
             if new_rows == 0:
@@ -166,6 +166,17 @@ class AlphaCodersSite(Site):
         name = urlparse(url).path.rsplit("/", 1)[-1]
         match = re.search(r"(\d+)\.[a-z0-9]+$", name)
         return match.group(1) if match else ""
+
+    @staticmethod
+    def _display_name(raw: str) -> str:
+        """first letter of every word up, the rest untouched.
+
+        the site's own row text is lowercase for most categories ("video
+        game") and cased for a few ("TV Show") - the app's category index
+        uses exactly this rule, so the dataset matches it.
+        """
+        words = [w for w in re.split(r"[ \t\r\n]+", raw.strip()) if w]
+        return " ".join(w[0].upper() + w[1:] for w in words)
 
     @staticmethod
     def _derive_1920(content_url: str) -> str:

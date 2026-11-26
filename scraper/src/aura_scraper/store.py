@@ -74,7 +74,7 @@ class DatasetStore:
         self,
         site: str,
         items: list[StoredItem],
-        categories: list[str],
+        categories: list[dict],
         failures: list[dict] | None = None,
     ) -> Path:
         index_path = self.site_root(site) / "index.json"

@@ -164,6 +164,21 @@ namespace Aura.Views.Backiee
             async Task<List<string>> LoadAlphaIndexAsync()
             {
                 var loadErrors = new List<string>();
+
+                // the scraped dataset is the PRIMARY source: it was scraped
+                // from the LIVE site through the Cloudflare bypass server, so
+                // the app does not need the archive snapshot at all (and the
+                // "these categories come from an archive" label disappears).
+                // the live/archive path stays as the second method, with its
+                // own loud label (rule 8).
+                var datasetCategories = ScraperDatasetService
+                    .GetCategories(ScraperDatasetService.SiteAlphaCoders);
+                if (datasetCategories.Count > 0)
+                {
+                    AlphaCodersService.SetCategories(datasetCategories);
+                    return loadErrors;
+                }
+
                 try
                 {
                     var (alphaCategories, fromArchive) = await new AlphaCodersService().GetCategoryIndexAsync();
@@ -459,6 +474,27 @@ namespace Aura.Views.Backiee
         private async Task<BitmapImage?> LoadRepresentativeThumbnailAsync(CategorySourceRef source)
         {
             WallpaperItem? first;
+
+            // the scraped dataset is the PRIMARY source when it exists: the
+            // thumbnails are local jpeg files on disk, so the card art costs
+            // no network request at all and cannot fail on a challenge or a
+            // markup change. the live fetch stays as the second method and
+            // its failures stay loud (rule 8).
+            var datasetSite = ScraperDatasetService.SiteFor(source.Platform);
+            if (!string.IsNullOrEmpty(datasetSite))
+            {
+                // the dataset stores the SOURCE's own category key; the app
+                // addresses the same category by its display name - desktopnexus
+                // mode titles map to subdomains, so both are tried.
+                var datasetItem = ScraperDatasetService
+                    .GetWallpapersWithFiles(datasetSite, DatasetCategoryKeys(source))
+                    .FirstOrDefault();
+                if (datasetItem != null)
+                {
+                    return await datasetItem.LoadImageAsync();
+                }
+            }
+
             switch (source.Platform)
             {
                 case "AlphaCoders":
@@ -492,6 +528,26 @@ namespace Aura.Views.Backiee
             }
 
             return first == null ? null : await first.LoadImageAsync();
+        }
+
+        /// <summary>
+        /// The category keys a dataset entry may carry for this card: the
+        /// app's own key plus the source's key (desktopnexus stores its
+        /// gallery subdomain, the app addresses the gallery by its title).
+        /// </summary>
+        private string[] DatasetCategoryKeys(CategorySourceRef source)
+        {
+            var keys = new List<string> { source.Key };
+            if (source.Platform == "DesktopNexus")
+            {
+                var subdomain = PublicWallpaperService.GetDesktopNexusSubdomain(source.Key);
+                if (!string.IsNullOrEmpty(subdomain))
+                {
+                    keys.Add(subdomain);
+                }
+            }
+
+            return keys.ToArray();
         }
 
         // merge every platform's categories by case-insensitive name into one grid model
