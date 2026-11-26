@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Aura.Models;
 
 namespace Aura.Services
@@ -100,11 +101,22 @@ namespace Aura.Services
 
         private sealed class IndexFile
         {
+            [JsonPropertyName("site")]
             public string Site { get; set; } = string.Empty;
+
+            [JsonPropertyName("generated_at")]
             public string GeneratedAt { get; set; } = string.Empty;
+
+            [JsonPropertyName("categories")]
             public List<JsonElement> Categories { get; set; } = new();
+
+            [JsonPropertyName("item_count")]
             public int ItemCount { get; set; }
+
+            [JsonPropertyName("failures")]
             public List<FailureEntry> Failures { get; set; } = new();
+
+            [JsonPropertyName("items")]
             public List<ItemEntry> Items { get; set; } = new();
         }
 
@@ -137,24 +149,52 @@ namespace Aura.Services
 
         private sealed class FailureEntry
         {
+            [JsonPropertyName("stage")]
             public string Stage { get; set; } = string.Empty;
+
+            [JsonPropertyName("category")]
             public string Category { get; set; } = string.Empty;
+
+            [JsonPropertyName("item_id")]
             public string ItemId { get; set; } = string.Empty;
+
+            [JsonPropertyName("url")]
             public string Url { get; set; } = string.Empty;
+
+            [JsonPropertyName("error")]
             public string Error { get; set; } = string.Empty;
         }
 
         private sealed class ItemEntry
         {
+            [JsonPropertyName("site")]
             public string Site { get; set; } = string.Empty;
+
+            [JsonPropertyName("category")]
             public string Category { get; set; } = string.Empty;
+
+            [JsonPropertyName("item_id")]
             public string ItemId { get; set; } = string.Empty;
+
+            [JsonPropertyName("title")]
             public string Title { get; set; } = string.Empty;
+
+            [JsonPropertyName("thumb")]
             public string Thumb { get; set; } = string.Empty;
+
+            [JsonPropertyName("full")]
             public string Full { get; set; } = string.Empty;
+
+            [JsonPropertyName("source_url")]
             public string SourceUrl { get; set; } = string.Empty;
+
+            [JsonPropertyName("width")]
             public int Width { get; set; }
+
+            [JsonPropertyName("height")]
             public int Height { get; set; }
+
+            [JsonPropertyName("bytes")]
             public long Bytes { get; set; }
         }
 

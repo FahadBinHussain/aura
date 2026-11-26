@@ -106,13 +106,22 @@ def _store_item(
 
     if skip_existing and want_thumb and not want_full and thumb_path.exists():
         # already on disk: keep the index in sync without re-downloading
+        width = height = None
+        try:
+            from PIL import Image
+
+            with Image.open(thumb_path) as image:
+                width, height = image.size
+        except Exception:
+            pass
+
         return StoredItem(
             wallpaper=wallpaper,
             thumb_path=_relative(store, site, thumb_path),
             full_path=_relative(store, site, full_path),
             bytes=thumb_path.stat().st_size,
-            width=None,
-            height=None,
+            width=width,
+            height=height,
         )
 
     try:

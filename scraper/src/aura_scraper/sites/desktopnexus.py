@@ -62,11 +62,10 @@ class DesktopNexusSite(Site):
             if subdomain in seen:
                 continue
             seen.add(subdomain)
-            name = link.get_text(" ", strip=True)
             categories.append(
                 Category(
                     key=subdomain,
-                    name=name or subdomain.replace("-", " ").title(),
+                    name=self._display_name(subdomain, link),
                 )
             )
 
@@ -77,10 +76,15 @@ class DesktopNexusSite(Site):
         return categories
 
     def listings(self, category: Category, page: int) -> list[Wallpaper]:
+        # the gallery is the subdomain ROOT - except the "www" gallery, whose
+        # listing lives under /all/ (it 302s to /all/freshness/); the home
+        # page itself carries no cards (verified live 2026-11-26).
+        listing_path = "/all/freshness/" if category.key == "www" else "/"
+
         if page <= 1:
-            url = f"https://{category.key}.desktopnexus.com/"
+            url = f"https://{category.key}.desktopnexus.com{listing_path}"
         else:
-            url = self._cursor_url(category, page)
+            url = self._cursor_url(category, page, listing_path)
 
         html = self.html(url)
         soup = BeautifulSoup(html, "html.parser")
@@ -130,9 +134,9 @@ class DesktopNexusSite(Site):
             )
         return wallpapers
 
-    def _cursor_url(self, category: Category, page: int) -> str:
+    def _cursor_url(self, category: Category, page: int, listing_path: str) -> str:
         """Follow `data-next-cursor` until the requested page is reached."""
-        url = f"https://{category.key}.desktopnexus.com/"
+        url = f"https://{category.key}.desktopnexus.com{listing_path}"
         for _ in range(page - 1):
             html = self.html(url)
             soup = BeautifulSoup(html, "html.parser")
@@ -143,8 +147,32 @@ class DesktopNexusSite(Site):
                     f"changed (page {page} unreachable)."
                 )
             cursor = root.get("data-next-cursor")
-            url = f"https://{category.key}.desktopnexus.com/?cursor={cursor}"
+            url = (
+                f"https://{category.key}.desktopnexus.com{listing_path}"
+                f"?cursor={cursor}"
+            )
         return url
+
+    @staticmethod
+    def _display_name(subdomain: str, link) -> str:
+        """The gallery's clean title.
+
+        the catalog links carry the wallpaper count with the name
+        ("Nature 405.6k wallpapers"), so the <strong> label is preferred and
+        the count is dropped. the www gallery is the app's "All".
+        """
+        if subdomain == "www":
+            return "All"
+
+        strong = link.find("strong")
+        if strong is not None:
+            text = strong.get_text(" ", strip=True)
+            if text:
+                return text
+
+        text = link.get_text(" ", strip=True)
+        text = re.split(r"\d[\d.,]*\s*[kmb]?\s*wallpapers", text, flags=re.I)[0]
+        return text.strip() or subdomain.replace("-", " ").title()
 
     @staticmethod
     def _force_jpeg(url: str) -> str:

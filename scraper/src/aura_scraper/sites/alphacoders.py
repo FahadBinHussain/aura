@@ -83,7 +83,7 @@ class AlphaCodersSite(Site):
                 new_rows += 1
                 name = link.get_text(" ", strip=True)
                 categories.append(
-                    Category(key=slug, name=_display_name(name) or slug.replace("-", " ").title())
+                    Category(key=slug, name=self._display_name(name) or slug.replace("-", " ").title())
                 )
 
             if new_rows == 0:

@@ -80,13 +80,36 @@ class DatasetStore:
         index_path = self.site_root(site) / "index.json"
         index_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # MERGE with what is already on disk: crawling ONE category must not
+        # wipe the other categories from the index (the app reads the index as
+        # the site's whole catalogue). the items of the categories this run
+        # touched are replaced, the rest are kept as they are.
+        previous = self.load_index(site) or {}
+        touched = {str(c.get("key", "")) for c in categories}
+        kept_items = [
+            item
+            for item in previous.get("items", [])
+            if str(item.get("category", "")) not in touched
+        ]
+        kept_categories = [
+            c
+            for c in previous.get("categories", [])
+            if isinstance(c, dict) and str(c.get("key", "")) not in touched
+        ]
+        kept_failures = [
+            f
+            for f in previous.get("failures", [])
+            if str(f.get("category", "")) not in touched
+        ]
+
         payload = {
             "site": site,
             "generated_at": datetime.now(timezone.utc).astimezone().isoformat(),
-            "categories": categories,
-            "item_count": len(items),
-            "failures": failures or [],
-            "items": [
+            "categories": kept_categories + list(categories),
+            "item_count": len(kept_items) + len(items),
+            "failures": kept_failures + list(failures or []),
+            "items": kept_items
+            + [
                 {
                     "site": item.wallpaper.site,
                     "category": item.wallpaper.category,
