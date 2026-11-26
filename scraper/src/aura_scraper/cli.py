@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from pathlib import Path
 
 from .config import Settings
 from .crawler import crawl_site
@@ -139,6 +140,63 @@ def cmd_index(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_install(args: argparse.Namespace) -> int:
+    """Point the installed app at this dataset.
+
+    The app resolves its dataset root in this order:
+      1. the AURA_SCRAPER_DATA environment variable
+      2. <repo>/scraper/data (a dev checkout)
+      3. %LOCALAPPDATA%\\Aura\\dataset (the installed app)
+
+    This command links (or copies) the dataset into the third location, so
+    the INSTALLED app reads the same files the dev checkout does.
+    """
+    import os
+    import shutil
+    import subprocess
+
+    settings = Settings.from_env()
+    source = settings.data_root
+    if not source.exists():
+        print(
+            f"no dataset at {source} - run 'aura-scraper crawl <site>' first.",
+            file=sys.stderr,
+        )
+        return 2
+
+    target = Path(
+        args.target
+        or Path(
+            os.environ.get("LOCALAPPDATA", str(Path.home()))
+        )
+        / "Aura"
+        / "dataset"
+    )
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    if target.exists():
+        print(f"{target} already exists - remove it first if you want a fresh link.")
+        return 1
+
+    # a directory junction is instant and stays in sync with the repo copy
+    try:
+        result = subprocess.run(
+            ["cmd", "/c", "mklink", "/J", str(target), str(source)],
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode == 0:
+            print(f"linked {target} -> {source}")
+            return 0
+        print(f"mklink failed ({result.stdout.strip()} {result.stderr.strip()}) - copying instead")
+    except Exception as exc:  # pragma: no cover
+        print(f"mklink unavailable ({exc}) - copying instead")
+
+    shutil.copytree(source, target)
+    print(f"copied {source} -> {target}")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="aura-scraper",
@@ -171,6 +229,14 @@ def build_parser() -> argparse.ArgumentParser:
     index = sub.add_parser("index", help="show the dataset summary")
     index.add_argument("site")
     index.set_defaults(func=cmd_index)
+
+    install = sub.add_parser(
+        "install", help="point the installed app at this dataset"
+    )
+    install.add_argument(
+        "--target", default=None, help="where to link (default %LOCALAPPDATA%\\Aura\\dataset)"
+    )
+    install.set_defaults(func=cmd_install)
 
     return parser
 

@@ -59,7 +59,21 @@ $py = "C:\Users\Admin\Downloads\aura\.venv-scraper\Scripts\python.exe"
 & $py -m aura_scraper.cli crawl alphacoders --pages 2         # scrape into scraper/data/alphacoders/
 & $py -m aura_scraper.cli crawl desktopnexus --category nature --full
 & $py -m aura_scraper.cli index alphacoders                   # what the dataset holds
+& $py -m aura_scraper.cli install                             # point the INSTALLED app at this dataset
 ```
+
+## how the app finds the dataset
+
+the app resolves its dataset root in this order:
+
+1. the `AURA_SCRAPER_DATA` environment variable,
+2. `<repo>/scraper/data` (a dev checkout),
+3. `%LOCALAPPDATA%\Aura\dataset` (the installed app).
+
+`aura-scraper install` links (or copies) the dataset into the third
+location, so the installed build reads the same files the dev checkout
+does. The app treats the dataset as the PRIMARY source and falls back to
+the live network path with its loud labels (rule 8).
 
 ## the dataset
 

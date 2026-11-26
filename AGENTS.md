@@ -2779,3 +2779,41 @@ web.archive.org snapshot" notice. that is a LABEL, not a failure - the
 live site is behind a Cloudflare JS challenge and the app still reads the
 live site through the scraper (or a dataset) instead of pretending the
 snapshot is live.
+
+## the app reads the scraped dataset (2026-11-26, commit 37a4b72)
+
+`winui/Services/ScraperDatasetService.cs` is the app-side reader for the
+dataset the scraper writes. it resolves the root in this order:
+
+1. `AURA_SCRAPER_DATA` (env),
+2. `<repo>/scraper/data` (dev checkout - it walks up from the exe folder),
+3. `%LOCALAPPDATA%\Aura\dataset` (the installed app).
+
+`aura-scraper install` junctions (or copies) the dataset into the third
+location so the INSTALLED build reads the same files.
+
+what reads the dataset:
+
+- the alphacoders CATEGORY INDEX (`CategoriesPage.LoadAlphaIndexAsync`):
+  the scraped index was taken from the LIVE site through the CF bypass
+  server, so the app no longer needs the web.archive snapshot and the
+  "categories are from a web.archive.org snapshot" label disappears. the
+  live/archive path stays as the second method WITH its label (rule 8).
+- the category THUMBNAILS (`LoadRepresentativeThumbnailAsync`): the
+  dataset's first item of that category is a local jpeg file, so the card
+  art costs no network request and cannot fail on a challenge. the live
+  fetch stays as the second method.
+
+the app's `WallpaperDownloader.GetImageBytesAsync` already reads a LOCAL
+PATH (`File.Exists` -> `ReadAllBytesAsync`), so the dataset needed no new
+image plumbing - the image url IS the file path.
+
+dataset categories are keyed by the SOURCE's own key (alphacoders' slug,
+desktopnexus' subdomain) while the app addresses a category by its
+display name - `GetWallpapersWithFiles(site, keys...)` takes both, and
+`PublicWallpaperService.GetDesktopNexusSubdomain(mode)` maps a desktopnexus
+mode title to its subdomain.
+
+dataset shape (verified live 2026-11-26): alphacoders 24 categories / 360
+items / 0 failures, desktopnexus 16 galleries / 768 items / 0 failures,
+every thumb a real JPEG on disk.
