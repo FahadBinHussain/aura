@@ -2817,3 +2817,28 @@ mode title to its subdomain.
 dataset shape (verified live 2026-11-26): alphacoders 24 categories / 360
 items / 0 failures, desktopnexus 16 galleries / 768 items / 0 failures,
 every thumb a real JPEG on disk.
+
+### the stale slideshow tick (2026-11-26)
+
+the user's saved slideshow config still ticked "Wallpaper Cave" after the
+platform was dropped, so every batch failed it with "not an implemented
+platform" - a red line on the Slideshow page for a platform that does not
+exist any more. `PublicWallpaperService.PruneRemovedPlatforms` now drops
+such ticks on load (the removal is LOGGED, not shown as an error - the
+cleanup succeeded, an error banner would be a lie) and the pruned lists
+are written back to `%APPDATA%\Aura\slideshow_settings.json` (JsonNode,
+so the rest of the file survives untouched).
+
+verified live 2026-11-26: desktop slideshow 9 platforms (was 10), lock
+screen 17 (was 18), and the only remaining warning is the pexels api key
+(the user's own setting, fixable in Settings > API Keys).
+
+### the installed build + how to re-test it
+
+the installed app lives in `%LOCALAPPDATA%\Programs\Aura` and the release
+zip is unpacked over it (robocopy /E - the user's app.log and the data
+folders stay). the app starts HIDDEN in the tray by design - launching
+Aura.exe a second time signals the running instance to show its window
+("second launch - signaled the running instance to show its window").
+the scraped dataset reaches the installed app through the junction
+`%LOCALAPPDATA%\Aura\dataset` (created by `aura-scraper install`).
