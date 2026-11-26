@@ -434,6 +434,26 @@ namespace Aura.Views.Backiee
                 {
                     _lockScreenRefreshInterval = settings["LockScreenSlideshowInterval"].GetString() ?? "12 hours";
                 }
+
+                // a saved tick can name a platform that is gone (wallpaper cave
+                // was dropped on 2026-11-26). keeping it means the slideshow
+                // reports "not an implemented platform" on EVERY batch, which
+                // is noise for a platform that does not exist any more - so
+                // the stale tick is dropped here and written back.
+                var desktopPruned = PublicWallpaperService.PruneRemovedPlatforms(_desktopPlatforms);
+                var lockPruned = PublicWallpaperService.PruneRemovedPlatforms(_lockScreenPlatforms);
+                if (desktopPruned.Removed.Count > 0 || lockPruned.Removed.Count > 0)
+                {
+                    var dropped = desktopPruned.Removed.Concat(lockPruned.Removed).Distinct().ToList();
+                    // logged, not shown as an error line: the cleanup SUCCEEDED,
+                    // so an error banner would be a lie. the log names what was
+                    // dropped and the page's platform list no longer ticks it.
+                    ((App)Application.Current).LogInfo(
+                        $"[SlideshowSettings] removed stale platform tick(s): {string.Join(", ", dropped)} - the platform is no longer available");
+                    _desktopPlatforms = desktopPruned.Kept;
+                    _lockScreenPlatforms = lockPruned.Kept;
+                    SaveSettings();
+                }
                 
                 
                 // Restart slideshows if they were enabled

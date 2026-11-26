@@ -1252,6 +1252,39 @@ namespace Aura
                     : new List<string>();
                 string lockInterval = settings.TryGetValue("LockScreenSlideshowInterval", out var li) ? li.GetString() ?? "12 hours" : "12 hours";
 
+                // a saved tick can name a platform that is gone (wallpaper cave
+                // was dropped on 2026-11-26) - drop it once, loudly, instead of
+                // failing it on every batch.
+                var desktopPruned = PublicWallpaperService.PruneRemovedPlatforms(desktopPlatforms);
+                var lockPruned = PublicWallpaperService.PruneRemovedPlatforms(lockPlatforms);
+                if (desktopPruned.Removed.Count > 0 || lockPruned.Removed.Count > 0)
+                {
+                    var dropped = desktopPruned.Removed.Concat(lockPruned.Removed).Distinct().ToList();
+                    LogInfo($"[SlideshowSettings] removed stale platform tick(s): {string.Join(", ", dropped)} - the platform is no longer available");
+                }
+
+                desktopPlatforms = desktopPruned.Kept;
+                lockPlatforms = lockPruned.Kept;
+
+                if (desktopPruned.Removed.Count > 0 || lockPruned.Removed.Count > 0)
+                {
+                    // write the pruned lists back, so the stale tick does not
+                    // come back on the next launch
+                    try
+                    {
+                        var node = System.Text.Json.Nodes.JsonNode.Parse(json);
+                        node["DesktopSlideshowPlatforms"] = JsonSerializer.SerializeToNode(desktopPlatforms);
+                        node["LockScreenSlideshowPlatforms"] = JsonSerializer.SerializeToNode(lockPlatforms);
+                        System.IO.File.WriteAllText(
+                            settingsPath,
+                            node.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
+                    }
+                    catch (Exception writeEx)
+                    {
+                        LogInfo($"[SlideshowSettings] could not write the pruned platform list back: {writeEx.Message}");
+                    }
+                }
+
                 var dispatcherQueue = App.MainDispatcherQueue ?? DispatcherQueue;
                 var service = SlideshowService.Instance;
 

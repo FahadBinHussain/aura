@@ -1027,6 +1027,37 @@ namespace Aura.Services
                 .Subdomain ?? "www";
         }
 
+        // a SAVED slideshow tick can name a platform that is no longer there -
+        // "Wallpaper Cave" was dropped on 2026-11-26 (the domain lost its dns
+        // record). keeping the tick means every batch fails it with "not an
+        // implemented platform", which is noise for a platform that simply
+        // does not exist any more. the stale tick is dropped here and the
+        // caller reports it.
+        public static (List<string> Kept, List<string> Removed) PruneRemovedPlatforms(IEnumerable<string>? platforms)
+        {
+            var kept = new List<string>();
+            var removed = new List<string>();
+
+            foreach (var platform in platforms ?? Array.Empty<string>())
+            {
+                if (string.IsNullOrWhiteSpace(platform))
+                {
+                    continue;
+                }
+
+                if (IsImplementedPlatform(platform))
+                {
+                    kept.Add(platform);
+                }
+                else
+                {
+                    removed.Add(platform);
+                }
+            }
+
+            return (kept, removed);
+        }
+
         // the Categories scope menu: implemented AND category-capable (a rejected scope would
         // always render an empty grid)
         public static IReadOnlyList<string> GetCategoryPlatformNames()
